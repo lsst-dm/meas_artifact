@@ -22,6 +22,7 @@ import lssttools.moment as moment
 import filter as filt
 import line
 import addTrace
+import hesse_cluster as hesse
 
 # - get intersections
 
@@ -36,15 +37,15 @@ def main(rootDir, visit, ccd, frame=1, title="", scale="zscale", zoom="to fit", 
     dx = 31
     dy = 31
     feps = 0.2
-    bins = 100,100 #200, 200 #128,128 #64,64 #32,32 #128,128
+    bins = 100 #100,100 #200, 200 #128,128 #64,64 #32,32 #128,128
     navg = 1.0
     ncut = 5
-    lumcut = 0.05
-    centcut = 1.0
+    lumcut = 0.02
+    centcut = 1.2
     gradcut = 10.0
     tiles = 1
     segment = 0.01
-    lapcut = 0.2
+    lapcut = 0.3
     cell_sep = 5
     
     # make a butler and specify your dataId
@@ -217,12 +218,8 @@ def main(rootDir, visit, ccd, frame=1, title="", scale="zscale", zoom="to fit", 
     print "hesse"
     theta_tmp0 = theta[wy,wx].ravel() + np.pi/2.0
     theta_tmp = theta_tmp0.copy()
-
-    for i in range(tiles//2):
-        theta_tmp = np.append(theta_tmp, theta_tmp0 + (i+1)*segment)
-        theta_tmp = np.append(theta_tmp, theta_tmp0 - (i+1)*segment)
-    xx = np.tile(xx0[wy,wx].ravel(), tiles)
-    yy = np.tile(yy0[wy,wx].ravel(), tiles)
+    xx = xx0[wy,wx].ravel()
+    yy = yy0[wy,wx].ravel()
     
     r   = xx*np.cos(theta_tmp) + yy*np.sin(theta_tmp)
     neg = np.where(r < 0.0)[0]
@@ -231,94 +228,23 @@ def main(rootDir, visit, ccd, frame=1, title="", scale="zscale", zoom="to fit", 
     theta_tmp[cycle] -= 2.0*np.pi
     r   = xx*np.cos(theta_tmp) + yy*np.sin(theta_tmp)
 
-    #bin2d, ts, rs = hesse_bin(t_new, r_new, bins=bins, r_max=r_max)
-    
-    
     #####################################
     # locate loci in hesse space
     #####################################
-    print "Find loci"
-    bin2d, theta_edge, r_edge = np.histogram2d(theta_tmp, r, bins=bins, range=((0.0, np.pi),(0.0, max(img.shape))))
-    #bin2d = filt.fftConvolve(bin2d, np.ones((3,3)).astype(float)/9.0) #4.0, 4.0, 0.0)
-    #bin2d = filt.fftSmooth2d(bin2d, 1.0, 1.0, 0.0)
-    wypos, wxpos = np.where(bin2d > 1)
-    avgPerBin = np.mean(bin2d[wypos,wxpos])
-    thresh = max(ncut, navg*avgPerBin)
-    print "Threshold: ", len(wypos), len(theta_tmp), avgPerBin, thresh
-    locus, numLocus = ndimg.label(bin2d > thresh, structure=np.ones((3,3)))
 
-    dead_loci = set()
-    for i1 in range(numLocus):
-        t1, r1 = np.where(locus == i1 + 1)
-        t1_mean = t1.mean()
-        r1_mean = r1.mean()
-        for i2 in range(i1+1, numLocus):
-            t2, r2 = np.where(locus == i2 + 1)
-            t2_mean = t2.mean()
-            r2_mean = r2.mean()
-            dist = ((t1_mean - t2_mean)**2 + (r1_mean - r2_mean)**2)**0.5
-            if dist < cell_sep:
-                locus[t2,r2] = locus[t1[0],r1[0]]
-                dead_loci.add(i2)
-                print "merging ", i1, i2
-                
-    print "Loci: ", numLocus
-        
-    r_best     = np.array([])
-    theta_best = np.array([])
+    print "Warning: length of inputs is ", len(theta_tmp)
+    r_max = max(xx.max(), yy.max())
+    r_new, t_new, _r, _xx, _yy = hesse.hesse_iter(theta_tmp, xx, yy, niter=2)
+    bin2d, r_edge, t_edge, rs, ts, idx = hesse.hesse_bin(r_new, t_new, bins=bins, r_max=r_max, ncut=ncut, navg=navg)
+    
+    
+    numLocus = len(ts)
     xfin = []
     yfin = []
-    ts = []
-    rs = []
     for i in range(numLocus):
-        loc_t,loc_r = np.where(locus == i + 1)
-        if len(loc_t) == 0:
-            #if i in dead_loci:
-            xfin.append([])
-            yfin.append([])
-            r_best = np.append(r_best, np.array([]))
-            theta_best = np.append(theta_best, np.array([]))
-            continue
-
-
-        peak_ti, peak_ri = 0.0, 0.0
-        max_val = 0.0
-        for i in range(len(loc_t)):
-            val = bin2d[loc_t[i],loc_r[i]]
-            if val > max_val:
-                max_val = val
-                peak_ti = loc_t[i]
-                peak_ri = loc_r[i]
-        if False:
-            min_ti = loc_t.min()
-            max_ti = loc_t.max()
-            min_ri = loc_r.min()
-            max_ri = loc_r.max()
-        else:
-            min_ti = max(peak_ti-1, 0)
-            max_ti = min(peak_ti+1, bins[0]-1)
-            min_ri = max(peak_ri-1, 0)
-            max_ri = min(peak_ri+1, bins[1]-1)
-        print "min/max", min_ti, max_ti, min_ri, max_ri
-        tlo, thi = theta_edge[min_ti], theta_edge[max_ti+1]
-        ts.append((tlo, thi))
-        rlo, rhi = r_edge[min_ri], r_edge[max_ri+1]
-        rs.append((rlo, rhi))
-        nbox = len(loc_t)
-        
-        wtmp = np.where((theta_tmp > tlo) & (theta_tmp < thi) & (r > rlo) & (r < rhi))[0]
-        xfin.append(xx[wtmp])
-        yfin.append(yy[wtmp])
-
-        #tt, rr = line.butterfly(theta_tmp[wtmp], r[wtmp])
-        tt = np.median(theta_tmp[wtmp])
-        rr = np.median(r[wtmp])
-        print "%6.1f %6.1f  %6.3f %6.3f  %6.1f %6.1f   %6.3f %6.1f  %3d  %3d" % (loc_t.mean(), loc_r.mean(), 0.5*(tlo + thi), thi-tlo, 0.50*(rlo+ rhi), rhi-rlo, tt, rr,  len(wtmp), nbox)
-        r_best = np.append(r_best, rr)
-        theta_best = np.append(theta_best, tt)
-
-    dx = np.cos(theta_best)
-    dy = np.sin(theta_best)
+        print "Locus ", i, ts[i], rs[i], len(idx[i])
+        xfin.append(xx[idx[i]])
+        yfin.append(yy[idx[i]])
     offset = 60.0
 
     prod_final = cent #lap #grad #cent
@@ -346,8 +272,6 @@ def main(rootDir, visit, ccd, frame=1, title="", scale="zscale", zoom="to fit", 
     #ax.scatter(xx0[wy,wx], yy0[wy,wx], c=np.tile(prod_final[wy,wx], tiles), edgecolor='none', alpha=0.1, s=0.2)
     ax.scatter(xx0[wy,wx], yy0[wy,wx], c='k', edgecolor='none', alpha=0.1, s=0.2)
     for i in range(numLocus):
-        if i in dead_loci:
-            continue
         ax.plot(xfin[i]+offset, yfin[i]+offset, '-'+colors[i%6])
         ax.plot(xfin[i]-offset, yfin[i]-offset, '-'+colors[i%6])
     ax.set_xlim([0, img.shape[1]])
@@ -377,12 +301,13 @@ def main(rootDir, visit, ccd, frame=1, title="", scale="zscale", zoom="to fit", 
         ax = fig.add_subplot(fy,fx,4+i)
         ax.set_title("%d"%(4+i))
         ax.hlines(r_edge, xmin, xmax)
-        ax.vlines(theta_edge, ymin, ymax)
-        for j in range(len(rs)):
-            rect = Rectangle( (ts[j][0], rs[j][0]), ts[j][1]-ts[j][0], rs[j][1]-rs[j][0], facecolor="none", edgecolor='red')
+        ax.vlines(t_edge, ymin, ymax)
+        for j in range(numLocus):
+            rect = Rectangle( (ts[j]-0.1, rs[j]-10), 0.2, 20, facecolor="none", edgecolor='red')
             ax.add_patch(rect)
+        ax.imshow(bin2d, cmap='gray_r', origin='bottom', extent=(0.0, np.pi, 0.0, r_max), aspect='auto', interpolation='none')
         ax.scatter(theta_tmp, r, s=4.0, c=np.tile(prod_final[wy,wx], tiles), edgecolor='none')
-        ax.scatter(theta_best, r_best, s=100.0, marker='o', c='r', facecolor='none')
+        ax.scatter(ts, rs, s=100.0, marker='o', c='r', facecolor='none')
         ax.set_xlim([xmin,xmax])
         ax.set_ylim([ymin,ymax])
         ax.set_xlabel("$\\theta$")
