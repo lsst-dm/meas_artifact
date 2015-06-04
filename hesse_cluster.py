@@ -52,8 +52,9 @@ def hesse_cluster(theta, x, y):
     # solve for the intersections between all lines
     mm1, mm2 = np.meshgrid(m, m)
     bb1, bb2 = np.meshgrid(b, b)
-    tt = (bb2 - bb1)/(mm1 - mm2)
-    rr = bb1 + mm1*(bb2 - bb1)/(mm1 - mm2)
+    eps = 1.0e-7
+    tt = (bb2 - bb1 + eps)/(mm1 - mm2 + eps)
+    rr = bb1 + mm1*tt
 
     # replace each theta with the mean of the intersection-thetas
     wr,wt = np.where(
@@ -102,7 +103,7 @@ def hesse_iter(theta, xx, yy, niter=3):
     return r, t, _r, _xx, _yy  #t.mean(), r.mean()
 
 
-def hesse_bin(r, theta, bins=200, r_max=4096, ncut=4, navg=1.0):
+def hesse_bin(r, theta, bins=200, r_max=4096, ncut=4, navg=0.0):
 
     
     non_trivial, = np.where( (np.abs(theta) > 1.0e-3) | (np.abs(r) > 1.0e-3))

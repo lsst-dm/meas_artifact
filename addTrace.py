@@ -2,15 +2,21 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+import lssttools.functions as func
 
 class Gauss2d(object):
 
-    def __init__(self, r, theta, sigma):
+    def __init__(self, r, theta, sigma, f_wing=0.1):
         self.r = r
         self.theta = theta
         self.sigma = sigma
         self.vx = np.cos(theta)
         self.vy = np.sin(theta)
+        
+        self.f_core = 1.0 - f_wing
+        self.f_wing = f_wing
+        if self.f_wing < 0.0 or self.f_wing > 1.0:
+            raise ValueError("f_wing must be in the range 0.0 .. 1.0")
         
     def __call__(self, x, y):
 
@@ -18,7 +24,11 @@ class Gauss2d(object):
         offset = np.abs(dot - self.r)
         wy,wx = np.where(offset < 5.0*self.sigma)
         out = np.zeros(x.shape)
-        out[wy,wx] += np.exp(-offset[wy,wx]**2/(2.0*self.sigma**2))
+        A1 = 1.0/(2.0*np.pi*self.sigma**2)
+        g1 = np.exp(-offset[wy,wx]**2/(2.0*self.sigma**2))
+        A2 = 1.0/(2.0*np.pi*(2.0*self.sigma)**2)
+        g2 = np.exp(-offset[wy,wx]**2/(2.0*(2.0*self.sigma)**2))
+        out[wy,wx] += self.f_core*g1 + self.f_wing*g2
         return out
         
         

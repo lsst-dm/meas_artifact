@@ -28,24 +28,30 @@ import hesse_cluster as hesse
 
 # separate into a callable routine
 # - take an exposure, add sat-trail to mask, return list of SatelliteTrail objects (theta, r, strength?)
+#   - get moments
+#   - smooth and do a luminosity cut
+#   - get a list of satisfying xx,yy
+#   - get the list of r,theta
+#   - bin and return detections
+
 # - write a MaskSatelliteTrailsTask
 # - test on real exposure
 
 def main(rootDir, visit, ccd, frame=1, title="", scale="zscale", zoom="to fit", trans=60):
 
-    softwidth = 31
+    softwidth = 9
     dx = 31
     dy = 31
-    feps = 0.2
-    bins = 100 #100,100 #200, 200 #128,128 #64,64 #32,32 #128,128
-    navg = 1.0
-    ncut = 5
+    feps = 0.1  # this is never quite what's expected
+    bins = 256 #100,100 #200, 200 #128,128 #64,64 #32,32 #128,128
+    navg = 0.2
+    ncut = 40
     lumcut = 0.02
-    centcut = 1.2
+    centcut = 1.0
     gradcut = 10.0
     tiles = 1
     segment = 0.01
-    lapcut = 0.3
+    lapcut = 1.0
     cell_sep = 5
     
     # make a butler and specify your dataId
@@ -60,7 +66,7 @@ def main(rootDir, visit, ccd, frame=1, title="", scale="zscale", zoom="to fit", 
     print "PSF: ", psfwidth
     
     print "Loading"
-    img0 = exposure.getMaskedImage().getImage().getArray()[:1024,:]
+    img0 = exposure.getMaskedImage().getImage().getArray()[:,:]
 
     #####################################
     # Add fakes
