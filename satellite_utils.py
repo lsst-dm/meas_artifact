@@ -2,6 +2,8 @@
 
 import numpy as np
 import numpy.fft as fft
+import scipy.signal as signal
+import scipy.ndimage.filters as filt
 
 import lsst.afw.geom as afwGeom
 import lsst.afw.geom.ellipses as ellipses
@@ -34,6 +36,39 @@ def fftConvolve2d(data, kernels):
         
     return convolved
 
+
+def separableConvolve(data, vx, vy):
+    mode = 'reflect'
+    out0 = filt.correlate1d(data, vx, mode=mode)
+    out  = filt.correlate1d(out0, vy, mode=mode, axis=0)
+    return out
+
+    
+def momentConvolve2d(data, k, sigma):
+
+    gauss = np.exp(-k**2/(2.0*sigma**2))
+    
+    kk = k*k
+
+    mode = 'reflect'
+    gaussX = filt.correlate1d(data, gauss, mode=mode)
+    gaussY = filt.correlate1d(data, gauss, mode=mode, axis=0)
+    
+    norm = filt.correlate1d(gaussX, gauss, mode=mode, axis=0)
+    w = np.where(norm == 0)
+    norm[w] = 1.0e-7
+    #norm = np.outer(gauss, gauss).sum()
+    
+    ix   = filt.correlate1d(gaussY, gauss*k, mode=mode) /norm
+    iy   = filt.correlate1d(gaussX, gauss*k, mode=mode, axis=0) /norm
+    ixx  = filt.correlate1d(gaussY, gauss*kk, mode=mode) /norm
+    iyy  = filt.correlate1d(gaussX, gauss*kk, mode=mode, axis=0) /norm
+    ixy0 = filt.correlate1d(data, gauss*k, mode=mode)
+    ixy  = filt.correlate1d(ixy0, gauss*k, mode=mode, axis=0) /norm
+
+    return ix, iy, ixx, iyy, ixy
+
+    
     
 def momentToEllipse(ixx, iyy, ixy, lo_clip=1.0):
 

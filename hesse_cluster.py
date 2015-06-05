@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+import time
 
 import numpy as np
 from scipy import ndimage as ndimg
@@ -25,7 +25,7 @@ def hesse_cluster(theta, x, y):
     
     t = theta.copy()
     t2 = t + dtheta
-    
+
     # clean the thetas
     r = x*np.cos(t) + y*np.sin(t)
     neg, = np.where(r < 0.0)
@@ -37,68 +37,140 @@ def hesse_cluster(theta, x, y):
 
     xx1, xx2 = np.meshgrid(x, x)
     yy1, yy2 = np.meshgrid(y, y)
-    dd = np.sqrt( (xx1 - xx2)**2 + (yy1 - yy2)**2 )
-    
+    dx = np.abs(xx1 - xx2)
+    dy = np.abs(yy1 - yy2)
+    dd = dx + dy
+
     # convert each point to a line
-    m = (r2 - r)/(t2 - t)
-    b = (t*r2 - t2*r)/(t - t2)
+    dt_tmp = t2 - t
+    m = (r2 - r)/dt_tmp
+    b = r - t*m
     
     # get the distance between points
+    tt1, tt2 = np.meshgrid(t, t)
+    rr1, rr2 = np.meshgrid(r, r)
+    good = (np.abs(tt1 - tt2) < tdist) & (np.abs(rr1 - rr2) < rdist)
+    bad  = ~good
+    
+    # solve for the intersections between all lines
+    mm1, mm2 = np.meshgrid(m, m)
+    bb1, bb2 = np.meshgrid(b, b)
+    trace = np.arange(mm1.shape[0], dtype=int)
+    dmm = mm1 - mm2
+    dmm[trace,trace] = 1.0
+    tt = (bb2 - bb1)/dmm
+    rr = bb1 + mm1*tt
+    
+    tt[bad] = 0.0
+    rr[bad] = 0.0
+
+    w = np.zeros(tt.shape) + 1.0e-7
+    
+    # weight by the pixel distance (farther is better, less degenerate)
+    w[good] += dd[good]
+
+    # de-weight points that have moved us far from where we started
+    dtr = np.abs( (tt - theta)*(rr - r) ) + 1.0
+    w /= dtr
+
+    t_new = np.average(tt, axis=0, weights=w)
+    r_new = np.average(rr, axis=0, weights=w)
+
+    # use original values for things that didn't converge
+    t0 = (t_new < 1.0e-6)
+    t_new[t0] = theta[t0]
+    r0 = (r_new < 1.0e-6)
+    r_new[r0] = r[r0]
+
+    return r_new, t_new, r, x, y
+
+
+
+def hesse_cluster2(theta, x, y):
+    """
+    @theta  angles
+    @x     x coordinates
+    @y     y coordinates
+
+    return list of (r_i,theta_i)
+    """
+
+    rdist = 100
+    tdist = 0.15
+    
+    t = theta.copy()
+
+    
+    # clean the thetas
+    print "cleaning"
+    r = x*np.cos(t) + y*np.sin(t)
+    neg, = np.where(r < 0.0)
+    t[neg] += np.pi
+    cycle, = np.where(t > 2.0*np.pi)
+    theta[cycle] -= 2.0*np.pi
+    r = x*np.cos(t) + y*np.sin(t)
+
+
+    if 0: #True:
+        return r, t, r, x, y
+
+    print "pixel distances"
+    # get the distance in pixel space
+    xx1, xx2 = np.meshgrid(x, x)
+    yy1, yy2 = np.meshgrid(y, y)
+    dx = xx1 - xx2
+    wy,wx = np.where(dx == 0)
+    dx[wy,wx] = 1.0
+    dy = yy1 - yy2
+    dd = np.sqrt( dx*dx + dy*dy )
+
+    print "hough distances"
+    # get the distance between points in hough space
     tt1, tt2 = np.meshgrid(t, t)
     rr1, rr2 = np.meshgrid(r, r)
     dt = np.abs(tt1 - tt2)
     dr = np.abs(rr1 - rr2)
 
-    # solve for the intersections between all lines
-    mm1, mm2 = np.meshgrid(m, m)
-    bb1, bb2 = np.meshgrid(b, b)
-    eps = 1.0e-7
-    tt = (bb2 - bb1 + eps)/(mm1 - mm2 + eps)
-    rr = bb1 + mm1*tt
+    print "loop"
+    n = len(t)
+    t_new = np.zeros(n)
+    r_new = np.zeros(n)
+    t_atan = 0.0
+    t_trig = 0.0
+    for i in xrange(n):
+        w, = np.where( (dr[i,:] < rdist) & (dt[i,:] < tdist) )
 
-    # replace each theta with the mean of the intersection-thetas
-    wr,wt = np.where(
-        (~np.isnan(tt)) & (~np.isnan(rr)) &
-        (np.isfinite(tt)) & (np.isfinite(rr)) &
-        (dt < tdist) & (dr < rdist)
-    )
-    # there must be a smart way to get the complement of the wr,wt indices ... this isn't it.
-    nr, nt = np.where(
-        (np.isnan(tt)) | (np.isnan(rr)) |
-        (~np.isfinite(tt)) | (~np.isfinite(rr)) |
-        (dt > tdist) | (dr > rdist)
-    )
+        print len(w)
+        tim = time.time()
+        tt = np.arctan2(-dy[w],dx[w])
+        t_atan += time.time() - tim
+        
+        weights = dd[w] + 1.0
+        t_n = np.average(tt, weights=weights)
+        tim = time.time()
+        r_n = x[i]*np.cos(t_n) + y[i]*np.sin(t_n)
+        if r_n < 0.0:
+            t_n += np.pi
+        if t_n > 2.0*np.pi:
+            t_n -= 2.0*np.pi
+        t_new[i] = t_n
+        r_new[i] = x[i]*np.cos(t_n) + y[i]*np.sin(t_n)
+        t_trig += time.time() - tim
 
-    tt[nr,nt] = 0.0
-    rr[nr,nt] = 0.0
-
-    w = np.zeros(tt.shape)+ 1.0e-7
-    w[wr,wt] += 1.0
-
-    # weight by the pixel distance (farther is better, less degenerate)
-    w *= dd
-
-    # de-weight points that have moved us far from where we started
-    dtt = np.abs(tt - theta)
-    drr = np.abs(rr - r)
-    w /= dtt*drr + 1.0
+    print "TIME", t_atan, t_trig
+    delt = t_new -t
+    print delt.mean(), delt.std()
     
-    t_new = np.average(tt, axis=0, weights=w)
-    r_new = np.average(rr, axis=0, weights=w)
-
-    # use original values for things that didn't converge
-    t0 = np.where(np.abs(t_new) < 1.0e-6)
-    t_new[t0] = theta[t0]
-    r0 = np.where(np.abs(r_new) < 1.0e-6)
-    r_new[r0] = r[r0]
-    
+     
     return r_new, t_new, r, x, y
 
+    
 
 def hesse_iter(theta, xx, yy, niter=3):
 
     r, t, _r, _xx, _yy = hesse_cluster(theta, xx, yy)
     for i in range(niter):
+        print "hesse_iter", i
         r, t, _, _xx, _yy = hesse_cluster(t, xx, yy)
     return r, t, _r, _xx, _yy  #t.mean(), r.mean()
 
@@ -174,9 +246,9 @@ if __name__ == '__main__':
     
     # r = x*cos(t) + y*sin(t)
     # --> y = (r - x*cos(t))/sin(t)
-    #x0 = nx*np.arange(0, n)/n
-    x0 = 0.5*nx + 3.0*np.random.normal(size=n//8)
-    x0 = np.append(x0, 0.6*nx + 3.0*np.random.normal(size=n//32))
+    x0 = nx*np.arange(0, n)/n
+    #x0 = 0.5*nx + 3.0*np.random.normal(size=n//1)
+    #x0 = np.append(x0, 0.6*nx + 3.0*np.random.normal(size=n//1))
     xx = np.array([])
     yy = np.array([])
     theta = np.array([])
@@ -190,20 +262,24 @@ if __name__ == '__main__':
 
         # add a random error to theta
         theta = np.append(theta, theta0 + dtheta*np.random.normal(size=n))
-    r_max = max(xx.max(), yy.max())
+
+    r_max = 1.0
+    if len(xx):
+        r_max = max(xx.max(), yy.max())
         
     print "N: ", n
 
     # add some totally fake garbage
-    xn = np.random.uniform(nx, size=n)
-    yn = np.random.uniform(ny, size=n)
-    tn = np.random.uniform(np.pi, size=n)
+    xn = np.random.uniform(nx, size=1)
+    yn = np.random.uniform(ny, size=1)
+    tn = np.random.uniform(np.pi, size=1)
 
     xx = np.append(xx, xn)
     yy = np.append(yy, yn)
     theta = np.append(theta, tn)
-    
-    r_new, t_new, r, _xx, _yy = hesse_iter(theta, xx, yy, niter=8)
+
+    print "Running hesse_iter"
+    r_new, t_new, r, _xx, _yy = hesse_iter(theta, xx, yy, niter=2)
     print t_new.mean(), r_new.mean()
     bin2d, r_edge, t_edge, rs, ts, idx = hesse_bin(r_new, t_new, bins=bins, r_max=r_max)
 
@@ -229,12 +305,15 @@ if __name__ == '__main__':
 
     i = 0
     for r0, theta0 in zip(r0s, theta0s):
+        if i > 3:
+            break
         ax = fig.add_subplot(3,2,3 + i)
         i += 1
         ax.imshow(bin2d, cmap='gray_r', origin='bottom', extent=(0.0, np.pi, 0.0, r_max), aspect='auto', interpolation='none')
-        colors = 'r', 'b', 'c'
-        for i in range(len(ts)):
-            ax.scatter(theta[idx[i]], r[idx[i]], c=colors[i], s=20.0, marker='.', edgecolor='none')
+        colors = 'r', 'b', 'c', 'm', 'g'
+        print len(idx)
+        for j in range(len(ts)):
+            ax.scatter(theta[idx[j]], r[idx[j]], c=colors[j % 4], s=20.0, marker='.', edgecolor='none')
             ax.scatter(ts, rs, c='g', s=30.0, marker='.', edgecolor='none')
         ax.set_xlim([theta0-0.1, theta0+0.1])
         ax.set_ylim([r0 - 20, r0 + 20])
