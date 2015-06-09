@@ -194,7 +194,7 @@ def hesse_bin(r, theta, bins=200, r_max=4096, ncut=4, navg=0.0):
     thresh = max(ncut, navg*avgPerBin)
 
     locus, numLocus = ndimg.label(bin2d > thresh, structure=np.ones((3,3)))
-    print "Threshold: ", len(wrpos), len(theta), avgPerBin, thresh, numLocus
+    #print "Threshold: ", len(wrpos), len(theta), avgPerBin, thresh, numLocus
 
     rs, ts, idx = [], [], []
     for i in range(numLocus):
@@ -222,7 +222,7 @@ def hesse_bin(r, theta, bins=200, r_max=4096, ncut=4, navg=0.0):
         wtmp = np.where((theta >= tlo) & (theta < thi) & (r >= rlo) & (r < rhi))[0]
         t_tmp = np.median(theta[wtmp])
         r_tmp = np.median(r[wtmp])
-        print "%6.1f %6.1f  %6.3f %6.3f  %6.1f %6.1f   %6.3f %6.1f  %3d  %3d" % (loc_t.mean(), loc_r.mean(), 0.5*(tlo + thi), thi-tlo, 0.50*(rlo+ rhi), rhi-rlo, t_tmp, r_tmp,  len(wtmp), nbox)
+        #print "%6.1f %6.1f  %6.3f %6.3f  %6.1f %6.1f   %6.3f %6.1f  %3d  %3d" % (loc_t.mean(), loc_r.mean(), 0.5*(tlo + thi), thi-tlo, 0.50*(rlo+ rhi), rhi-rlo, t_tmp, r_tmp,  len(wtmp), nbox)
         rs.append(r_tmp)
         ts.append(t_tmp)
         idx.append(wtmp)

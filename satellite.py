@@ -5,6 +5,8 @@ import time
 import numpy as np
 import numpy.fft as fft
 
+import matplotlib.pyplot as plt
+
 import lsst.afw.image as afwImage
 import lsst.afw.geom as afwGeom
 import lsst.afw.geom.ellipses as ellipses
@@ -12,6 +14,13 @@ import lsst.afw.geom.ellipses as ellipses
 import satellite_utils as satUtil
 import hesse_cluster as hesse
 
+
+class SatelliteTrailList(list):
+    def __init__(self, nTotal, binMax):
+        self.nTotal = nTotal
+        self.binMax = binMax
+
+        
 class SatelliteTrail(object):
     def __init__(self, r, theta, flux=1.0, f_wing=0.1):
         self.r     = r
@@ -22,17 +31,28 @@ class SatelliteTrail(object):
         self.f_core = 1.0 - f_wing
         self.f_wing = f_wing
 
+        self.nAboveThresh = 0
+        self.houghBinMax = 0
         
     def setMask(self, exposure, nPsfWidth=3.0):
-        pass
 
+        msk = exposure.getMaskedImage().getMask()
+        sigma = satUtil.getExposurePsfSigma(exposure)
+        satellitePlane = msk.addMaskPlane("SATELLITE")
+        tmp = type(msk)(msk.getWidth(), msk.getHeight())
+        self.insert(tmp, sigma=sigma, maskBit=satellitePlane)
+        msk |= tmp
+        # return the number of masked pixels
+        return len(np.where(tmp.getArray() > 0)[0])
+        
     def trace(self, nx, ny, offset=0):
         x = np.arange(nx)
         y = (self.r + offset - x*self.vx)/self.vy
         w, = np.where( (x > 0) & (x < nx) & (y > 0) & (y < ny) )
         return x[w], y[w]
-        
-    def insert(self, exposure, sigma=None):
+
+
+    def insert(self, exposure, sigma=None, nSigma=7.0, maskBit=None):
 
         # Handle Exposure, Image, ndarray
         if isinstance(exposure, afwImage.ExposureF):
@@ -45,6 +65,9 @@ class SatelliteTrail(object):
             img = exposure.getArray()
             nx, ny = exposure.getWidth(), exposure.getHeight()
 
+        elif isinstance(exposure, afwImage.MaskU):
+            img = exposure.getArray()
+            nx, ny = exposure.getWidth(), exposure.getHeight()
         elif isinstance(exposure, np.ndarray):
             img = exposure
             ny, nx = img.shape
@@ -56,10 +79,7 @@ class SatelliteTrail(object):
         #############################
         # plant the trail
         #############################
-        x = np.arange(nx)
-        y = np.arange(ny)
-            
-        xx, yy = np.meshgrid(y, x)
+        xx, yy = np.meshgrid(np.arange(nx), np.arange(ny))
 
         # plant the trail using the distance from our line
         # as the parameter in a 1D DoubleGaussian
@@ -67,12 +87,15 @@ class SatelliteTrail(object):
         offset = np.abs(dot - self.r)
 
         # only bother updating the pixels within 5-sigma of the line
-        wy,wx  = np.where(offset < 5.0*sigma)
+        wy,wx  = np.where(offset < nSigma*sigma)
         A1  = 1.0/(2.0*np.pi*sigma**2)
         g1  = np.exp(-offset[wy,wx]**2/(2.0*sigma**2))
         A2  = 1.0/(2.0*np.pi*(2.0*sigma)**2)
         g2  = np.exp(-offset[wy,wx]**2/(2.0*(2.0*sigma)**2))
-        img[wy,wx] += self.flux*(self.f_core*A1*g1 + self.f_wing*A2*g2)
+        if maskBit:
+            img[wy,wx] = maskBit
+        else:
+            img[wy,wx] += self.flux*(self.f_core*A1*g1 + self.f_wing*A2*g2)
         
         return img
 
@@ -81,7 +104,7 @@ class SatelliteTrail(object):
 class SatelliteFinder(object):
 
     def __init__(self,
-                 kernelSigma = 9,
+                 kernelSigma = 15,
                  kernelSize  = 31,
                  centerLimit = 1.0,
                  eRange      = 0.1,
@@ -121,9 +144,7 @@ class SatelliteFinder(object):
         xx, yy = np.meshgrid(np.arange(img.shape[1], dtype=int), np.arange(img.shape[0], dtype=int))
         
         #   - get ellipticities and thetas
-        t = time.time()
-        center, ellip, theta, ellipCal, thetaCal = self._getMoments2(exposure)
-        print "getMoments: ", time.time() - t
+        center, ellip, theta, ellipCal, thetaCal = self._getMoments(exposure)
         
         #   - cull unsuitable pixels
         wy,wx = np.where(
@@ -133,9 +154,7 @@ class SatelliteFinder(object):
         )
         
         #   - convert suiltable pixels to hesse form (r,theta)
-        t = time.time()
         r, theta = self._hesseForm(theta[wy,wx], xx[wy,wx], yy[wy,wx])
-        print "hesseForm: ", time.time() - t
 
         self.r = r
         self.theta = theta
@@ -143,86 +162,28 @@ class SatelliteFinder(object):
         self.xx = xx[wy,wx]
         
         #   - bin and return detections
-        t = time.time()
-        rs, ts, xfin, yfin = self._houghTransform(r, theta, xx[wy,wx], yy[wy,wx])
-        print "houghTransform: ", time.time() - t
+        rs, ts, xfin, yfin, binMax = self._houghTransform(r, theta, xx[wy,wx], yy[wy,wx])
         
-        trails = []
-        for r,t in zip(rs, ts):
-            trails.append(SatelliteTrail(r, t))
+        trails = SatelliteTrailList(len(r), max(binMax))
+        for r,t,x,b in zip(rs, ts, xfin, binMax):
+            trail = SatelliteTrail(r, t)
+            trail.nAboveThresh = len(x)
+            trail.houghBinMax = b
+            trails.append(trail)
         
         return trails
 
-        
-    def _smooth(self, exposure):
-        return satUtil.separableConvolve(data, vx, vy)
+
         
     def _getMoments(self, exposure):
         """ return delta-centroid, ellip, theta """
 
         dx, dy = exposure.getWidth(), exposure.getHeight()
         img = exposure.getMaskedImage().getImage().getArray()
-        
-        #############################
-        # build the kernel
-        #############################
-        print "building the kernel"
-        kxx, kyy = np.meshgrid(self.kx, self.ky)
-        gauss = np.exp(-(kxx**2 + kyy**2)/(2.0*self.kernelSigma**2))
-        
-        xxkern = gauss*kxx**2
-        xkern  = gauss*kxx
-        yykern = gauss*kyy**2
-        ykern  = gauss*kyy
-        xykern = gauss*kxx*kyy
-
-        #############################
-        # convolve
-        #############################
-        print "convolving"
-        kernels   = gauss, xkern, ykern, xxkern, yykern, xykern
-        convolved = satUtil.fftConvolve2d(img, kernels)
-        norm, ximg, yimg, xximg, yyimg, xyimg = convolved
-
-        print "normalizing"
-        # overall image intensity will creep in through gaussian, so normalize against it
-        for tmp in ximg, yimg, xximg, yyimg, xyimg:
-            tmp /= norm
-
-            
-        ##################################
-        # make a calibration trail
-        ##################################
-        print "calibration trail"
-        calTrail = SatelliteTrail(self.kernelSize//2, 0.0)
-        cal = np.zeros((self.kernelSize, self.kernelSize))
-        calTrail.insert(cal, sigma=satUtil.getExposurePsfSigma(exposure))
-
-        # we need only one point, so just do the product and sum (i.e. no convolution)
-        norm_cal = (cal*gauss).sum()
-        xxcal = (xxkern*cal).sum()/norm_cal
-        xcal  = (xkern*cal).sum()/norm_cal
-        yycal = (yykern*cal).sum()/norm_cal
-        ycal  = (ykern*cal).sum()/norm_cal
-        xycal = (xykern*cal).sum()/norm_cal
-
-        center = np.sqrt(ximg**2 + yimg**2)
-        ellip, theta       = satUtil.momentToEllipse(xximg, yyimg, xyimg)
-        ellipCal, thetaCal = satUtil.momentToEllipse(xxcal, yycal, xycal)
-
-        return center, ellip, theta, ellipCal, thetaCal
-
-
-    def _getMoments2(self, exposure):
-        """ return delta-centroid, ellip, theta """
-
-        dx, dy = exposure.getWidth(), exposure.getHeight()
-        img = exposure.getMaskedImage().getImage().getArray()
 
         ##################################
         # make a calibration trail
         ##################################
-        print "calibration trail"
         calTrail = SatelliteTrail(self.kernelSize//2, 0.0)
         cal = np.zeros((self.kernelSize, self.kernelSize))
         calTrail.insert(cal, sigma=satUtil.getExposurePsfSigma(exposure))
@@ -239,15 +200,12 @@ class SatelliteFinder(object):
         ellip, theta       = satUtil.momentToEllipse(xximg, yyimg, xyimg)
         ellipCal, thetaCal = satUtil.momentToEllipse(xxcal, yycal, xycal)
 
-        print "Calibration", ellipCal, thetaCal
-        
         return center, ellip, theta, ellipCal, thetaCal
         
 
     def _hesseForm(self, theta, xx, yy):
         """ return r,theta """
         
-        print "hesse", len(theta)
         theta_tmp0 = theta + np.pi/2.0
         theta_tmp = theta_tmp0.copy()
         
@@ -264,37 +222,34 @@ class SatelliteFinder(object):
     def _houghTransform(self, r_in, theta_in, xx_in, yy_in):
         """ return list(SatelliteTrails) """
 
-        # things get slow with more than 1000 points
+        # things get slow with more than ~1000 points, shuffle and cut
         points = len(r_in)
         maxPoints = 1000
+        r, theta, xx, yy = np.array([]), np.array([]), np.array([]), np.array([])
         if points > maxPoints:
             idx = np.arange(points, dtype=int)
             np.random.shuffle(idx)
             idx = idx[:maxPoints]
-            r = r_in[idx]
-            theta = theta_in[idx]
-            xx = xx_in[idx]
-            yy = yy_in[idx]
-            
-        print "Hough", len(r)
+            r, theta, xx, yy = r_in[idx], theta_in[idx], xx_in[idx], yy_in[idx]
+
+        # improve the r,theta locations
+        r_new, theta_new, _r, _xx, _yy = hesse.hesse_iter(theta, xx, yy, niter=0)
+
+        # bin the data in r,theta space; get r,theta that pass our threshold as a satellite trail
         r_max = 1.0
         if len(xx):
             r_max = max(xx.max(), yy.max())
-        t = time.time()
-        r_new, t_new, _r, _xx, _yy = hesse.hesse_iter(theta, xx, yy, niter=0)
-        print "hesse_iter: ", time.time() - t
-        t = time.time()
-        bin2d, r_edge, t_edge, rs, ts, idx = hesse.hesse_bin(r_new, t_new,
-                                                             bins=self.houghBins, r_max=r_max,
-                                                             ncut=self.houghThresh)
-        print "hesse_bin: ", time.time() - t
+        bin2d, r_edge, theta_edge, rs, thetas, idx = hesse.hesse_bin(r_new, theta_new,
+                                                                     bins=self.houghBins, r_max=r_max,
+                                                                     ncut=self.houghThresh)
         
-        numLocus = len(ts)
-        xfin = []
-        yfin = []
+        numLocus = len(thetas)
+        xfin, yfin, binMax = [], [], []
         for i in range(numLocus):
-            print "Locus ", i, ts[i], rs[i], len(idx[i])
             xfin.append(xx[idx[i]])
             yfin.append(yy[idx[i]])
-            
-        return rs, ts, xfin, yfin
+            binMax.append(len(idx[i]))
+        if numLocus == 0:
+            binMax = [bin2d.max()]
+        return rs, thetas, xfin, yfin, binMax
+        

@@ -69,7 +69,7 @@ def main():
     show.append(cal)
     fig = plt.figure()
     for i, im in enumerate(show):
-        ax = fig.add_subplot(1, len(show), 1+i)
+        ax = fig.add_subplot(2, len(show)/2, 1+i)
         ax.imshow(im)
     fig.savefig("moment.png")
 

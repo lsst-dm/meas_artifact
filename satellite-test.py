@@ -49,14 +49,14 @@ def main():
 
     print "Trying to find them"
     t = time.time()
-    kernelSigma = 9    # pixels
+    kernelSigma = 15    # pixels
     kernelSize  = 31   # pixels
     centerLimit = 1.0   # about 1 pixel
     eRange      = 0.08   # about +/- 0.1
     
     houghThresh     = 40    # counts in a r,theta bins
     houghBins       = 256   # number of r,theta bins (i.e. 256x256)
-    luminosityLimit = 4.0   # low cut on pixel flux
+    luminosityLimit = 2.0   # low cut on pixel flux
     
     finder = satell.SatelliteFinder(
         kernelSigma=kernelSigma,
@@ -76,11 +76,12 @@ def main():
     
     for trail in trails_in:
         print trail.r, trail.theta
-        
+
+    print "Masking"
     for trail in satelliteTrails:
-        #trail.setMask(exposure, maskPlane)
+        trail.setMask(exp)
         print trail.r, trail.theta
-        
+    exp.writeFits("sattest.fits")
 
     fig = figure.Figure()
     can = FigCanvas(fig)
