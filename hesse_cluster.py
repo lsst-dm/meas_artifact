@@ -179,9 +179,9 @@ def hesse_bin(r, theta, bins=200, r_max=4096, ncut=4, navg=0.0):
 
     
     non_trivial, = np.where( (np.abs(theta) > 1.0e-3) | (np.abs(r) > 1.0e-3))
-    
+
     bin2d, r_edge, t_edge = np.histogram2d(r[non_trivial], theta[non_trivial],
-                                           bins=(bins,bins), range=((0.0, r_max),(0.0, np.pi)) )
+                                           bins=(bins,bins), range=((0.0, r_max),(0.0, 2.0*np.pi)) )
 
     #bin2d, r_edge, t_edge = np.histogram2d(r, theta,
     #                                       bins=(bins,bins), range=((0.0, r_max),(0.0, np.pi)) )
