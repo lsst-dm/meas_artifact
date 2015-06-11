@@ -8,10 +8,12 @@ import numpy.fft as fft
 import matplotlib.pyplot as plt
 import matplotlib.figure as figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigCanvas
+from matplotlib.patches import Rectangle
 
 import lsst.afw.image as afwImage
 import lsst.afw.geom as afwGeom
 import lsst.afw.geom.ellipses as ellipses
+import lsst.afw.math as afwMath
 
 import satellite_utils as satUtil
 import hesse_cluster as hesse
@@ -47,15 +49,18 @@ class SatelliteTrail(object):
         # return the number of masked pixels
         return len(np.where(tmp.getArray() > 0)[0])
         
-    def trace(self, nx, ny, offset=0):
+    def trace(self, nx, ny, offset=0, bins=1):
         x = np.arange(nx)
-        y = (self.r + offset - x*self.vx)/self.vy
+        y = (self.r/bins + offset - x*self.vx)/self.vy
         w, = np.where( (x > 0) & (x < nx) & (y > 0) & (y < ny) )
         return x[w], y[w]
 
 
     def insert(self, exposure, sigma=None, nSigma=7.0, maskBit=None):
 
+        if sigma < 1.0:
+            sigma = 1.0
+        
         # Handle Exposure, Image, ndarray
         if isinstance(exposure, afwImage.ExposureF):
             img = exposure.getMaskedImage().getImage().getArray()
@@ -108,8 +113,8 @@ class SatelliteFinder(object):
     def __init__(self,
                  kernelSigma = 15,
                  kernelSize  = 31,
-                 centerLimit = 1.0,
-                 eRange      = 0.1,
+                 centerLimit = 0.8,
+                 eRange      = 0.06,
                  houghThresh = 20,
                  houghBins   = 256,
                  luminosityLimit = 4.0,
@@ -130,91 +135,174 @@ class SatelliteFinder(object):
         self.luminosityLimit   = luminosityLimit
         self.luminosityMax     = luminosityMax
         
-        self.preSmooth = False
         
-        
-    def getTrails(self, exposure, width=None):
+    def getTrails(self, exposure, width=None, bins=None):
 
+        if bins:
+            exp = type(exposure)(afwMath.binImage(exposure.getMaskedImage(), bins))
+            exp.setMetadata(exposure.getMetadata())
+            exp.setPsf(exposure.getPsf())
+        else:
+            exp = exposure
+            bins = 1
+        self.bins = bins
+            
         #   - smooth 
-        img = exposure.getMaskedImage().getImage().getArray()
-        noise = img.std()
-        psfsigma = satUtil.getExposurePsfSigma(exposure)
-        k = 2*int(6.0*psfsigma) + 1
-        kk = np.arange(k) - k//2
-        gauss = (1.0/np.sqrt(2.0*np.pi))*np.exp(-kk*kk/(2.0*psfsigma))
-        img = satUtil.separableConvolve(img, gauss, gauss)
-
+        img = exp.getMaskedImage().getImage().getArray()
+        self.noise = img.std()
+        
+        psfsigma = satUtil.getExposurePsfSigma(exp)
+        img = self._smooth(img, psfsigma)
+        _msk = exp.getMaskedImage().getMask()
+        msk = _msk.getArray()
+        BAD = _msk.getPlaneBitMask("BAD")
         
         xx, yy = np.meshgrid(np.arange(img.shape[1], dtype=int), np.arange(img.shape[0], dtype=int))
         
         #   - get ellipticities and thetas
-        center, ellip, theta0, ellipCal, thetaCal = self._getMoments(exposure, width=width)
+        self.sumI, self.center, self.ellip, self.theta0, \
+            self.ellipCal, self.thetaCal = self._getMoments(exp, width=width)
         
         #   - cull unsuitable pixels
-        wy,wx = np.where(
-            np.abs( (ellip - ellipCal) < self.eRange )
-            & (img > self.luminosityLimit*noise) & (img < self.luminosityMax*noise) 
-            & (np.abs(center) < self.centerLimit)
+        self.wy,self.wx = np.where(
+            np.abs( (self.ellip - self.ellipCal) < self.eRange )
+            & (img > self.luminosityLimit*self.noise) & (img < self.luminosityMax*self.noise) 
+            & (np.abs(self.center) < self.centerLimit)
+            & ~(msk & BAD)
         )
         
         #   - convert suiltable pixels to hesse form (r,theta)
-        r, theta = self._hesseForm(theta0[wy,wx], xx[wy,wx], yy[wy,wx])
+        self.r, self.theta = self._hesseForm(self.theta0[self.wy,self.wx],
+                                             xx[self.wy,self.wx], yy[self.wy,self.wx])
 
-        self.r = r
-        self.theta = theta
-        self.yy = yy[wy,wx]
-        self.xx = xx[wy,wx]
+
+        self.yy = yy[self.wy,self.wx]
+        self.xx = xx[self.wy,self.wx]
         
         #   - bin and return detections
-        rs, ts, xfin, yfin, binMax = self._houghTransform(r, theta, xx[wy,wx], yy[wy,wx])
+        rs, ts, xfin, yfin, binMax = self._houghTransform(self.r, self.theta,
+                                                          xx[self.wy,self.wx], yy[self.wy,self.wx])
         
-        trails = SatelliteTrailList(len(r), max(binMax))
+        trails = SatelliteTrailList(len(self.r), max(binMax))
         for r,t,x,b in zip(rs, ts, xfin, binMax):
-            trail = SatelliteTrail(r, t)
+            trail = SatelliteTrail(bins*r, t)
             trail.nAboveThresh = len(x)
             trail.houghBinMax = b
             trails.append(trail)
 
+            
+        md = exp.getMetadata()
+        v, c = 0, 0
+        if 'VISIT' in md.paramNames():
+            v, c = md.get('VISIT', 0), md.get('CCD_REGISTRY', 0)
+        self._debugPlot(img, trails, "satdebug-%05d-%03d-b%02d.png" % (v, c, self.bins))
 
+        return trails
+
+        
+    def _debugPlot(self, img, trails, pngfile):
+        
         ###################################
         # a debug figure
         ###################################
         debug = True
         if debug:
 
+            dr = 100
+            dt = 0.2
+            colors = 'm', 'c', 'g', 'r'
+            
+            def font(ax):
+                for t in ax.get_xticklabels() + ax.get_yticklabels():
+                    t.set_size("xx-small")
+            
             fig = figure.Figure()
             can = FigCanvas(fig)
-            ax = fig.add_subplot(221)
+
+            # pixel plot
+            ax = fig.add_subplot(231)
             ax.imshow(np.arcsinh(img), cmap="gray", origin='lower')
-            for trail in trails:
-                ny, nx = img.shape
-                x, y = trail.trace(nx, ny, offset=20)
-                ax.plot(x, y, 'r-')
-                x, y = trail.trace(nx, ny, offset=-20)
-                ax.plot(x, y, 'r-')
-
-            ax = fig.add_subplot(222)
-            ax.plot(self.theta, self.r, 'r.', markersize=2.0)
-            for trail in trails:
-                ax.plot(trail.theta, trail.r, 'go', mfc=None)
-            ax.set_xlabel("Theta")
-            ax.set_ylabel("r")
-            ax = fig.add_subplot(223)
-            ax.plot(theta0, ellip, '.k', ms=0.3, alpha=0.2)
-            ax.set_xlabel("Theta")
-            ax.set_ylabel("e")
-
-            ax = fig.add_subplot(224)
-            ax.loglog(center[wy,wx], img[wy,wx]/noise, '.k', ms=1.0, alpha=0.5)
-            ax.set_xlabel("Center")
-            ax.set_ylabel("Flux")
+            ny, nx = img.shape
+            for i,trail in enumerate(trails):
+                x, y = trail.trace(nx, ny, offset=20, bins=self.bins)
+                ax.plot(x, y, colors[i%4]+'-')
+                x, y = trail.trace(nx, ny, offset=-20, bins=self.bins)
+                ax.plot(x, y, colors[i%4]+'-')
+            ax.set_xlim([0, nx])
+            ax.set_ylim([0, ny])
+            font(ax)
             
-            md = exposure.getMetadata()
-            v, c = md.get('VISIT', 0), md.get('CCD_REGISTRY', 0)
-            fig.savefig("satdebug-%05d-%03d.png" % (v, c))
-            
-        return trails
+            # hough  r vs theta
+            ax = fig.add_subplot(232)
+            ax.plot(self.theta, self.bins*self.r, 'k.', ms=1.0, alpha=0.5)
+            for i,trail in enumerate(trails):
+                ax.plot(trail.theta, trail.r, 'o', mfc='none', mec=colors[i%4], ms=10)
+                ax.add_patch(Rectangle( (trail.theta - dt, trail.r - dr), 2*dt, 2*dr, facecolor='none', edgecolor=colors[i%4]))
+            ax.set_xlabel("Theta", size='small')
+            ax.set_ylabel("r", size='small')
+            ax.text(0.95, 0.95, "N=%d" % (len(self.theta)), size='xx-small',
+                    horizontalalignment='right', verticalalignment='center', transform = ax.transAxes)
+            font(ax)
 
+            # e vs theta
+            ax = fig.add_subplot(233)
+            stride = int(len(self.theta0)/400)
+            if stride < 1:
+                stride = 1
+            #ax.plot(self.theta0[::stride], self.ellip[::stride], '.k', ms=0.2, alpha=0.2)
+            ax.scatter(self.theta0[::stride], self.ellip[::stride],
+                       c=np.clip(self.center[::stride], 0.0, 2.0*self.centerLimit),
+                       s=0.2, alpha=0.2, edgecolor='none')
+            ax.hlines([self.ellipCal], -np.pi/2.0, np.pi/2.0, color='m', linestyle='-')
+            ax.hlines([self.ellipCal - self.eRange], -np.pi/2.0, np.pi/2.0, color='m', linestyle='--')
+            ax.hlines([self.ellipCal + self.eRange], -np.pi/2.0, np.pi/2.0, color='m', linestyle='--')
+            ax.set_xlabel("Theta", size='small')
+            ax.set_ylabel("e", size='small')
+            ax.set_xlim([-np.pi/2.0, np.pi/2.0])
+            ax.set_ylim([0.0, 1.0])
+            font(ax)
+
+            # centroid vs flux
+            ax = fig.add_subplot(234)
+            ax.loglog(self.center[::stride], img[::stride]/self.noise, '.k', ms=1.0, alpha=0.5)
+            ax.set_xlabel("Center", size='small')
+            ax.set_ylabel("Flux", size='small')
+            ax.set_xlim([0.01, 10])
+            ax.set_ylim([0.001, 100])
+            font(ax)
+
+
+            for i,trail in enumerate(trails[0:2]):
+                ax = fig.add_subplot(2,3,5+i)
+                ax.plot(self.theta, self.bins*self.r, 'k.', ms=1.0, alpha=0.8)
+                ax.plot(trail.theta, trail.r, 'go', mfc='none', ms=20, mec=colors[i%4])
+                ax.set_xlabel("Theta", size='small')
+                ax.set_ylabel("r", size='small')
+                rmin, rmax = trail.r - dr, trail.r + dr
+                tmin, tmax = trail.theta - dt, trail.theta + dt
+                ax.set_xlim([tmin, tmax])
+                ax.set_ylim([rmin, rmax])
+                w, = np.where( (np.abs(self.theta - trail.theta) < dt) &
+                              (np.abs(self.bins*self.r - trail.r) < dr))
+                ax.text(0.95, 0.95, "N=%d" % (len(w)), size='xx-small',
+                        horizontalalignment='right', verticalalignment='center', transform = ax.transAxes)
+                font(ax)
+                
+            
+            fig.savefig(pngfile)
+            
+        
+    def _smooth(self, img, sigma):
+
+        # if we're heavily binned, we're already smoothed
+        if self.bins > 2:
+            return img
+            
+        k = 2*int(6.0*sigma) + 1
+        kk = np.arange(k) - k//2
+        gauss = (1.0/np.sqrt(2.0*np.pi))*np.exp(-kk*kk/(2.0*sigma))
+        smth = satUtil.separableConvolve(img, gauss, gauss)
+        return smth
 
         
     def _getMoments(self, exposure, width=None):
@@ -226,27 +314,42 @@ class SatelliteFinder(object):
         ##################################
         # make a calibration trail
         ##################################
-        calTrail = SatelliteTrail(self.kernelSize//2, 0.0)
+        calTrail = SatelliteTrail(self.kernelSize//2, 0)
+        #calTrail = SatelliteTrail(0.0, np.pi/4.0)
         cal = np.zeros((self.kernelSize, self.kernelSize))
         if not width:
             sigma = satUtil.getExposurePsfSigma(exposure)
+            maskBit = None
+            nSigma = 7.0
         else:
             sigma = width/2.0
-        calTrail.insert(cal, sigma=sigma)
+            maskBit = 1.0
+            nSigma = 1.0
+        calTrail.insert(cal, sigma=sigma/self.bins, maskBit=maskBit, nSigma=nSigma)
+        # make sure we smooth in exactly the same way!
+        cal = self._smooth(cal, sigma)
 
+        fig = figure.Figure()
+        can = FigCanvas(fig)
+        ax = fig.add_subplot(111)
+        ax.imshow(cal)
+        fig.savefig("junk.png")
         
+        ####################################
+        # measure both the real moments and cal image
+        ####################################
         convolved = satUtil.momentConvolve2d(img, self.kx, self.kernelSigma)
-        ximg, yimg, xximg, yyimg, xyimg = convolved
+        sumI, ximg, yimg, xximg, yyimg, xyimg = convolved
         
         convolved_cal = satUtil.momentConvolve2d(cal, self.kx, self.kernelSigma)
         xcen, ycen = self.kernelSize//2, self.kernelSize//2
-        xcal, ycal, xxcal, yycal, xycal = [c[ycen,xcen] for c in convolved_cal]
+        _, xcal, ycal, xxcal, yycal, xycal = [c[ycen,xcen] for c in convolved_cal]
 
         center = np.sqrt(ximg**2 + yimg**2)
         ellip, theta       = satUtil.momentToEllipse(xximg, yyimg, xyimg)
         ellipCal, thetaCal = satUtil.momentToEllipse(xxcal, yycal, xycal)
 
-        return center, ellip, theta, ellipCal, thetaCal
+        return sumI, center, ellip, theta, ellipCal, thetaCal
         
 
     def _hesseForm(self, theta, xx, yy):
@@ -301,7 +404,6 @@ class SatelliteFinder(object):
             yfin.append(yy[idx[i]])
             binMax.append(len(idx[i]))
         if numLocus == 0:
-            print "Max", bin2d.sum()
             binMax = [bin2d.max()]
         return rs, thetas, xfin, yfin, binMax
         

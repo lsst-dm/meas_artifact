@@ -66,7 +66,7 @@ def momentConvolve2d(data, k, sigma):
     ixy0 = filt.correlate1d(data, gauss*k, mode=mode)
     ixy  = filt.correlate1d(ixy0, gauss*k, mode=mode, axis=0) /sumI
 
-    return ix, iy, ixx, iyy, ixy
+    return sumI, ix, iy, ixx, iyy, ixy
 
     
     

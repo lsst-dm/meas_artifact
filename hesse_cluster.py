@@ -178,9 +178,12 @@ def hesse_iter(theta, xx, yy, niter=3):
 def hesse_bin(r, theta, bins=200, r_max=4096, ncut=4, navg=0.0):
 
     
-    non_trivial, = np.where( (np.abs(theta) > 1.0e-3) | (np.abs(r) > 1.0e-3))
+    non_trivial = (np.abs(theta) > 1.0e-2) & (np.abs(r) > 1.0*r_max/bins)
+    non_bleed   = np.abs(theta - np.pi/2.0) > 1.0e-2
 
-    bin2d, r_edge, t_edge = np.histogram2d(r[non_trivial], theta[non_trivial],
+    ok = non_trivial  & non_bleed
+
+    bin2d, r_edge, t_edge = np.histogram2d(r[ok], theta[ok], 
                                            bins=(bins,bins), range=((0.0, r_max),(0.0, 2.0*np.pi)) )
 
     #bin2d, r_edge, t_edge = np.histogram2d(r, theta,
