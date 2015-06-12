@@ -55,16 +55,16 @@ class SatelliteTask(pipeBase.CmdLineTask):
             width       = 100.0  #width of an out of focus aircraft
             houghThresh     = 100    # counts in a r,theta bins
         else:
-            luminosityLimit = 1.0   # low cut on pixel flux
-            luminosityMax   = 20.0  # max luminsity for pixel flux
+            luminosityLimit = 0.2   # low cut on pixel flux
+            luminosityMax   = 40.0  # max luminsity for pixel flux
             maskNPsfSigma = 7.0
             centerLimit = 0.8  # about 1 pixel
-            eRange      = 0.06  # about +/- 0.1
+            eRange      = 0.04  # about +/- 0.1
             houghBins       = 256   # number of r,theta bins (i.e. 256x256)
             kernelSigma = 11    # pixels
             kernelSize  = 21   # pixels
             width=None
-            houghThresh     = 80    # counts in a r,theta bins
+            houghThresh     = 40    # counts in a r,theta bins
         
         finder = satell.SatelliteFinder(
             kernelSigma=kernelSigma,

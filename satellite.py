@@ -119,6 +119,8 @@ class SatelliteFinder(object):
                  houghBins   = 256,
                  luminosityLimit = 4.0,
                  luminosityMax = 10.0,
+                 skewLimit   = 40.0,
+                 widthToPsfLimit = 0.4
              ):
         """ """
         
@@ -134,7 +136,8 @@ class SatelliteFinder(object):
         self.houghBins         = houghBins
         self.luminosityLimit   = luminosityLimit
         self.luminosityMax     = luminosityMax
-        
+        self.skewLimit         = skewLimit
+        self.widthToPsfLimit   = widthToPsfLimit
         
     def getTrails(self, exposure, width=None, bins=None):
 
@@ -161,7 +164,7 @@ class SatelliteFinder(object):
         
         #   - get ellipticities and thetas
         self.sumI, self.center, self.ellip, self.theta0, \
-            self.ellipCal, self.thetaCal = self._getMoments(exp, width=width)
+            self.ellipCal, self.thetaCal, self.skew, self.b = self._getMoments(exp, width=width)
         
         #   - cull unsuitable pixels
         self.wy,self.wx = np.where(
@@ -169,6 +172,8 @@ class SatelliteFinder(object):
             & (img > self.luminosityLimit*self.noise) & (img < self.luminosityMax*self.noise) 
             & (np.abs(self.center) < self.centerLimit)
             & ~(msk & BAD)
+            & (np.abs(self.skew) < self.skewLimit)
+            & (np.abs(self.b - 1.0) < self.widthToPsfLimit)
         )
         
         #   - convert suiltable pixels to hesse form (r,theta)
@@ -180,11 +185,11 @@ class SatelliteFinder(object):
         self.xx = xx[self.wy,self.wx]
         
         #   - bin and return detections
-        rs, ts, xfin, yfin, binMax = self._houghTransform(self.r, self.theta,
-                                                          xx[self.wy,self.wx], yy[self.wy,self.wx])
+        self.rs, self.ts, xfin, yfin, binMax = self._houghTransform(self.r, self.theta,
+                                                                    xx[self.wy,self.wx], yy[self.wy,self.wx])
         
         trails = SatelliteTrailList(len(self.r), max(binMax))
-        for r,t,x,b in zip(rs, ts, xfin, binMax):
+        for r,t,x,b in zip(self.rs, self.ts, xfin, binMax):
             trail = SatelliteTrail(bins*r, t)
             trail.nAboveThresh = len(x)
             trail.houghBinMax = b
@@ -264,7 +269,11 @@ class SatelliteFinder(object):
 
             # centroid vs flux
             ax = fig.add_subplot(234)
-            ax.loglog(self.center[::stride], img[::stride]/self.noise, '.k', ms=1.0, alpha=0.5)
+            ax.scatter(self.center[::stride], img[::stride]/self.noise,
+                       c=np.clip(self.skew[::stride], 0.0, self.skewLimit), marker='.', s=1.0,
+                       alpha=0.5, edgecolor='none')
+            ax.set_xscale("log")
+            ax.set_yscale("log")
             ax.set_xlabel("Center", size='small')
             ax.set_ylabel("Flux", size='small')
             ax.set_xlim([0.01, 10])
@@ -275,6 +284,7 @@ class SatelliteFinder(object):
             for i,trail in enumerate(trails[0:2]):
                 ax = fig.add_subplot(2,3,5+i)
                 ax.plot(self.theta, self.bins*self.r, 'k.', ms=1.0, alpha=0.8)
+                ax.plot(self.theta_new, self.bins*self.r_new, 'r.', ms=1.0, alpha=0.8)
                 ax.plot(trail.theta, trail.r, 'go', mfc='none', ms=20, mec=colors[i%4])
                 ax.set_xlabel("Theta", size='small')
                 ax.set_ylabel("r", size='small')
@@ -318,7 +328,7 @@ class SatelliteFinder(object):
         #calTrail = SatelliteTrail(0.0, np.pi/4.0)
         cal = np.zeros((self.kernelSize, self.kernelSize))
         if not width:
-            sigma = satUtil.getExposurePsfSigma(exposure)
+            sigma = satUtil.getExposurePsfSigma(exposure, minor=True)
             maskBit = None
             nSigma = 7.0
         else:
@@ -339,17 +349,18 @@ class SatelliteFinder(object):
         # measure both the real moments and cal image
         ####################################
         convolved = satUtil.momentConvolve2d(img, self.kx, self.kernelSigma)
-        sumI, ximg, yimg, xximg, yyimg, xyimg = convolved
+        sumI, ximg, yimg, xximg, yyimg, xyimg, x3img, y3img = convolved
         
         convolved_cal = satUtil.momentConvolve2d(cal, self.kx, self.kernelSigma)
         xcen, ycen = self.kernelSize//2, self.kernelSize//2
-        _, xcal, ycal, xxcal, yycal, xycal = [c[ycen,xcen] for c in convolved_cal]
+        _, xcal, ycal, xxcal, yycal, xycal, x3cal, y3cal = [c[ycen,xcen] for c in convolved_cal]
 
         center = np.sqrt(ximg**2 + yimg**2)
-        ellip, theta       = satUtil.momentToEllipse(xximg, yyimg, xyimg)
-        ellipCal, thetaCal = satUtil.momentToEllipse(xxcal, yycal, xycal)
-
-        return sumI, center, ellip, theta, ellipCal, thetaCal
+        ellip, theta, B       = satUtil.momentToEllipse(xximg, yyimg, xyimg)
+        skew = np.sqrt(x3img**2 + y3img**2)
+        ellipCal, thetaCal, bCal = satUtil.momentToEllipse(xxcal, yycal, xycal)
+        
+        return sumI, center, ellip, theta, ellipCal, thetaCal, skew, B/bCal
         
 
     def _hesseForm(self, theta, xx, yy):
@@ -387,13 +398,13 @@ class SatelliteFinder(object):
             r, theta, xx, yy = r_in[idx], theta_in[idx], xx_in[idx], yy_in[idx]
 
         # improve the r,theta locations
-        r_new, theta_new, _r, _xx, _yy = hesse.hesse_iter(theta, xx, yy, niter=0)
+        self.r_new, self.theta_new, _r, _xx, _yy = hesse.hesse_iter(theta, xx, yy, niter=3)
 
         # bin the data in r,theta space; get r,theta that pass our threshold as a satellite trail
         r_max = 1.0
         if len(xx):
             r_max = max(xx.max(), yy.max())
-        bin2d, r_edge, theta_edge, rs, thetas, idx = hesse.hesse_bin(r_new, theta_new,
+        bin2d, r_edge, theta_edge, rs, thetas, idx = hesse.hesse_bin(self.r_new, self.theta_new,
                                                                      bins=self.houghBins, r_max=r_max,
                                                                      ncut=self.houghThresh)
         
