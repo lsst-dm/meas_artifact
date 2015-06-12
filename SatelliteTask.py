@@ -13,6 +13,8 @@ import hsc.pipe.base.parallel as basePara
 
 basePool.Debugger().enabled = True
 
+import numpy as np
+#np.seterr(all='raise')
 
 import satellite as satell
 
@@ -26,7 +28,8 @@ class SatelliteTask(pipeBase.CmdLineTask):
         
         exposure = dataRef.get('calexp', immediate=True)
         v,c = dataRef.dataId['visit'], dataRef.dataId['ccd']
-        path = os.path.join("/home/bick/sandbox/hough/data", str(v))
+        basedir = os.environ.get('SATELLITE_DATA', '/home/bick/sandbox/hough/data')
+        path = os.path.join(basedir, str(v))
         try:
             os.mkdir(path)
         except:

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import os
 import time
 
 import numpy as np
@@ -200,7 +201,9 @@ class SatelliteFinder(object):
         v, c = 0, 0
         if 'VISIT' in md.paramNames():
             v, c = md.get('VISIT', 0), md.get('CCD_REGISTRY', 0)
-        self._debugPlot(img, trails, "satdebug-%05d-%03d-b%02d.png" % (v, c, self.bins))
+        basedir = os.environ.get("SATELLITE_DATA", "/home/bick/sandbox/hough/data")
+        path = os.path.join(basedir, "%04d" % (v))
+        self._debugPlot(img, trails, os.path.join(path,"satdebug-%05d-%03d-b%02d.png" % (v, c, self.bins)))
 
         return trails
 
@@ -339,11 +342,11 @@ class SatelliteFinder(object):
         # make sure we smooth in exactly the same way!
         cal = self._smooth(cal, sigma)
 
-        fig = figure.Figure()
-        can = FigCanvas(fig)
-        ax = fig.add_subplot(111)
-        ax.imshow(cal)
-        fig.savefig("junk.png")
+        #fig = figure.Figure()
+        #can = FigCanvas(fig)
+        #ax = fig.add_subplot(111)
+        #ax.imshow(cal)
+        #fig.savefig("junk.png")
         
         ####################################
         # measure both the real moments and cal image

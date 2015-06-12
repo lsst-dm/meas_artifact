@@ -170,7 +170,7 @@ def hesse_iter(theta, xx, yy, niter=3):
 
     r, t, _r, _xx, _yy = hesse_cluster(theta, xx, yy)
     for i in range(niter):
-        print "hesse_iter", i
+        #print "hesse_iter", i
         r, t, _, _xx, _yy = hesse_cluster(t, xx, yy)
     return r, t, _r, _xx, _yy  #t.mean(), r.mean()
 
@@ -193,7 +193,10 @@ def hesse_bin(r, theta, bins=200, r_max=4096, ncut=4, navg=0.0):
     #bin2d = filt.fftSmooth2d(bin2d, 1.0, 1.0, 0.0)
 
     wrpos, wtpos = np.where(bin2d > 1)
-    avgPerBin = np.mean(bin2d[wrpos,wtpos])
+    if len(wrpos):
+        avgPerBin = np.mean(bin2d[wrpos,wtpos])
+    else:
+        avgPerBin = 1.0
     thresh = max(ncut, navg*avgPerBin)
 
     locus, numLocus = ndimg.label(bin2d > thresh, structure=np.ones((3,3)))
@@ -283,7 +286,7 @@ if __name__ == '__main__':
 
     print "Running hesse_iter"
     r_new, t_new, r, _xx, _yy = hesse_iter(theta, xx, yy, niter=2)
-    print t_new.mean(), r_new.mean()
+    #print t_new.mean(), r_new.mean()
     bin2d, r_edge, t_edge, rs, ts, idx = hesse_bin(r_new, t_new, bins=bins, r_max=r_max)
 
     print rs, ts, bin2d.shape
