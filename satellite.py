@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import os
-import time
+import time, datetime
 
 import numpy as np
 import numpy.fft as fft
@@ -143,6 +143,8 @@ class SatelliteFinder(object):
     def getTrails(self, exposure, width=None, bins=None):
 
         if bins:
+            #exp2 = type(exposure)(exposure, afwGeom.Box2I(afwGeom.Point2I(0,0), afwGeom.Extent2I(600,2000)))
+            #exposure = exp2
             exp = type(exposure)(afwMath.binImage(exposure.getMaskedImage(), bins))
             exp.setMetadata(exposure.getMetadata())
             exp.setPsf(exposure.getPsf())
@@ -162,21 +164,27 @@ class SatelliteFinder(object):
         BAD = _msk.getPlaneBitMask("BAD")
         
         xx, yy = np.meshgrid(np.arange(img.shape[1], dtype=int), np.arange(img.shape[0], dtype=int))
-        
+
+        print "getMoments"
         #   - get ellipticities and thetas
-        self.sumI, self.center, self.ellip, self.theta0, \
-            self.ellipCal, self.thetaCal, self.skew, self.b = self._getMoments(exp, width=width)
-        
+        self.sumI, self.center, self.center_perp, self.ellip, self.theta0, \
+            self.ellipCal, self.thetaCal, \
+            self.skew, self.skew_perp, self.b = self._getMoments(exp, width=width)
+
+        print "... where ... "
         #   - cull unsuitable pixels
         self.wy,self.wx = np.where(
-            np.abs( (self.ellip - self.ellipCal) < self.eRange )
+            ( np.abs(self.ellip - self.ellipCal) < self.eRange )
             & (img > self.luminosityLimit*self.noise) & (img < self.luminosityMax*self.noise) 
-            & (np.abs(self.center) < self.centerLimit)
+            & (np.abs(self.center_perp) < self.centerLimit)
+            & (np.abs(self.center) < 2.0*self.centerLimit)
             & ~(msk & BAD)
-            & (np.abs(self.skew) < self.skewLimit)
+            & (np.abs(self.skew_perp) < self.skewLimit)
+            & (np.abs(self.skew) < 2.0*self.skewLimit)
             & (np.abs(self.b - 1.0) < self.widthToPsfLimit)
         )
-        
+
+        print "hesse"
         #   - convert suiltable pixels to hesse form (r,theta)
         self.r, self.theta = self._hesseForm(self.theta0[self.wy,self.wx],
                                              xx[self.wy,self.wx], yy[self.wy,self.wx])
@@ -184,13 +192,15 @@ class SatelliteFinder(object):
 
         self.yy = yy[self.wy,self.wx]
         self.xx = xx[self.wy,self.wx]
-        
+
+        print "Hough"
         #   - bin and return detections
-        self.rs, self.ts, xfin, yfin, binMax = self._houghTransform(self.r, self.theta,
-                                                                    xx[self.wy,self.wx], yy[self.wy,self.wx])
+        self.rs, self.ts, self.xfin, self.yfin, binMax = self._houghTransform(self.r, self.theta,
+                                                                              xx[self.wy,self.wx],
+                                                                              yy[self.wy,self.wx])
         
         trails = SatelliteTrailList(len(self.r), max(binMax))
-        for r,t,x,b in zip(self.rs, self.ts, xfin, binMax):
+        for r,t,x,b in zip(self.rs, self.ts, self.xfin, binMax):
             trail = SatelliteTrail(bins*r, t)
             trail.nAboveThresh = len(x)
             trail.houghBinMax = b
@@ -203,6 +213,11 @@ class SatelliteFinder(object):
             v, c = md.get('VISIT', 0), md.get('CCD_REGISTRY', 0)
         basedir = os.environ.get("SATELLITE_DATA", "/home/bick/sandbox/hough/data")
         path = os.path.join(basedir, "%04d" % (v))
+        try:
+            os.mkdir(path)
+        except:
+            pass
+        print "plotting"
         self._debugPlot(img, trails, os.path.join(path,"satdebug-%05d-%03d-b%02d.png" % (v, c, self.bins)))
 
         return trails
@@ -213,6 +228,7 @@ class SatelliteFinder(object):
         ###################################
         # a debug figure
         ###################################
+        py, px = 2, 4
         debug = True
         if debug:
 
@@ -226,41 +242,48 @@ class SatelliteFinder(object):
             
             fig = figure.Figure()
             can = FigCanvas(fig)
+            fig.suptitle(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
             # pixel plot
-            ax = fig.add_subplot(231)
+            ax = fig.add_subplot(py, px, 1)
             ax.imshow(np.arcsinh(img), cmap="gray", origin='lower')
+            ax.plot(self.xx, self.yy, 'r.', ms=1.0)
             ny, nx = img.shape
             for i,trail in enumerate(trails):
-                x, y = trail.trace(nx, ny, offset=20, bins=self.bins)
+                x, y = trail.trace(nx, ny, offset=30, bins=self.bins)
                 ax.plot(x, y, colors[i%4]+'-')
-                x, y = trail.trace(nx, ny, offset=-20, bins=self.bins)
+                x, y = trail.trace(nx, ny, offset=-30, bins=self.bins)
                 ax.plot(x, y, colors[i%4]+'-')
             ax.set_xlim([0, nx])
             ax.set_ylim([0, ny])
             font(ax)
             
             # hough  r vs theta
-            ax = fig.add_subplot(232)
+            ax = fig.add_subplot(py, px, 2)
             ax.plot(self.theta, self.bins*self.r, 'k.', ms=1.0, alpha=0.5)
             for i,trail in enumerate(trails):
                 ax.plot(trail.theta, trail.r, 'o', mfc='none', mec=colors[i%4], ms=10)
                 ax.add_patch(Rectangle( (trail.theta - dt, trail.r - dr), 2*dt, 2*dr, facecolor='none', edgecolor=colors[i%4]))
             ax.set_xlabel("Theta", size='small')
             ax.set_ylabel("r", size='small')
+            ax.set_xlim([0.0, 2.0*np.pi])
+            ax.set_ylim([0.0, ny])
             ax.text(0.95, 0.95, "N=%d" % (len(self.theta)), size='xx-small',
                     horizontalalignment='right', verticalalignment='center', transform = ax.transAxes)
             font(ax)
 
             # e vs theta
-            ax = fig.add_subplot(233)
-            stride = int(len(self.theta0)/400)
+            ax = fig.add_subplot(py, px, 3)
+            stride = int(1.0*self.theta0.size/20000)
             if stride < 1:
                 stride = 1
             #ax.plot(self.theta0[::stride], self.ellip[::stride], '.k', ms=0.2, alpha=0.2)
             ax.scatter(self.theta0[::stride], self.ellip[::stride],
                        c=np.clip(self.center[::stride], 0.0, 2.0*self.centerLimit),
-                       s=0.2, alpha=0.2, edgecolor='none')
+                       s=0.4, alpha=0.4, edgecolor='none')
+            ax.scatter(self.theta0[self.wy,self.wx], self.ellip[self.wy,self.wx],
+                       c=np.clip(self.center[self.wy,self.wx], 0.0, 2.0*self.centerLimit),
+                       s=0.8, alpha=0.8, edgecolor='none')
             ax.hlines([self.ellipCal], -np.pi/2.0, np.pi/2.0, color='m', linestyle='-')
             ax.hlines([self.ellipCal - self.eRange], -np.pi/2.0, np.pi/2.0, color='m', linestyle='--')
             ax.hlines([self.ellipCal + self.eRange], -np.pi/2.0, np.pi/2.0, color='m', linestyle='--')
@@ -268,13 +291,17 @@ class SatelliteFinder(object):
             ax.set_ylabel("e", size='small')
             ax.set_xlim([-np.pi/2.0, np.pi/2.0])
             ax.set_ylim([0.0, 1.0])
+            #ax.set_ylim([self.ellipCal-3.0*self.eRange, self.ellipCal+3.0*self.eRange])
             font(ax)
 
             # centroid vs flux
-            ax = fig.add_subplot(234)
+            ax = fig.add_subplot(py, px, 4)
             ax.scatter(self.center[::stride], img[::stride]/self.noise,
-                       c=np.clip(self.skew[::stride], 0.0, self.skewLimit), marker='.', s=1.0,
+                       c=np.clip(self.center_perp[::stride], 0.0, 2.0*self.centerLimit), marker='.', s=1.0,
                        alpha=0.5, edgecolor='none')
+            ax.scatter(self.center[self.wy,self.wx], img[self.wy,self.wx]/self.noise,
+                       c=np.clip(self.center_perp[self.wy,self.wx], 0.0, 2.0*self.centerLimit),
+                       s=2.0, alpha=1.0, edgecolor='none')
             ax.set_xscale("log")
             ax.set_yscale("log")
             ax.set_xlabel("Center", size='small')
@@ -284,11 +311,29 @@ class SatelliteFinder(object):
             font(ax)
 
 
-            for i,trail in enumerate(trails[0:2]):
-                ax = fig.add_subplot(2,3,5+i)
+            # b versus skew
+            ax = fig.add_subplot(py, px, 5)
+            ax.scatter(self.skew, self.b,
+                       c=np.clip(self.center, 0.0, 2.0*self.centerLimit), marker='.', s=2.0,
+                       alpha=0.5, edgecolor='none')
+            ax.scatter(self.skew[self.wy,self.wx], self.b[self.wy,self.wx],
+                       c=np.clip(self.center[self.wy,self.wx], 0.0, 2.0*self.centerLimit), marker='.', s=4.0,
+                       alpha=1.0, edgecolor='none')
+            ax.vlines([self.skewLimit], 0, 3.0, linestyle='--', color='k')
+            ax.hlines([1.0 - self.widthToPsfLimit, 1.0+self.widthToPsfLimit],
+                      0, 3.0*self.skewLimit, linestyle='--', color='k')
+            ax.set_xlabel("Skew", size='small')
+            ax.set_ylabel("B", size='small')
+            ax.set_xlim([0.0, 3.0*self.skewLimit])
+            ax.set_ylim([0.0, 2.0])
+            font(ax)
+
+            
+            for i,trail in enumerate(trails[0:px*py-5]):
+                ax = fig.add_subplot(py,px,6+1*i)
                 ax.plot(self.theta, self.bins*self.r, 'k.', ms=1.0, alpha=0.8)
                 ax.plot(self.theta_new, self.bins*self.r_new, 'r.', ms=1.0, alpha=0.8)
-                ax.plot(trail.theta, trail.r, 'go', mfc='none', ms=20, mec=colors[i%4])
+                ax.plot(trail.theta, trail.r, 'o', mfc='none', ms=20, mec=colors[i%4])
                 ax.set_xlabel("Theta", size='small')
                 ax.set_ylabel("r", size='small')
                 rmin, rmax = trail.r - dr, trail.r + dr
@@ -296,11 +341,15 @@ class SatelliteFinder(object):
                 ax.set_xlim([tmin, tmax])
                 ax.set_ylim([rmin, rmax])
                 w, = np.where( (np.abs(self.theta - trail.theta) < dt) &
-                              (np.abs(self.bins*self.r - trail.r) < dr))
+                               (np.abs(self.bins*self.r - trail.r) < dr))
+                w_new, = np.where( (np.abs(self.theta_new - trail.theta) < dt) &
+                                   (np.abs(self.bins*self.r_new - trail.r) < dr))
                 ax.text(0.95, 0.95, "N=%d" % (len(w)), size='xx-small',
                         horizontalalignment='right', verticalalignment='center', transform = ax.transAxes)
+                ax.text(0.95, 0.90, "N=%d" % (len(w_new)), size='xx-small',color = 'r',
+                        horizontalalignment='right', verticalalignment='center', transform = ax.transAxes)
                 font(ax)
-                
+
             
             fig.savefig(pngfile)
             
@@ -308,7 +357,7 @@ class SatelliteFinder(object):
     def _smooth(self, img, sigma):
 
         # if we're heavily binned, we're already smoothed
-        if self.bins > 2:
+        if self.bins > 4:
             return img
             
         k = 2*int(6.0*sigma) + 1
@@ -360,10 +409,11 @@ class SatelliteFinder(object):
 
         center = np.sqrt(ximg**2 + yimg**2)
         ellip, theta, B       = satUtil.momentToEllipse(xximg, yyimg, xyimg)
+        center_perp = np.abs(ximg*np.sin(theta) - yimg*np.cos(theta))
         skew = np.sqrt(x3img**2 + y3img**2)
+        skew_perp = np.abs(x3img*np.sin(theta) - y3img*np.cos(theta))
         ellipCal, thetaCal, bCal = satUtil.momentToEllipse(xxcal, yycal, xycal)
-        
-        return sumI, center, ellip, theta, ellipCal, thetaCal, skew, B/bCal
+        return sumI, center, center_perp, ellip, theta, ellipCal, thetaCal, skew, skew_perp, B/bCal
         
 
     def _hesseForm(self, theta, xx, yy):
@@ -406,7 +456,7 @@ class SatelliteFinder(object):
         # bin the data in r,theta space; get r,theta that pass our threshold as a satellite trail
         r_max = 1.0
         if len(xx):
-            r_max = max(xx.max(), yy.max())
+            r_max = np.sqrt(xx.max()**2 + yy.max()**2)
         bin2d, r_edge, theta_edge, rs, thetas, idx = hesse.hesse_bin(self.r_new, self.theta_new,
                                                                      bins=self.houghBins, r_max=r_max,
                                                                      ncut=self.houghThresh)

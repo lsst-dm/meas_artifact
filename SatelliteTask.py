@@ -29,7 +29,7 @@ class SatelliteTask(pipeBase.CmdLineTask):
         exposure = dataRef.get('calexp', immediate=True)
         v,c = dataRef.dataId['visit'], dataRef.dataId['ccd']
         basedir = os.environ.get('SATELLITE_DATA', '/home/bick/sandbox/hough/data')
-        path = os.path.join(basedir, str(v))
+        path = os.path.join(basedir, "%04d" %(v))
         try:
             os.mkdir(path)
         except:
@@ -47,27 +47,31 @@ class SatelliteTask(pipeBase.CmdLineTask):
     def runSatellite(self, exposure, bins=None, broadTrail=False, log=None):
             
         if broadTrail:
-            luminosityLimit = 0.2   # low cut on pixel flux
-            luminosityMax = 2.0
+            luminosityLimit = 0.01   # low cut on pixel flux
+            luminosityMax = 4.0
             maskNPsfSigma = 3.0*bins
-            centerLimit = 1.2   # about 1 pixel
-            eRange      = 0.1  # about +/- 0.1
+            centerLimit = 2.0   # about 1 pixel
+            eRange      = 0.04  # about +/- 0.1
             houghBins      = 128   # number of r,theta bins (i.e. 256x256)
-            kernelSigma = 31    # pixels
-            kernelSize  = 51   # pixels
-            width       = 100.0  #width of an out of focus aircraft
-            houghThresh     = 100    # counts in a r,theta bins
+            kernelSigma = 21    # pixels
+            kernelSize  = 41   # pixels
+            width       = 60.0 #100.0  #width of an out of focus aircraft (unbinned)
+            houghThresh     = 40    # counts in a r,theta bins
+            skewLimit   = 200.0
+            widthToPsfLimit = 0.2
         else:
-            luminosityLimit = 0.2   # low cut on pixel flux
-            luminosityMax   = 40.0  # max luminsity for pixel flux
+            luminosityLimit = 0.1   # low cut on pixel flux
+            luminosityMax   = 80.0  # max luminsity for pixel flux
             maskNPsfSigma = 7.0
-            centerLimit = 0.8  # about 1 pixel
+            centerLimit = 1.0  # about 1 pixel
             eRange      = 0.04  # about +/- 0.1
             houghBins       = 256   # number of r,theta bins (i.e. 256x256)
-            kernelSigma = 11    # pixels
-            kernelSize  = 21   # pixels
+            kernelSigma = 9    # pixels
+            kernelSize  = 17   # pixels
             width=None
             houghThresh     = 40    # counts in a r,theta bins
+            skewLimit       = 20.0
+            widthToPsfLimit = 0.15
         
         finder = satell.SatelliteFinder(
             kernelSigma=kernelSigma,
@@ -77,7 +81,9 @@ class SatelliteTask(pipeBase.CmdLineTask):
             houghThresh=houghThresh,
             houghBins=houghBins,
             luminosityLimit=luminosityLimit,
-            luminosityMax=luminosityMax
+            luminosityMax=luminosityMax,
+            skewLimit=skewLimit,
+            widthToPsfLimit=widthToPsfLimit
         )
 
         satelliteTrails = finder.getTrails(exposure, bins=bins, width=width)

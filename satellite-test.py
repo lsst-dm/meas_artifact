@@ -66,7 +66,9 @@ def main():
         eRange=eRange,
         houghThresh=houghThresh,
         houghBins=houghBins,
-        luminosityLimit=luminosityLimit
+        luminosityLimit=luminosityLimit,
+        skewLimit=50.0,
+        widthToPsfLimit=0.4,
     )
 
     satelliteTrails = finder.getTrails(exp)
