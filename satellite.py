@@ -21,9 +21,10 @@ import hesse_cluster as hesse
 
 
 class SatelliteTrailList(list):
-    def __init__(self, nTotal, binMax):
+    def __init__(self, nTotal, binMax, psfSigma):
         self.nTotal = nTotal
         self.binMax = binMax
+        self.psfSigma = psfSigma
 
         
 class SatelliteTrail(object):
@@ -67,7 +68,7 @@ class SatelliteTrail(object):
             img = exposure.getMaskedImage().getImage().getArray()
             nx, ny = exposure.getWidth(), exposure.getHeight()
             if sigma is None:
-                sigma = satUtil.getExposurePsfSigma(exposure)
+                sigma = satUtil.getExposurePsfSigma(exposure, minor=True)
                 
         elif isinstance(exposure, afwImage.ImageF):
             img = exposure.getArray()
@@ -139,6 +140,7 @@ class SatelliteFinder(object):
         self.luminosityMax     = luminosityMax
         self.skewLimit         = skewLimit
         self.widthToPsfLimit   = widthToPsfLimit
+        self.bRatio            = 1.0
         
     def getTrails(self, exposure, width=None, bins=None):
 
@@ -157,11 +159,15 @@ class SatelliteFinder(object):
         img = exp.getMaskedImage().getImage().getArray()
         self.noise = img.std()
         
-        psfsigma = satUtil.getExposurePsfSigma(exp)
-        img = self._smooth(img, psfsigma)
+        psfsigma = satUtil.getExposurePsfSigma(exp, minor=True)
+        print "PSF sigma: ", psfsigma
+        self.sigmaSmooth = 2.0
+        img = self._smooth(img, self.sigmaSmooth)
         _msk = exp.getMaskedImage().getMask()
         msk = _msk.getArray()
         BAD = _msk.getPlaneBitMask("BAD")
+        CR = _msk.getPlaneBitMask("CR")
+        SAT = _msk.getPlaneBitMask("SAT")
         
         xx, yy = np.meshgrid(np.arange(img.shape[1], dtype=int), np.arange(img.shape[0], dtype=int))
 
@@ -178,10 +184,10 @@ class SatelliteFinder(object):
             & (img > self.luminosityLimit*self.noise) & (img < self.luminosityMax*self.noise) 
             & (np.abs(self.center_perp) < self.centerLimit)
             & (np.abs(self.center) < 2.0*self.centerLimit)
-            & ~(msk & BAD)
+            & ~(msk & BAD) & ~(msk & CR) & ~(msk & SAT)
             & (np.abs(self.skew_perp) < self.skewLimit)
             & (np.abs(self.skew) < 2.0*self.skewLimit)
-            & (np.abs(self.b - 1.0) < self.widthToPsfLimit)
+            & (np.abs(self.b - self.bRatio) < self.widthToPsfLimit)
         )
 
         print "hesse"
@@ -199,8 +205,9 @@ class SatelliteFinder(object):
                                                                               xx[self.wy,self.wx],
                                                                               yy[self.wy,self.wx])
         
-        trails = SatelliteTrailList(len(self.r), max(binMax))
+        trails = SatelliteTrailList(len(self.r), max(binMax), psfsigma)
         for r,t,x,b in zip(self.rs, self.ts, self.xfin, binMax):
+            print "Trail: ", bins*r, t, len(x), b
             trail = SatelliteTrail(bins*r, t)
             trail.nAboveThresh = len(x)
             trail.houghBinMax = b
@@ -320,7 +327,7 @@ class SatelliteFinder(object):
                        c=np.clip(self.center[self.wy,self.wx], 0.0, 2.0*self.centerLimit), marker='.', s=4.0,
                        alpha=1.0, edgecolor='none')
             ax.vlines([self.skewLimit], 0, 3.0, linestyle='--', color='k')
-            ax.hlines([1.0 - self.widthToPsfLimit, 1.0+self.widthToPsfLimit],
+            ax.hlines([self.bRatio - self.widthToPsfLimit, self.bRatio+self.widthToPsfLimit],
                       0, 3.0*self.skewLimit, linestyle='--', color='k')
             ax.set_xlabel("Skew", size='small')
             ax.set_ylabel("B", size='small')
@@ -359,7 +366,7 @@ class SatelliteFinder(object):
         # if we're heavily binned, we're already smoothed
         if self.bins > 4:
             return img
-            
+
         k = 2*int(6.0*sigma) + 1
         kk = np.arange(k) - k//2
         gauss = (1.0/np.sqrt(2.0*np.pi))*np.exp(-kk*kk/(2.0*sigma))
@@ -380,16 +387,18 @@ class SatelliteFinder(object):
         #calTrail = SatelliteTrail(0.0, np.pi/4.0)
         cal = np.zeros((self.kernelSize, self.kernelSize))
         if not width:
-            sigma = satUtil.getExposurePsfSigma(exposure, minor=True)
+            sigmaInsert = satUtil.getExposurePsfSigma(exposure, minor=True)
+            sigmaSmooth = self.sigmaSmooth
             maskBit = None
             nSigma = 7.0
         else:
-            sigma = width/2.0
+            sigmaInsert = width/2.0
+            sigmaSmooth = width/2.0
             maskBit = 1.0
             nSigma = 1.0
-        calTrail.insert(cal, sigma=sigma/self.bins, maskBit=maskBit, nSigma=nSigma)
+        calTrail.insert(cal, sigma=sigmaInsert/self.bins, maskBit=maskBit, nSigma=nSigma)
         # make sure we smooth in exactly the same way!
-        cal = self._smooth(cal, sigma)
+        cal = self._smooth(cal, sigmaSmooth)
 
         #fig = figure.Figure()
         #can = FigCanvas(fig)
@@ -428,35 +437,55 @@ class SatelliteFinder(object):
         theta_tmp0 = theta_tmp0 + np.pi/2.0
         theta_tmp = theta_tmp0.copy()
 
-        r   = xx*np.cos(theta_tmp) + yy*np.sin(theta_tmp)
-        neg = np.where(r < 0.0)[0]
+        r0   = xx*np.cos(theta_tmp) + yy*np.sin(theta_tmp)
+        neg = np.where(r0 < 0.0)[0]
         theta_tmp[neg] += np.pi
         cycle = np.where(theta_tmp > 2.0*np.pi)[0]
         theta_tmp[cycle] -= 2.0*np.pi
-        r   = xx*np.cos(theta_tmp) + yy*np.sin(theta_tmp)
-        return r, theta_tmp
+        r0   = xx*np.cos(theta_tmp) + yy*np.sin(theta_tmp)
+        
+        return r0, theta_tmp
         
 
     def _houghTransform(self, r_in, theta_in, xx_in, yy_in):
         """ return list(SatelliteTrails) """
 
+        # wrap theta~0 to above 2pi y     # wrap theta~2pi to near near
+        thresh = 0.2
+        w_0,   = np.where( theta_in < thresh )
+        w_2pi, = np.where( 2.0*np.pi - theta_in < thresh )
+
+        r0     = np.append(r_in,   r_in[w_0]) 
+        theta0 = np.append(theta_in, theta_in[w_0] + 2.0*np.pi)
+        xx0    = np.append(xx_in,  xx_in[w_0])
+        yy0    = np.append(yy_in,  yy_in[w_0])
+        
+        r0     = np.append(r0,     r_in[w_2pi])    
+        theta0 = np.append(theta0, theta_in[w_2pi] - 2.0*np.pi)
+        xx0    = np.append(xx0,    xx_in[w_2pi])
+        yy0    = np.append(yy0,    yy_in[w_2pi])
+
+        
         # things get slow with more than ~1000 points, shuffle and cut
-        points = len(r_in)
+        points = len(r0)
         maxPoints = 1000
-        r, theta, xx, yy = r_in, theta_in, xx_in, yy_in
+
+        r, theta, xx, yy = r0, theta0, xx0, yy0
         if points > maxPoints:
             idx = np.arange(points, dtype=int)
             np.random.shuffle(idx)
             idx = idx[:maxPoints]
-            r, theta, xx, yy = r_in[idx], theta_in[idx], xx_in[idx], yy_in[idx]
+            r, theta, xx, yy = r0[idx], theta0[idx], xx0[idx], yy0[idx]
 
+            
         # improve the r,theta locations
         self.r_new, self.theta_new, _r, _xx, _yy = hesse.hesse_iter(theta, xx, yy, niter=3)
 
-        # bin the data in r,theta space; get r,theta that pass our threshold as a satellite trail
         r_max = 1.0
         if len(xx):
             r_max = np.sqrt(xx.max()**2 + yy.max()**2)
+                
+        # bin the data in r,theta space; get r,theta that pass our threshold as a satellite trail
         bin2d, r_edge, theta_edge, rs, thetas, idx = hesse.hesse_bin(self.r_new, self.theta_new,
                                                                      bins=self.houghBins, r_max=r_max,
                                                                      ncut=self.houghThresh)

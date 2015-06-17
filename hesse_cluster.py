@@ -24,15 +24,16 @@ def hesse_cluster(theta, x, y):
     tdist = 0.15
     
     t = theta.copy()
-    t2 = t + dtheta
 
     # clean the thetas
     r = x*np.cos(t) + y*np.sin(t)
     neg, = np.where(r < 0.0)
     t[neg] += np.pi
-    cycle, = np.where(t > 2.0*np.pi)
-    theta[cycle] -= 2.0*np.pi
+    cycle, = np.where(t > 2.0*np.pi + 0.2)
+    t[cycle] -= 2.0*np.pi
     r = x*np.cos(t) + y*np.sin(t)
+    
+    t2 = t + dtheta
     r2 = x*np.cos(t2) + y*np.sin(t2)
 
     xx1, xx2 = np.meshgrid(x, x)
@@ -42,8 +43,7 @@ def hesse_cluster(theta, x, y):
     dd = dx + dy
 
     # convert each point to a line
-    dt_tmp = t2 - t
-    m = (r2 - r)/dt_tmp
+    m = (r2 - r)/dtheta
     b = r - t*m
     
     # get the distance between points
@@ -58,6 +58,8 @@ def hesse_cluster(theta, x, y):
     trace = np.arange(mm1.shape[0], dtype=int)
     dmm = mm1 - mm2
     dmm[trace,trace] = 1.0
+    parallel = np.where(np.abs(dmm) < 0.01)
+    dmm[parallel] = 1.0
     tt = (bb2 - bb1)/dmm
     rr = bb1 + mm1*tt
     
@@ -70,7 +72,7 @@ def hesse_cluster(theta, x, y):
     w[good] += dd[good]
 
     # de-weight points that have moved us far from where we started
-    dtr = np.abs( (tt - theta)*(rr - r) ) + 1.0
+    dtr = np.abs( (tt - t)*(rr - r) ) + 1.0
     w /= dtr
 
     t_new = np.average(tt, axis=0, weights=w)
@@ -78,7 +80,7 @@ def hesse_cluster(theta, x, y):
 
     # use original values for things that didn't converge
     t0 = (t_new < 1.0e-6)
-    t_new[t0] = theta[t0]
+    t_new[t0] = t[t0]
     r0 = (r_new < 1.0e-6)
     r_new[r0] = r[r0]
 
@@ -175,16 +177,33 @@ def hesse_iter(theta, xx, yy, niter=3):
     return r, t, _r, _xx, _yy  #t.mean(), r.mean()
 
 
-def hesse_bin(r, theta, bins=200, r_max=4096, ncut=4, navg=0.0):
+def hesse_bin(r0, theta0, bins=200, r_max=4096, ncut=4, navg=0.0):
 
+    r = r0
+    theta = theta0
+    
+    thresh = 0.4
+    # wrap theta~0 to above 2pi y     # wrap theta~2pi to near near
+    #w_0,   = np.where( theta < 0.2 )
+    #w_2pi, = np.where( 2.0*np.pi - theta < thresh )
+    
+    #r = np.append(r0, r0[w_0])    
+    #theta = np.append(theta0, theta0[w_0] + 2.0*np.pi)
+    #r = np.append(r, r0[w_2pi])    
+    #theta = np.append(theta, theta0[w_2pi] - 2.0*np.pi)
+
+    #w = np.arange(len(theta))
+    #w = np.append(w, w_0)
+    #w = np.append(w, w_2pi)
     
     non_trivial = (np.abs(theta) > 1.0e-2) & (np.abs(r) > 1.0*r_max/bins)
     non_bleed   = np.abs(theta - np.pi/2.0) > 1.0e-2
 
     ok = non_trivial  & non_bleed
 
+                  
     bin2d, r_edge, t_edge = np.histogram2d(r[ok], theta[ok], 
-                                           bins=(bins,bins), range=((0.0, r_max),(0.0, 2.0*np.pi)) )
+                                           bins=(bins,bins), range=((0.0, r_max),(-thresh, thresh+2.0*np.pi)) )
 
     #bin2d, r_edge, t_edge = np.histogram2d(r, theta,
     #                                       bins=(bins,bins), range=((0.0, r_max),(0.0, np.pi)) )
@@ -229,9 +248,16 @@ def hesse_bin(r, theta, bins=200, r_max=4096, ncut=4, navg=0.0):
         t_tmp = np.median(theta[wtmp])
         r_tmp = np.median(r[wtmp])
         #print "%6.1f %6.1f  %6.3f %6.3f  %6.1f %6.1f   %6.3f %6.1f  %3d  %3d" % (loc_t.mean(), loc_r.mean(), 0.5*(tlo + thi), thi-tlo, 0.50*(rlo+ rhi), rhi-rlo, t_tmp, r_tmp,  len(wtmp), nbox)
+
+        # don't accept theta < 0 or > 2pi
+        if t_tmp < 0.0 or t_tmp > 2.0*np.pi:
+            continue
+            
         rs.append(r_tmp)
         ts.append(t_tmp)
-        idx.append(wtmp)
+
+        w = np.where((theta0 >= tlo) & (theta0 < thi) & (r0 >= rlo) & (r0 < rhi))[0]
+        idx.append(w)
 
     return bin2d, r_edge, t_edge, rs, ts, idx
 

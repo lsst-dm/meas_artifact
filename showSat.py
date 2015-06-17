@@ -48,13 +48,15 @@ def main(rerun, visits):
         
         logs = [(c, "data/%04d/log%05d-%03d.txt" % (visit, visit ,c)) for c in range(104)]
         all_positive = set()
+        binmax = {}
         for c, log  in logs:
             if os.path.exists(log):
                 with open(log, 'r') as lp:
                     for line in lp.readlines():
-                        m = re.search("Detected ([123456789]) satellite", line)
+                        m = re.search("Detected ([123456789]) satellite.*bin-max: (\d+)", line)
                         if m:
                             all_positive.add(c)
+                            binmax[c] = m.groups()[1]
         all_negative = set(range(104)) - all_positive
 
         fig = figure.Figure()

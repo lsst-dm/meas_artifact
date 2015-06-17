@@ -39,7 +39,7 @@ class SatelliteTask(pipeBase.CmdLineTask):
             # run for regular satellites
             self.runSatellite(exposure, bins=2, log=log)
             # run for broad linear (aircraft?) features by binning
-            self.runSatellite(exposure, bins=4, broadTrail=True, log=log)
+            #self.runSatellite(exposure, bins=4, broadTrail=True, log=log)
 
         exposure.writeFits(os.path.join(path,"exp%04d-%03d.fits"%(v,c)))
 
@@ -60,18 +60,18 @@ class SatelliteTask(pipeBase.CmdLineTask):
             skewLimit   = 200.0
             widthToPsfLimit = 0.2
         else:
-            luminosityLimit = 0.1   # low cut on pixel flux
-            luminosityMax   = 80.0  # max luminsity for pixel flux
+            luminosityLimit = 0.2   # low cut on pixel flux
+            luminosityMax   = 120.0  # max luminsity for pixel flux
             maskNPsfSigma = 7.0
-            centerLimit = 1.0  # about 1 pixel
-            eRange      = 0.04  # about +/- 0.1
+            centerLimit = 0.5  # about 1 pixel
+            eRange      = 0.025  # about +/- 0.1
             houghBins       = 256   # number of r,theta bins (i.e. 256x256)
             kernelSigma = 9    # pixels
             kernelSize  = 17   # pixels
             width=None
-            houghThresh     = 40    # counts in a r,theta bins
+            houghThresh     = 10    # counts in a r,theta bins
             skewLimit       = 20.0
-            widthToPsfLimit = 0.15
+            widthToPsfLimit = 0.1
         
         finder = satell.SatelliteFinder(
             kernelSigma=kernelSigma,
@@ -86,20 +86,20 @@ class SatelliteTask(pipeBase.CmdLineTask):
             widthToPsfLimit=widthToPsfLimit
         )
 
-        satelliteTrails = finder.getTrails(exposure, bins=bins, width=width)
+        trails = finder.getTrails(exposure, bins=bins, width=width)
         msg = ""
         if bins:
             msg = "(binned %dx) " % bins
-        msg += "Detected %d satellite trails.  cand-pix: %d bin-max: %d" % \
-               (len(satelliteTrails), satelliteTrails.nTotal, satelliteTrails.binMax)
+        msg += "Detected %d satellite trails.  cand-pix: %d bin-max: %d  psfSigma: %.2f" % \
+               (len(trails), trails.nTotal, trails.binMax, trails.psfSigma)
         self.log.info(msg)
         if log:
             log.write(msg+"\n")
         
-        for i, trail in enumerate(satelliteTrails):
+        for i, trail in enumerate(trails):
             maskedPixels = trail.setMask(exposure, nSigma=maskNPsfSigma)
             msg = "Trail %d of %d (r: %.1f,theta: %.4f):  cand-pix: %d max-bin-count: %d mask-pix: %d" % \
-                  (i+1, len(satelliteTrails), trail.r, trail.theta,
+                  (i+1, len(trails), trail.r, trail.theta,
                    trail.nAboveThresh, trail.houghBinMax, maskedPixels)          
             self.log.info(msg)
             if log:
