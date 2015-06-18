@@ -12,6 +12,7 @@ def getExposurePsfSigma(exposure, minor=False):
     nx, ny = exposure.getWidth(), exposure.getHeight()
     midpixel = afwGeom.Point2D(nx//2, ny//2)
     psfshape = exposure.getPsf().computeShape(midpixel)
+    
     axes  = ellipses.Axes(psfshape)
     if minor:
         return axes.getB()

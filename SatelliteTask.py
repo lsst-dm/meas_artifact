@@ -18,6 +18,7 @@ import numpy as np
 
 import satellite as satell
 
+
 class SatelliteTask(pipeBase.CmdLineTask):
     _DefaultName = 'satellite'
     ConfigClass = pexConfig.Config
@@ -37,9 +38,9 @@ class SatelliteTask(pipeBase.CmdLineTask):
         logfile = os.path.join(path, "log%05d-%03d.txt" % (v,c))
         with open(logfile, 'w') as log:
             # run for regular satellites
-            self.runSatellite(exposure, bins=2, log=log)
+            #self.runSatellite(exposure, bins=2, log=log)
             # run for broad linear (aircraft?) features by binning
-            #self.runSatellite(exposure, bins=4, broadTrail=True, log=log)
+            self.runSatellite(exposure, bins=4, broadTrail=True, log=log)
 
         exposure.writeFits(os.path.join(path,"exp%04d-%03d.fits"%(v,c)))
 
@@ -50,17 +51,17 @@ class SatelliteTask(pipeBase.CmdLineTask):
             luminosityLimit = 0.01   # low cut on pixel flux
             luminosityMax = 4.0
             maskNPsfSigma = 3.0*bins
-            centerLimit = 2.0   # about 1 pixel
+            centerLimit = 1.0   # about 1 pixel
             eRange      = 0.04  # about +/- 0.1
             houghBins      = 128   # number of r,theta bins (i.e. 256x256)
             kernelSigma = 21    # pixels
             kernelSize  = 41   # pixels
-            width       = 60.0 #100.0  #width of an out of focus aircraft (unbinned)
-            houghThresh     = 40    # counts in a r,theta bins
-            skewLimit   = 200.0
-            widthToPsfLimit = 0.2
+            width       = 55.0 #100.0  #width of an out of focus aircraft (unbinned)
+            houghThresh     = 10    # counts in a r,theta bins
+            skewLimit   = 100.0
+            widthToPsfLimit = 0.1
         else:
-            luminosityLimit = 0.2   # low cut on pixel flux
+            luminosityLimit = 0.04   # low cut on pixel flux
             luminosityMax   = 120.0  # max luminsity for pixel flux
             maskNPsfSigma = 7.0
             centerLimit = 0.5  # about 1 pixel
@@ -114,11 +115,31 @@ class SatelliteTask(pipeBase.CmdLineTask):
 
 
 
+class SatelliteDistribRunner(pipeBase.TaskRunner):
+
+    @staticmethod
+    def getTargetList(parsedCmd, **kwargs):
+
+        allRefs = parsedCmd.id.refList
+        nVisit = int((len(allRefs))**0.5)
+        if nVisit**2 != len(allRefs):
+            msg = "Mismatch in visits and ccds ... should be same length"
+            raise ValueError(msg)
+        targets = []
+        for i in range(nVisit):
+            ref = allRefs[i + i*nVisit]
+            targets += [(ref, kwargs)]
+        return targets
+            
+        
+class SatelliteDistribTask(SatelliteTask):
+    _DefaultName = 'distrib'
+    ConfigClass = pexConfig.Config
+    RunnerClass = SatelliteDistribRunner
 
 
 
-
-
+    
 class PoolSatelliteConfig(pexConfig.Config):
     satellite    = pexConfig.ConfigurableField(target=SatelliteTask, doc="satellite")
 

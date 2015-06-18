@@ -164,10 +164,14 @@ class SatelliteFinder(object):
         self.sigmaSmooth = 2.0
         img = self._smooth(img, self.sigmaSmooth)
         _msk = exp.getMaskedImage().getMask()
-        msk = _msk.getArray()
-        BAD = _msk.getPlaneBitMask("BAD")
-        CR = _msk.getPlaneBitMask("CR")
-        SAT = _msk.getPlaneBitMask("SAT")
+        msk    = _msk.getArray()
+        BAD    = _msk.getPlaneBitMask("BAD")
+        CR     = _msk.getPlaneBitMask("CR")
+        SAT    = _msk.getPlaneBitMask("SAT")
+        INTRP  = _msk.getPlaneBitMask("INTRP")
+        EDGE   = _msk.getPlaneBitMask("EDGE")
+        SUSPECT= _msk.getPlaneBitMask("SUSPECT")
+        MASK   = BAD | CR | SAT | INTRP | EDGE | SUSPECT
         
         xx, yy = np.meshgrid(np.arange(img.shape[1], dtype=int), np.arange(img.shape[0], dtype=int))
 
@@ -179,17 +183,47 @@ class SatelliteFinder(object):
 
         print "... where ... "
         #   - cull unsuitable pixels
-        self.wy,self.wx = np.where(
+        faint_test = (
             ( np.abs(self.ellip - self.ellipCal) < self.eRange )
             & (img > self.luminosityLimit*self.noise) & (img < self.luminosityMax*self.noise) 
             & (np.abs(self.center_perp) < self.centerLimit)
             & (np.abs(self.center) < 2.0*self.centerLimit)
-            & ~(msk & BAD) & ~(msk & CR) & ~(msk & SAT)
+            & ~(msk & MASK)
             & (np.abs(self.skew_perp) < self.skewLimit)
             & (np.abs(self.skew) < 2.0*self.skewLimit)
             & (np.abs(self.b - self.bRatio) < self.widthToPsfLimit)
         )
 
+        self.medium_factor = 2.0
+        self.mediumLimit = 0.5
+        self.mediumScale = 1.0
+        medium_test = (
+            ( np.abs(self.ellip - self.ellipCal/self.mediumScale) < self.medium_factor*self.eRange )
+            & (img > self.mediumLimit*self.noise) & (img < self.luminosityMax*self.noise) 
+            & (np.abs(self.center_perp) < self.centerLimit/self.medium_factor)
+            & (np.abs(self.center) < 2.0*self.centerLimit/self.medium_factor)
+            & ~(msk & MASK)
+            & (np.abs(self.skew_perp) < self.skewLimit/self.medium_factor)
+            & (np.abs(self.skew) < 2.0*self.skewLimit/self.medium_factor)
+            & (np.abs(self.b - self.mediumScale*self.bRatio) < self.medium_factor*self.widthToPsfLimit)
+        )
+        
+        self.bright_factor = 5.0
+        self.brightLimit = 2.0
+        self.brightScale = 1.0
+        bright_test = (
+            ( np.abs(self.ellip - self.ellipCal/self.brightScale) < self.bright_factor*self.eRange )
+            & (img > self.brightLimit*self.noise) & (img < self.luminosityMax*self.noise) 
+            & (np.abs(self.center_perp) < self.centerLimit/self.bright_factor)
+            & (np.abs(self.center) < 2.0*self.centerLimit/self.bright_factor)
+            & ~(msk & MASK)
+            & (np.abs(self.skew_perp) < self.skewLimit/self.bright_factor)
+            & (np.abs(self.skew) < 2.0*self.skewLimit/self.bright_factor)
+            & (np.abs(self.b - self.brightScale*self.bRatio) < self.bright_factor*self.widthToPsfLimit)
+        )
+
+        self.wy, self.wx = np.where(faint_test | medium_test | bright_test)
+        
         print "hesse"
         #   - convert suiltable pixels to hesse form (r,theta)
         self.r, self.theta = self._hesseForm(self.theta0[self.wy,self.wx],
@@ -292,8 +326,16 @@ class SatelliteFinder(object):
                        c=np.clip(self.center[self.wy,self.wx], 0.0, 2.0*self.centerLimit),
                        s=0.8, alpha=0.8, edgecolor='none')
             ax.hlines([self.ellipCal], -np.pi/2.0, np.pi/2.0, color='m', linestyle='-')
-            ax.hlines([self.ellipCal - self.eRange], -np.pi/2.0, np.pi/2.0, color='m', linestyle='--')
-            ax.hlines([self.ellipCal + self.eRange], -np.pi/2.0, np.pi/2.0, color='m', linestyle='--')
+            fhlines = [
+                self.ellipCal - self.eRange,
+                self.ellipCal + self.eRange,
+            ]
+            bhlines = [
+                self.ellipCal/self.brightScale - self.bright_factor*self.eRange,
+                self.ellipCal/self.brightScale + self.bright_factor*self.eRange,
+            ]
+            ax.hlines(fhlines, -np.pi/2.0, np.pi/2.0, color='m', linestyle='--')
+            ax.hlines(bhlines, -np.pi/2.0, np.pi/2.0, color='c', linestyle='--')
             ax.set_xlabel("Theta", size='small')
             ax.set_ylabel("e", size='small')
             ax.set_xlim([-np.pi/2.0, np.pi/2.0])
@@ -309,6 +351,7 @@ class SatelliteFinder(object):
             ax.scatter(self.center[self.wy,self.wx], img[self.wy,self.wx]/self.noise,
                        c=np.clip(self.center_perp[self.wy,self.wx], 0.0, 2.0*self.centerLimit),
                        s=2.0, alpha=1.0, edgecolor='none')
+            ax.vlines([self.centerLimit, self.centerLimit/self.bright_factor], 0.001, 100, color='k', linestyle='--')
             ax.set_xscale("log")
             ax.set_yscale("log")
             ax.set_xlabel("Center", size='small')
@@ -326,9 +369,17 @@ class SatelliteFinder(object):
             ax.scatter(self.skew[self.wy,self.wx], self.b[self.wy,self.wx],
                        c=np.clip(self.center[self.wy,self.wx], 0.0, 2.0*self.centerLimit), marker='.', s=4.0,
                        alpha=1.0, edgecolor='none')
-            ax.vlines([self.skewLimit], 0, 3.0, linestyle='--', color='k')
-            ax.hlines([self.bRatio - self.widthToPsfLimit, self.bRatio+self.widthToPsfLimit],
-                      0, 3.0*self.skewLimit, linestyle='--', color='k')
+            ax.vlines([self.skewLimit, self.skewLimit/self.bright_factor], 0, 3.0, linestyle='--', color='k')
+            fhlines = [
+                self.bRatio - self.widthToPsfLimit,
+                self.bRatio + self.widthToPsfLimit,
+            ]
+            bhlines = [
+                self.brightScale*self.bRatio - self.bright_factor*self.widthToPsfLimit,
+                self.brightScale*self.bRatio + self.bright_factor*self.widthToPsfLimit,
+            ]
+            ax.hlines(fhlines, 0, 3.0*self.skewLimit, linestyle='--', color='m')
+            ax.hlines(bhlines, 0, 3.0*self.skewLimit, linestyle='--', color='c')
             ax.set_xlabel("Skew", size='small')
             ax.set_ylabel("B", size='small')
             ax.set_xlim([0.0, 3.0*self.skewLimit])
@@ -393,7 +444,7 @@ class SatelliteFinder(object):
             nSigma = 7.0
         else:
             sigmaInsert = width/2.0
-            sigmaSmooth = width/2.0
+            sigmaSmooth = self.sigmaSmooth
             maskBit = 1.0
             nSigma = 1.0
         calTrail.insert(cal, sigma=sigmaInsert/self.bins, maskBit=maskBit, nSigma=nSigma)
