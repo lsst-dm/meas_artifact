@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-VISITS=270^1236^1168^242^1166^1184^1166^1166
-CCDS=78^65^47^95^96^78^65^70
+VISITS=270^1236^1168^242^1166^1184^1166^1166^1188^1240^1248
+CCDS=78^65^47^95^96^78^65^70^18^51^43
 
 if [ "$1" = 'run' ]; then
     ./specific.py /lustre/Subaru/SSP/rerun/bick/cosmos333/ --id visit=$VISITS ccd=$CCDS -j 6
@@ -24,6 +24,10 @@ if [ $REPLY = 'y' -o $REPLY = 'Y' ]; then
 
     gm display $DIR/1166/satdebug-01166-065-b04.png &
     gm display $DIR/1166/satdebug-01166-070-b04.png &
+    gm display $DIR/1188/satdebug-01188-018-b04.png &
+    gm display $DIR/1240/satdebug-01240-051-b04.png &
+    gm display $DIR/1248/satdebug-01248-043-b04.png &
+    
     
 else
     echo "Exiting."

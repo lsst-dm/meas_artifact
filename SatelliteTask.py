@@ -38,7 +38,7 @@ class SatelliteTask(pipeBase.CmdLineTask):
         logfile = os.path.join(path, "log%05d-%03d.txt" % (v,c))
         with open(logfile, 'w') as log:
             # run for regular satellites
-            #self.runSatellite(exposure, bins=2, log=log)
+            self.runSatellite(exposure, bins=2, log=log)
             # run for broad linear (aircraft?) features by binning
             self.runSatellite(exposure, bins=4, broadTrail=True, log=log)
 
@@ -48,17 +48,17 @@ class SatelliteTask(pipeBase.CmdLineTask):
     def runSatellite(self, exposure, bins=None, broadTrail=False, log=None):
             
         if broadTrail:
-            luminosityLimit = 0.01   # low cut on pixel flux
+            luminosityLimit = 0.02   # low cut on pixel flux
             luminosityMax = 4.0
             maskNPsfSigma = 3.0*bins
-            centerLimit = 1.0   # about 1 pixel
-            eRange      = 0.04  # about +/- 0.1
+            centerLimit = 1.2   # about 1 pixel
+            eRange      = 0.06  # about +/- 0.1
             houghBins      = 128   # number of r,theta bins (i.e. 256x256)
             kernelSigma = 21    # pixels
             kernelSize  = 41   # pixels
-            width       = 55.0 #100.0  #width of an out of focus aircraft (unbinned)
-            houghThresh     = 10    # counts in a r,theta bins
-            skewLimit   = 100.0
+            width       = 60.0 #100.0  #width of an out of focus aircraft (unbinned)
+            houghThresh     = 16    # counts in a r,theta bins
+            skewLimit   = 150.0
             widthToPsfLimit = 0.1
         else:
             luminosityLimit = 0.04   # low cut on pixel flux

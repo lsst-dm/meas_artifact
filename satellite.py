@@ -195,7 +195,7 @@ class SatelliteFinder(object):
         )
 
         self.medium_factor = 2.0
-        self.mediumLimit = 0.5
+        self.mediumLimit = 10.0*self.luminosityLimit #0.5
         self.mediumScale = 1.0
         medium_test = (
             ( np.abs(self.ellip - self.ellipCal/self.mediumScale) < self.medium_factor*self.eRange )
@@ -208,8 +208,8 @@ class SatelliteFinder(object):
             & (np.abs(self.b - self.mediumScale*self.bRatio) < self.medium_factor*self.widthToPsfLimit)
         )
         
-        self.bright_factor = 5.0
-        self.brightLimit = 2.0
+        self.bright_factor = 6.0
+        self.brightLimit = 20.0*self.luminosityLimit #2.0
         self.brightScale = 1.0
         bright_test = (
             ( np.abs(self.ellip - self.ellipCal/self.brightScale) < self.bright_factor*self.eRange )
@@ -304,11 +304,12 @@ class SatelliteFinder(object):
             ax.plot(self.theta, self.bins*self.r, 'k.', ms=1.0, alpha=0.5)
             for i,trail in enumerate(trails):
                 ax.plot(trail.theta, trail.r, 'o', mfc='none', mec=colors[i%4], ms=10)
-                ax.add_patch(Rectangle( (trail.theta - dt, trail.r - dr), 2*dt, 2*dr, facecolor='none', edgecolor=colors[i%4]))
+                ax.add_patch(Rectangle( (trail.theta - dt, trail.r - self.bins*dr),
+                                        2*dt, 2*self.bins*dr, facecolor='none', edgecolor=colors[i%4]))
             ax.set_xlabel("Theta", size='small')
             ax.set_ylabel("r", size='small')
             ax.set_xlim([0.0, 2.0*np.pi])
-            ax.set_ylim([0.0, ny])
+            ax.set_ylim([0.0, self.bins*ny])
             ax.text(0.95, 0.95, "N=%d" % (len(self.theta)), size='xx-small',
                     horizontalalignment='right', verticalalignment='center', transform = ax.transAxes)
             font(ax)
@@ -352,6 +353,7 @@ class SatelliteFinder(object):
                        c=np.clip(self.center_perp[self.wy,self.wx], 0.0, 2.0*self.centerLimit),
                        s=2.0, alpha=1.0, edgecolor='none')
             ax.vlines([self.centerLimit, self.centerLimit/self.bright_factor], 0.001, 100, color='k', linestyle='--')
+            ax.hlines([self.luminosityLimit], 0.01, 10, color='k', linestyle='--')
             ax.set_xscale("log")
             ax.set_yscale("log")
             ax.set_xlabel("Center", size='small')

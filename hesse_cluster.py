@@ -182,19 +182,7 @@ def hesse_bin(r0, theta0, bins=200, r_max=4096, ncut=4, navg=0.0):
     r = r0
     theta = theta0
     
-    thresh = 0.4
-    # wrap theta~0 to above 2pi y     # wrap theta~2pi to near near
-    #w_0,   = np.where( theta < 0.2 )
-    #w_2pi, = np.where( 2.0*np.pi - theta < thresh )
-    
-    #r = np.append(r0, r0[w_0])    
-    #theta = np.append(theta0, theta0[w_0] + 2.0*np.pi)
-    #r = np.append(r, r0[w_2pi])    
-    #theta = np.append(theta, theta0[w_2pi] - 2.0*np.pi)
-
-    #w = np.arange(len(theta))
-    #w = np.append(w, w_0)
-    #w = np.append(w, w_2pi)
+    theta_margin = 0.4
     
     non_trivial = (np.abs(theta) > 1.0e-2) & (np.abs(r) > 1.0*r_max/bins)
     non_bleed   = np.abs(theta - np.pi/2.0) > 1.0e-2
@@ -202,14 +190,8 @@ def hesse_bin(r0, theta0, bins=200, r_max=4096, ncut=4, navg=0.0):
     ok = non_trivial  & non_bleed
 
                   
-    bin2d, r_edge, t_edge = np.histogram2d(r[ok], theta[ok], 
-                                           bins=(bins,bins), range=((0.0, r_max),(-thresh, thresh+2.0*np.pi)) )
-
-    #bin2d, r_edge, t_edge = np.histogram2d(r, theta,
-    #                                       bins=(bins,bins), range=((0.0, r_max),(0.0, np.pi)) )
-    
-    #bin2d = filt.fftConvolve(bin2d, np.ones((3,3)).astype(float)/9.0) #4.0, 4.0, 0.0)
-    #bin2d = filt.fftSmooth2d(bin2d, 1.0, 1.0, 0.0)
+    bin2d, r_edge, t_edge = np.histogram2d(r[ok], theta[ok], bins=(bins,bins),
+                                           range=((0.0, r_max), (-theta_margin, theta_margin+2.0*np.pi)) )
 
     wrpos, wtpos = np.where(bin2d > 1)
     if len(wrpos):
@@ -219,7 +201,6 @@ def hesse_bin(r0, theta0, bins=200, r_max=4096, ncut=4, navg=0.0):
     thresh = max(ncut, navg*avgPerBin)
 
     locus, numLocus = ndimg.label(bin2d > thresh, structure=np.ones((3,3)))
-    #print "Threshold: ", len(wrpos), len(theta), avgPerBin, thresh, numLocus
 
     rs, ts, idx = [], [], []
     for i in range(numLocus):
