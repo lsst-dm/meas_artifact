@@ -78,7 +78,7 @@ def momentConvolve2d(data, k, sigma):
 
     
     
-def momentToEllipse(ixx, iyy, ixy, lo_clip=1.0):
+def momentToEllipse(ixx, iyy, ixy, lo_clip=0.1):
 
     tmp   = 0.5*(ixx + iyy)
     diff  = ixx - iyy

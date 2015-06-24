@@ -22,7 +22,7 @@ def main(rerun, visits):
     with open(filename, 'r') as fp:
         lines = fp.readlines()
 
-    all_types = "bfpvaF"
+    all_types = "bfpvaFdsrz"
     ccds = {}
     tps, fps, tns, fns = {}, {}, {}, {}
     for c in all_types:
@@ -42,6 +42,7 @@ def main(rerun, visits):
             for i, t in enumerate(types):
                 ccds[t][int(v)] += [int(re.sub("[cs]", "", c)) for c in fields[4+i].split(',')]
 
+                
     for visit in visits:
 
         print "Running", visit
@@ -101,7 +102,7 @@ def main(rerun, visits):
                     img = fimg.getPixels(c)
                     img += v
 
-            ax = fig.add_subplot(2,3,i_t + 1)
+            ax = fig.add_subplot(2,5,i_t + 1)
             ax.set_title("Type %s" % (track_type))
             ax.imshow(fimg.image[::-1], cmap=cmap, vmin=0.0, vmax=4.0)
 

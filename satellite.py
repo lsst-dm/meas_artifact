@@ -26,11 +26,34 @@ class SatelliteTrailList(list):
         self.binMax = binMax
         self.psfSigma = psfSigma
 
+        self.drMax = 50.0
+        self.dthetaMax = 0.1
         
+    def merge(self, trailList):
+
+        s = SatelliteTrailList(self.nTotal, self.binMax, self.psfSigma)
+        for t in self:
+            s.append(t)
+            
+        for t in trailList:
+            r     = t.r
+            theta = t.theta
+
+            isDuplicate = False
+            for t2 in self:
+                dr = t2.r - r
+                dt = t2.theta - theta
+                if abs(dr) < self.drMax and abs(dt) < self.dthetaMax:
+                    isDuplicate = True
+            if not isDuplicate:
+                s.append(t)
+        return s
+                
 class SatelliteTrail(object):
-    def __init__(self, r, theta, flux=1.0, f_wing=0.1):
+    def __init__(self, r, theta, width=1, flux=1.0, f_wing=0.1):
         self.r     = r
         self.theta = theta
+        self.width = width
         self.vx    = np.cos(theta)
         self.vy    = np.sin(theta)
         self.flux  = flux
@@ -40,13 +63,14 @@ class SatelliteTrail(object):
         self.nAboveThresh = 0
         self.houghBinMax = 0
         
-    def setMask(self, exposure, nSigma=7.0):
+    def setMask(self, exposure):
 
         msk = exposure.getMaskedImage().getMask()
         sigma = satUtil.getExposurePsfSigma(exposure)
         satellitePlane = msk.addMaskPlane("SATELLITE")
+        satelliteBit = 1 << satellitePlane
         tmp = type(msk)(msk.getWidth(), msk.getHeight())
-        self.insert(tmp, sigma=sigma, nSigma=nSigma, maskBit=satellitePlane)
+        self.insert(tmp, sigma=sigma, maskBit=satelliteBit)
         msk |= tmp
         # return the number of masked pixels
         return len(np.where(tmp.getArray() > 0)[0])
@@ -58,9 +82,9 @@ class SatelliteTrail(object):
         return x[w], y[w]
 
 
-    def insert(self, exposure, sigma=None, nSigma=7.0, maskBit=None):
+    def insert(self, exposure, sigma=None, maskBit=None):
 
-        if sigma < 1.0:
+        if sigma and sigma < 1.0:
             sigma = 1.0
         
         # Handle Exposure, Image, ndarray
@@ -95,8 +119,14 @@ class SatelliteTrail(object):
         dot    = xx*self.vx + yy*self.vy
         offset = np.abs(dot - self.r)
 
+        # go to 4 sigma of the wider gaussian in the double gauss
+        if self.width > 1:
+            hwidth = self.width/2.0
+        else:
+            hwidth = 8.0*sigma
+        
         # only bother updating the pixels within 5-sigma of the line
-        wy,wx  = np.where(offset < nSigma*sigma)
+        wy,wx  = np.where(offset < hwidth)
         A1  = 1.0/(2.0*np.pi*sigma**2)
         g1  = np.exp(-offset[wy,wx]**2/(2.0*sigma**2))
         A2  = 1.0/(2.0*np.pi*(2.0*sigma)**2)
@@ -144,87 +174,167 @@ class SatelliteFinder(object):
         
     def getTrails(self, exposure, width=None, bins=None):
 
+        emsk = exposure.getMaskedImage().getMask()
+        BAD    = emsk.getPlaneBitMask("BAD")
+        CR     = emsk.getPlaneBitMask("CR")
+        SAT    = emsk.getPlaneBitMask("SAT")
+        INTRP  = emsk.getPlaneBitMask("INTRP")
+        EDGE   = emsk.getPlaneBitMask("EDGE")
+        SUSPECT= emsk.getPlaneBitMask("SUSPECT")
+        MASK   = BAD | CR | SAT | INTRP | EDGE | SUSPECT
+        
+
+        t1 = time.time()
+        self.width = width
+        
         if bins:
-            #exp2 = type(exposure)(exposure, afwGeom.Box2I(afwGeom.Point2I(0,0), afwGeom.Extent2I(600,2000)))
-            #exposure = exp2
+
             exp = type(exposure)(afwMath.binImage(exposure.getMaskedImage(), bins))
             exp.setMetadata(exposure.getMetadata())
             exp.setPsf(exposure.getPsf())
+
+            # if we're looking for extended trails, replace the detections with rms level
+            exp_faint = exp.clone()
+            exp_faint.setMetadata(exposure.getMetadata())
+            exp_faint.setPsf(exposure.getPsf())
+            if True:
+                _fmsk = exp_faint.getMaskedImage().getMask()
+                fmsk = _fmsk.getArray()
+                DET = _fmsk.getPlaneBitMask("DETECTED")
+                DET |= MASK
+                w = fmsk & DET > 0
+                im = exp_faint.getMaskedImage().getImage().getArray()
+                rms = im[~w].std()
+                im[w] = rms
+                
+                
         else:
             exp = exposure
+            exp_faint = exposure
             bins = 1
         self.bins = bins
-            
+
+        _msk = exp.getMaskedImage().getMask()
+        msk  = _msk.getArray()
+
         #   - smooth 
         img = exp.getMaskedImage().getImage().getArray()
+        w_bad = msk & MASK > 0
+        img[w_bad] = 0.0
         self.noise = img.std()
+
+        img_faint = exp_faint.getMaskedImage().getImage().getArray()
+        img_faint[w_bad] = 0
+        self.noise_f = img_faint.std()
         
         psfsigma = satUtil.getExposurePsfSigma(exp, minor=True)
-        print "PSF sigma: ", psfsigma
-        self.sigmaSmooth = 2.0
+        self.sigmaSmooth = 1.0
         img = self._smooth(img, self.sigmaSmooth)
-        _msk = exp.getMaskedImage().getMask()
-        msk    = _msk.getArray()
-        BAD    = _msk.getPlaneBitMask("BAD")
-        CR     = _msk.getPlaneBitMask("CR")
-        SAT    = _msk.getPlaneBitMask("SAT")
-        INTRP  = _msk.getPlaneBitMask("INTRP")
-        EDGE   = _msk.getPlaneBitMask("EDGE")
-        SUSPECT= _msk.getPlaneBitMask("SUSPECT")
-        MASK   = BAD | CR | SAT | INTRP | EDGE | SUSPECT
+        img_faint = self._smooth(img_faint, self.sigmaSmooth)
+        
         
         xx, yy = np.meshgrid(np.arange(img.shape[1], dtype=int), np.arange(img.shape[0], dtype=int))
 
-        print "getMoments"
         #   - get ellipticities and thetas
+        
         self.sumI, self.center, self.center_perp, self.ellip, self.theta0, \
-            self.ellipCal, self.thetaCal, \
-            self.skew, self.skew_perp, self.b = self._getMoments(exp, width=width)
+            self.skew, self.skew_perp, self.b, \
+            self.ellipCals, self.bCals = self._getMoments(exp, width=width)
+        self.lum = self.sumI
 
-        print "... where ... "
-        #   - cull unsuitable pixels
-        faint_test = (
-            ( np.abs(self.ellip - self.ellipCal) < self.eRange )
-            & (img > self.luminosityLimit*self.noise) & (img < self.luminosityMax*self.noise) 
-            & (np.abs(self.center_perp) < self.centerLimit)
-            & (np.abs(self.center) < 2.0*self.centerLimit)
-            & ~(msk & MASK)
-            & (np.abs(self.skew_perp) < self.skewLimit)
-            & (np.abs(self.skew) < 2.0*self.skewLimit)
-            & (np.abs(self.b - self.bRatio) < self.widthToPsfLimit)
-        )
+        self.sumI_f, self.center_f, self.center_perp_f, self.ellip_f, self.theta0_f, \
+            self.skew_f, self.skew_perp_f, self.b_f,\
+            self.ellipCals_f, self.bCals_f = self._getMoments(exp_faint, width=width)
+        self.lum_f = self.sumI_f
 
-        self.medium_factor = 2.0
-        self.mediumLimit = 10.0*self.luminosityLimit #0.5
-        self.mediumScale = 1.0
-        medium_test = (
-            ( np.abs(self.ellip - self.ellipCal/self.mediumScale) < self.medium_factor*self.eRange )
-            & (img > self.mediumLimit*self.noise) & (img < self.luminosityMax*self.noise) 
-            & (np.abs(self.center_perp) < self.centerLimit/self.medium_factor)
-            & (np.abs(self.center) < 2.0*self.centerLimit/self.medium_factor)
-            & ~(msk & MASK)
-            & (np.abs(self.skew_perp) < self.skewLimit/self.medium_factor)
-            & (np.abs(self.skew) < 2.0*self.skewLimit/self.medium_factor)
-            & (np.abs(self.b - self.mediumScale*self.bRatio) < self.medium_factor*self.widthToPsfLimit)
-        )
+
+        nCal = len(self.bCals)
+        accumulate = np.zeros(img.shape, dtype=np.uint16)
         
-        self.bright_factor = 6.0
-        self.brightLimit = 20.0*self.luminosityLimit #2.0
-        self.brightScale = 1.0
-        bright_test = (
-            ( np.abs(self.ellip - self.ellipCal/self.brightScale) < self.bright_factor*self.eRange )
-            & (img > self.brightLimit*self.noise) & (img < self.luminosityMax*self.noise) 
-            & (np.abs(self.center_perp) < self.centerLimit/self.bright_factor)
-            & (np.abs(self.center) < 2.0*self.centerLimit/self.bright_factor)
-            & ~(msk & MASK)
-            & (np.abs(self.skew_perp) < self.skewLimit/self.bright_factor)
-            & (np.abs(self.skew) < 2.0*self.skewLimit/self.bright_factor)
-            & (np.abs(self.b - self.brightScale*self.bRatio) < self.bright_factor*self.widthToPsfLimit)
-        )
+        haul = []
+        for i in range(nCal):
 
-        self.wy, self.wx = np.where(faint_test | medium_test | bright_test)
+            b_f = self.b_f / self.bCals_f[i]
+            b   = self.b   / self.bCals[i]
+
+            ellipCal   = self.ellipCals[i]
+            ellipCal_f = self.ellipCals_f[i]
+
+            
+            #   - cull unsuitable pixels
+            mask_test = (
+                ( np.abs(self.ellip_f - ellipCal_f) < self.eRange )
+                & (self.lum_f > self.luminosityLimit*self.noise_f) & (self.lum_f < 3.0*self.luminosityLimit*self.noise_f)
+                & (np.abs(self.center_perp_f) < self.centerLimit)
+                & (np.abs(self.center_f) < 2.0*self.centerLimit)
+                & (msk & MASK == 0)
+                & (np.abs(self.skew_perp_f) < self.skewLimit)
+                & (np.abs(self.skew_f) < 2.0*self.skewLimit)
+                & (np.abs(b_f - self.bRatio) < self.widthToPsfLimit)
+            )
+            if not width:
+                mask_test &= 0
+
+            faint_test = (
+                ( np.abs(self.ellip - ellipCal) < self.eRange )
+                & (self.lum > self.luminosityLimit*self.noise) & (self.lum < self.luminosityMax*self.noise) 
+                & (np.abs(self.center_perp) < self.centerLimit)
+                & (np.abs(self.center) < 2.0*self.centerLimit)
+                & (msk & MASK == 0)
+                & (np.abs(self.skew_perp) < self.skewLimit)
+                & (np.abs(self.skew) < 2.0*self.skewLimit)
+                & (np.abs(b - self.bRatio) < self.widthToPsfLimit)
+            )
+
+
+            self.medium_factor = 2.0
+            self.mediumLimit = 10.0*self.luminosityLimit #0.5
+            self.mediumScale = 1.0
+            medium_test = (
+                ( np.abs(self.ellip - ellipCal/self.mediumScale) < self.medium_factor*self.eRange )
+                & (self.lum > self.mediumLimit*self.noise) & (self.lum < self.luminosityMax*self.noise) 
+                & (np.abs(self.center_perp) < self.centerLimit/self.medium_factor)
+                & (np.abs(self.center) < 2.0*self.centerLimit/self.medium_factor)
+                & (msk & MASK == 0)
+                & (np.abs(self.skew_perp) < self.skewLimit/self.medium_factor)
+                & (np.abs(self.skew) < 2.0*self.skewLimit/self.medium_factor)
+                & (np.abs(b - self.mediumScale*self.bRatio) < self.medium_factor*self.widthToPsfLimit)
+            )
+
+            self.bright_factor = 6.0
+            self.brightLimit = 20.0*self.luminosityLimit #2.0
+            self.brightScale = 1.0
+            bright_test = (
+                ( np.abs(self.ellip - ellipCal/self.brightScale) < self.bright_factor*self.eRange )
+                & (self.lum > self.brightLimit*self.noise) & (self.lum < self.luminosityMax*self.noise) 
+                & (np.abs(self.center_perp) < self.centerLimit/self.bright_factor)
+                & (np.abs(self.center) < 2.0*self.centerLimit/self.bright_factor)
+                & (msk & MASK == 0)
+                & (np.abs(self.skew_perp) < self.skewLimit/self.bright_factor)
+                & (np.abs(self.skew) < 2.0*self.skewLimit/self.bright_factor)
+                & (np.abs(b - self.brightScale*self.bRatio) < self.bright_factor*self.widthToPsfLimit)
+            )
+
+            print (mask_test == True).sum(), \
+                (faint_test  == True).sum(), \
+                (medium_test == True).sum(), \
+                (bright_test == True).sum()
+            all_test = mask_test | faint_test | medium_test | bright_test
+
+            wid = 1
+            if width:
+                wid = width[i]
+            
+            haul.append( (all_test.sum(), wid, all_test) )
+
+            accumulate |= all_test
+            
+        hits, wid, test = sorted(haul, key=lambda x:x[0], reverse=True)[0]
+        #print hits
+        #accumulate |= test
+
+        self.wy, self.wx = np.where(accumulate)
         
-        print "hesse"
         #   - convert suiltable pixels to hesse form (r,theta)
         self.r, self.theta = self._hesseForm(self.theta0[self.wy,self.wx],
                                              xx[self.wy,self.wx], yy[self.wy,self.wx])
@@ -233,7 +343,6 @@ class SatelliteFinder(object):
         self.yy = yy[self.wy,self.wx]
         self.xx = xx[self.wy,self.wx]
 
-        print "Hough"
         #   - bin and return detections
         self.rs, self.ts, self.xfin, self.yfin, binMax = self._houghTransform(self.r, self.theta,
                                                                               xx[self.wy,self.wx],
@@ -241,8 +350,8 @@ class SatelliteFinder(object):
         
         trails = SatelliteTrailList(len(self.r), max(binMax), psfsigma)
         for r,t,x,b in zip(self.rs, self.ts, self.xfin, binMax):
-            print "Trail: ", bins*r, t, len(x), b
-            trail = SatelliteTrail(bins*r, t)
+            print "Trail: ", bins*r, t, wid, len(x), b
+            trail = SatelliteTrail(bins*r, t, width=wid)
             trail.nAboveThresh = len(x)
             trail.houghBinMax = b
             trails.append(trail)
@@ -258,8 +367,13 @@ class SatelliteFinder(object):
             os.mkdir(path)
         except:
             pass
-        print "plotting"
-        self._debugPlot(img, trails, os.path.join(path,"satdebug-%05d-%03d-b%02d.png" % (v, c, self.bins)))
+
+        print "Done.", time.time() - t1
+        
+        print "Now plotting"
+
+        broad = "AC" if width else "SAT"
+        self._debugPlot(img, trails, os.path.join(path,"satdebug-%05d-%03d-%s.png" % (v, c, broad)))
 
         return trails
 
@@ -326,17 +440,18 @@ class SatelliteFinder(object):
             ax.scatter(self.theta0[self.wy,self.wx], self.ellip[self.wy,self.wx],
                        c=np.clip(self.center[self.wy,self.wx], 0.0, 2.0*self.centerLimit),
                        s=0.8, alpha=0.8, edgecolor='none')
-            ax.hlines([self.ellipCal], -np.pi/2.0, np.pi/2.0, color='m', linestyle='-')
-            fhlines = [
-                self.ellipCal - self.eRange,
-                self.ellipCal + self.eRange,
-            ]
-            bhlines = [
-                self.ellipCal/self.brightScale - self.bright_factor*self.eRange,
-                self.ellipCal/self.brightScale + self.bright_factor*self.eRange,
-            ]
-            ax.hlines(fhlines, -np.pi/2.0, np.pi/2.0, color='m', linestyle='--')
-            ax.hlines(bhlines, -np.pi/2.0, np.pi/2.0, color='c', linestyle='--')
+            for i in range(len(self.ellipCals)):
+                ax.hlines([self.ellipCals[i]], -np.pi/2.0, np.pi/2.0, color='m', linestyle='-')
+                fhlines = [
+                    self.ellipCals[i] - self.eRange,
+                    self.ellipCals[i] + self.eRange,
+                ]
+                bhlines = [
+                    self.ellipCals[i]/self.brightScale - self.bright_factor*self.eRange,
+                    self.ellipCals[i]/self.brightScale + self.bright_factor*self.eRange,
+                ]
+                ax.hlines(fhlines, -np.pi/2.0, np.pi/2.0, color='m', linestyle='--')
+                ax.hlines(bhlines, -np.pi/2.0, np.pi/2.0, color='c', linestyle='--')
             ax.set_xlabel("Theta", size='small')
             ax.set_ylabel("e", size='small')
             ax.set_xlim([-np.pi/2.0, np.pi/2.0])
@@ -346,31 +461,39 @@ class SatelliteFinder(object):
 
             # centroid vs flux
             ax = fig.add_subplot(py, px, 4)
-            ax.scatter(self.center[::stride], img[::stride]/self.noise,
+            ax.scatter(self.center[::stride], self.lum[::stride]/self.noise,
                        c=np.clip(self.center_perp[::stride], 0.0, 2.0*self.centerLimit), marker='.', s=1.0,
                        alpha=0.5, edgecolor='none')
-            ax.scatter(self.center[self.wy,self.wx], img[self.wy,self.wx]/self.noise,
+            ax.scatter(self.center[self.wy,self.wx], self.lum[self.wy,self.wx]/self.noise,
                        c=np.clip(self.center_perp[self.wy,self.wx], 0.0, 2.0*self.centerLimit),
                        s=2.0, alpha=1.0, edgecolor='none')
-            ax.vlines([self.centerLimit, self.centerLimit/self.bright_factor], 0.001, 100, color='k', linestyle='--')
+            for i,trail in enumerate(trails):
+                x, y = trail.trace(nx, ny, offset=0, bins=self.bins)
+                x = x.astype(int)
+                y = y.astype(int)
+                ax.plot(self.center[y,x], self.lum[y,x]/self.noise, colors[i%4]+'.', ms=1.0)
+            
+            ax.vlines([self.centerLimit, self.centerLimit/self.bright_factor],
+                      self.luminosityLimit/10.0, 10.0*self.luminosityMax, color='k', linestyle='--')
             ax.hlines([self.luminosityLimit], 0.01, 10, color='k', linestyle='--')
             ax.set_xscale("log")
             ax.set_yscale("log")
             ax.set_xlabel("Center", size='small')
             ax.set_ylabel("Flux", size='small')
             ax.set_xlim([0.01, 10])
-            ax.set_ylim([0.001, 100])
+            ax.set_ylim([self.luminosityLimit/10.0, 10*self.luminosityMax])
             font(ax)
 
 
             # b versus skew
             ax = fig.add_subplot(py, px, 5)
-            ax.scatter(self.skew, self.b,
-                       c=np.clip(self.center, 0.0, 2.0*self.centerLimit), marker='.', s=2.0,
-                       alpha=0.5, edgecolor='none')
-            ax.scatter(self.skew[self.wy,self.wx], self.b[self.wy,self.wx],
-                       c=np.clip(self.center[self.wy,self.wx], 0.0, 2.0*self.centerLimit), marker='.', s=4.0,
-                       alpha=1.0, edgecolor='none')
+            for i in range(len(self.bCals)):
+                ax.scatter(self.skew, self.b/self.bCals[i],
+                           c=np.clip(self.center, 0.0, 2.0*self.centerLimit), marker='.', s=1.0,
+                           alpha=0.5, edgecolor='none')
+                ax.scatter(self.skew[self.wy,self.wx], self.b[self.wy,self.wx]/self.bCals[i],
+                           c=np.clip(self.center[self.wy,self.wx], 0.0, 2.0*self.centerLimit), marker='.', s=2.0,
+                           alpha=1.0, edgecolor='none')
             ax.vlines([self.skewLimit, self.skewLimit/self.bright_factor], 0, 3.0, linestyle='--', color='k')
             fhlines = [
                 self.bRatio - self.widthToPsfLimit,
@@ -382,6 +505,13 @@ class SatelliteFinder(object):
             ]
             ax.hlines(fhlines, 0, 3.0*self.skewLimit, linestyle='--', color='m')
             ax.hlines(bhlines, 0, 3.0*self.skewLimit, linestyle='--', color='c')
+            for i,trail in enumerate(trails):
+                x, y = trail.trace(nx, ny, offset=0, bins=self.bins)
+                x = x.astype(int)
+                y = y.astype(int)
+                marker = '.', '+'
+                for j in range(len(self.bCals)):
+                    ax.plot(self.skew[y,x], self.b[y,x]/self.bCals[j], colors[i%4]+marker[j], ms=4.0)
             ax.set_xlabel("Skew", size='small')
             ax.set_ylabel("B", size='small')
             ax.set_xlim([0.0, 3.0*self.skewLimit])
@@ -433,49 +563,58 @@ class SatelliteFinder(object):
         dx, dy = exposure.getWidth(), exposure.getHeight()
         img = exposure.getMaskedImage().getImage().getArray()
 
-        ##################################
-        # make a calibration trail
-        ##################################
-        calTrail = SatelliteTrail(self.kernelSize//2, 0)
-        #calTrail = SatelliteTrail(0.0, np.pi/4.0)
-        cal = np.zeros((self.kernelSize, self.kernelSize))
+        trailWidth = []
+        psfSigma = satUtil.getExposurePsfSigma(exposure, minor=True)
+        sigmaSmooth  = self.sigmaSmooth
         if not width:
-            sigmaInsert = satUtil.getExposurePsfSigma(exposure, minor=True)
-            sigmaSmooth = self.sigmaSmooth
-            maskBit = None
-            nSigma = 7.0
+            trailWidth += [1]
+            maskBit      = None
         else:
-            sigmaInsert = width/2.0
-            sigmaSmooth = self.sigmaSmooth
-            maskBit = 1.0
-            nSigma = 1.0
-        calTrail.insert(cal, sigma=sigmaInsert/self.bins, maskBit=maskBit, nSigma=nSigma)
-        # make sure we smooth in exactly the same way!
-        cal = self._smooth(cal, sigmaSmooth)
+            for w in width:
+                trailWidth += [w/2.0]
+            maskBit     = 1.0
+        nCal = len(trailWidth)
+                
+        ##################################
+        # make calibration trails
+        ##################################
+        ellipCals, thetaCals, bCals = [],[],[]
+        for i in range(nCal):
+            calTrail = SatelliteTrail(self.kernelSize//2, 0, width=trailWidth[i]/self.bins)
+            #calTrail = SatelliteTrail(0.0, np.pi/4.0)
+            cal = np.zeros((self.kernelSize, self.kernelSize))
+            calTrail.insert(cal, sigma=psfSigma/self.bins, maskBit=maskBit)
+            # make sure we smooth in exactly the same way!
+            cal = self._smooth(cal, sigmaSmooth)
 
-        #fig = figure.Figure()
-        #can = FigCanvas(fig)
-        #ax = fig.add_subplot(111)
-        #ax.imshow(cal)
-        #fig.savefig("junk.png")
-        
+            if False:
+                fig = figure.Figure()
+                can = FigCanvas(fig)
+                ax = fig.add_subplot(111)
+                ax.imshow(cal)
+                fig.savefig("junk.png")
+
+            convolved_cal = satUtil.momentConvolve2d(cal, self.kx, self.kernelSigma)
+            xcen, ycen = self.kernelSize//2, self.kernelSize//2
+            _, xcal, ycal, xxcal, yycal, xycal, x3cal, y3cal = [c[ycen,xcen] for c in convolved_cal]
+            ellipCal, thetaCal, bCal = satUtil.momentToEllipse(xxcal, yycal, xycal)
+            ellipCals.append(ellipCal)
+            bCals.append(bCal)
+            
+            
         ####################################
         # measure both the real moments and cal image
         ####################################
         convolved = satUtil.momentConvolve2d(img, self.kx, self.kernelSigma)
         sumI, ximg, yimg, xximg, yyimg, xyimg, x3img, y3img = convolved
         
-        convolved_cal = satUtil.momentConvolve2d(cal, self.kx, self.kernelSigma)
-        xcen, ycen = self.kernelSize//2, self.kernelSize//2
-        _, xcal, ycal, xxcal, yycal, xycal, x3cal, y3cal = [c[ycen,xcen] for c in convolved_cal]
-
-        center = np.sqrt(ximg**2 + yimg**2)
-        ellip, theta, B       = satUtil.momentToEllipse(xximg, yyimg, xyimg)
-        center_perp = np.abs(ximg*np.sin(theta) - yimg*np.cos(theta))
-        skew = np.sqrt(x3img**2 + y3img**2)
-        skew_perp = np.abs(x3img*np.sin(theta) - y3img*np.cos(theta))
-        ellipCal, thetaCal, bCal = satUtil.momentToEllipse(xxcal, yycal, xycal)
-        return sumI, center, center_perp, ellip, theta, ellipCal, thetaCal, skew, skew_perp, B/bCal
+        center            = np.sqrt(ximg**2 + yimg**2)
+        ellip, theta, B   = satUtil.momentToEllipse(xximg, yyimg, xyimg)
+        center_perp       = np.abs(ximg*np.sin(theta) - yimg*np.cos(theta))
+        skew              = np.sqrt(x3img**2 + y3img**2)
+        skew_perp         = np.abs(x3img*np.sin(theta) - y3img*np.cos(theta))
+        
+        return sumI, center, center_perp, ellip, theta, skew, skew_perp, B, ellipCals, bCals
         
 
     def _hesseForm(self, theta, xx, yy):
@@ -523,6 +662,7 @@ class SatelliteFinder(object):
         points = len(r0)
         maxPoints = 1000
 
+        np.random.seed(44)
         r, theta, xx, yy = r0, theta0, xx0, yy0
         if points > maxPoints:
             idx = np.arange(points, dtype=int)

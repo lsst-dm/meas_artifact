@@ -75,7 +75,7 @@ def main(rerun, visits):
     with open(filename, 'r') as fp:
         lines = fp.readlines()
 
-    all_types = "bfpvaF"
+    all_types = "bfpvaFds"
     ccds = {}
     tps, fps, tns, fns = {}, {}, {}, {}
     for c in all_types:

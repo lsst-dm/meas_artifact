@@ -9,6 +9,7 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as FigCanvas
 
 import line
 
+
 def hesse_cluster(theta, x, y):
     """
     @theta  angles
@@ -42,6 +43,14 @@ def hesse_cluster(theta, x, y):
     dy = np.abs(yy1 - yy2)
     dd = dx + dy
 
+    # this is the theta we get if we just draw a line between points in pixel space
+    w0 = np.where(dx == 0)
+    dx[w0] = 1.0
+    intercept = yy1 - (dy/dx)*xx1
+    sign = np.sign(intercept)
+    pixel_theta = np.arctan2(dy, dx) + sign*np.pi/2.0
+    
+    
     # convert each point to a line
     m = (r2 - r)/dtheta
     b = r - t*m
@@ -72,12 +81,15 @@ def hesse_cluster(theta, x, y):
     w[good] += dd[good]
 
     # de-weight points that have moved us far from where we started
-    dtr = np.abs( (tt - t)*(rr - r) ) + 1.0
-    w /= dtr
+    dtr = np.abs((tt - t)*(rr - r)) + 1.0
+    theta_discrepancy = np.abs( tt - pixel_theta ) + 0.01
+
+    w /= dtr*theta_discrepancy
 
     t_new = np.average(tt, axis=0, weights=w)
     r_new = np.average(rr, axis=0, weights=w)
 
+    
     # use original values for things that didn't converge
     t0 = (t_new < 1.0e-6)
     t_new[t0] = t[t0]
@@ -202,7 +214,7 @@ def hesse_bin(r0, theta0, bins=200, r_max=4096, ncut=4, navg=0.0):
 
     locus, numLocus = ndimg.label(bin2d > thresh, structure=np.ones((3,3)))
 
-    rs, ts, idx = [], [], []
+    rs, ts, idx, drs, dts = [], [], [], [], []
     for i in range(numLocus):
         loc_r,loc_t = np.where(locus == i + 1)
         
@@ -227,7 +239,10 @@ def hesse_bin(r0, theta0, bins=200, r_max=4096, ncut=4, navg=0.0):
         
         wtmp = np.where((theta >= tlo) & (theta < thi) & (r >= rlo) & (r < rhi))[0]
         t_tmp = np.median(theta[wtmp])
+        dt_tmp = theta[wtmp].std()
         r_tmp = np.median(r[wtmp])
+        dr_tmp = r[wtmp].std()
+        
         #print "%6.1f %6.1f  %6.3f %6.3f  %6.1f %6.1f   %6.3f %6.1f  %3d  %3d" % (loc_t.mean(), loc_r.mean(), 0.5*(tlo + thi), thi-tlo, 0.50*(rlo+ rhi), rhi-rlo, t_tmp, r_tmp,  len(wtmp), nbox)
 
         # don't accept theta < 0 or > 2pi
@@ -235,12 +250,38 @@ def hesse_bin(r0, theta0, bins=200, r_max=4096, ncut=4, navg=0.0):
             continue
             
         rs.append(r_tmp)
+        drs.append(dr_tmp)
         ts.append(t_tmp)
+        dts.append(dt_tmp)
 
         w = np.where((theta0 >= tlo) & (theta0 < thi) & (r0 >= rlo) & (r0 < rhi))[0]
         idx.append(w)
 
-    return bin2d, r_edge, t_edge, rs, ts, idx
+    # check for wrapped-theta doubles,
+    # - pick the one with the lowest stdev
+    # - this is rare, but a bright near-vertical trail can be detected near theta=0 and theta=2pi
+    # --> the real trail is rarely exactly vertical, so one solution will not converge nicely.
+    #     ... the stdev of thetas will be wider (10x).
+    n = len(rs)
+    kill_list = []
+    for i in range(n):
+        for j in range(i,n):
+            dr = abs(rs[i] - rs[j])
+            dt = abs(ts[i] - ts[j])
+            if dr < 10 and dt > 1.9*np.pi:
+                print "d_thetas: ", dts[i], dts[j]
+                bad = i if dts[i] > dts[j] else j
+                kill_list.append(bad)
+
+    rs_good, ts_good, idx_good = [],[],[]
+    for i in range(n):
+        if i in kill_list:
+            continue
+        rs_good.append(rs[i])
+        ts_good.append(ts[i])
+        idx_good.append(idx[i])
+                
+    return bin2d, r_edge, t_edge, rs_good, ts_good, idx_good
 
 
 
