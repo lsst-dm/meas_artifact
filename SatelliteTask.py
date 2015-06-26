@@ -40,9 +40,9 @@ class SatelliteTask(pipeBase.CmdLineTask):
             # run for regular satellites
             trails = self.runSatellite(exposure, bins=4, log=log)
             # run for broad linear (aircraft?) features by binning
-            trailsB = self.runSatellite(exposure, bins=4, broadTrail=True, log=log)
+            #trailsB = self.runSatellite(exposure, bins=4, broadTrail=True, log=log)
 
-            trails = trails.merge(trailsB)
+            #trails = trails.merge(trailsB)
             
             msg = "Detected %d satellite trails.  cand-pix: %d bin-max: %d  psfSigma: %.2f" % \
                   (len(trails), trails.nTotal, trails.binMax, trails.psfSigma)
@@ -78,7 +78,7 @@ class SatelliteTask(pipeBase.CmdLineTask):
             skewLimit   = 150.0
             widthToPsfLimit = 0.1
         else:
-            luminosityLimit = 10.0   # low cut on pixel flux
+            luminosityLimit = 6.0   # low cut on pixel flux
             luminosityMax   = 1.0e4 # max luminsity for pixel flux
             maskNPsfSigma = 7.0
             centerLimit = 0.8  # about 1 pixel
@@ -87,7 +87,7 @@ class SatelliteTask(pipeBase.CmdLineTask):
             kernelSigma = 9    # pixels
             kernelSize  = 17   # pixels
             width=None
-            houghThresh     = 30    # counts in a r,theta bins
+            houghThresh     = 50    # counts in a r,theta bins
             skewLimit       = 40.0
             widthToPsfLimit = 0.15
 

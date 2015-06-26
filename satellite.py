@@ -203,10 +203,11 @@ class SatelliteFinder(object):
                 DET = _fmsk.getPlaneBitMask("DETECTED")
                 DET |= MASK
                 w = fmsk & DET > 0
-                im = exp_faint.getMaskedImage().getImage().getArray()
+                im = exp_faint.getMaskedImage().getImage().getArray()                
                 rms = im[~w].std()
-                im[w] = rms
-                
+                im[w] = 0.0 #rms
+                wlo = np.where(im <= 0.0) #1.0*rms)
+                im[wlo] = 0.0 #2.0*rms
                 
         else:
             exp = exposure
@@ -231,10 +232,48 @@ class SatelliteFinder(object):
         self.sigmaSmooth = 1.0
         img = self._smooth(img, self.sigmaSmooth)
         img_faint = self._smooth(img_faint, self.sigmaSmooth)
-        
+        img_faint[np.where(img_faint < rms)] = rms
         
         xx, yy = np.meshgrid(np.arange(img.shape[1], dtype=int), np.arange(img.shape[0], dtype=int))
 
+
+        def pVals(cen, ell, skw, lum, b, ellCal, bCal, nois, theta, _MASK):
+        
+            z_center = cen**2/(2.0*self.centerLimit**2)
+            p_center = np.exp(-z_center)
+            z_ellip  = (ell - ellCal[0])**2/(2.0*16.0*self.eRange**2)
+            wsharp = np.where(ell > 0.9)
+            z_ellip[wsharp]  = 10.0
+            #z_ellip  = (self.ellip - 0.5)**2/(2.0*0.2**2)
+            p_ellip  = np.exp(-z_ellip)
+            z_skew   = skw**2/(2.0*self.skewLimit**2)
+            p_skew   = np.exp(-z_skew)
+            z_lum    = np.clip(lum, 0.0, None)**2/(2.0*nois**2)
+            p_lum    = 1.0 - np.exp(-z_lum)
+            z_b      = (b/bCal[0] - 1.0*self.bRatio)**2/(2.0*16.0*self.widthToPsfLimit**2)
+            p_b      = np.exp(-z_b)
+
+            good = np.zeros(p_lum.shape) + 1.0e-10
+            good[(msk & _MASK == 0)] += 1.0
+            p_value =   good*p_lum #p_center*p_skew #*p_b*p_ellip
+
+            p1000 = np.percentile(p_value, 100.0*(p_value.size - 1000.0)/p_value.size)
+            print "p999: ", p1000
+            w_p = p_value > p1000
+            hist, edges = np.histogram(self.theta0[w_p], bins=np.linspace(-np.pi, np.pi, 20))
+            i_count = hist.argmax()
+            t = 0.5*(edges[i_count] + edges[i_count+1])
+            z_theta = (theta - t)**2/(2.0*0.2**2)
+            p_theta = np.exp(-z_theta)
+            p_value *= p_theta
+
+            p1000 = np.percentile(p_value, 100.0*(p_value.size - 1000.0)/p_value.size)
+            print "p999: ", p1000
+            w_p = p_value > p1000
+            
+            print "Hits", w_p.sum()
+            return p_value, p_center, p_ellip, p_skew, p_lum, p_b, p_theta, w_p
+            
         #   - get ellipticities and thetas
         
         self.sumI, self.center, self.center_perp, self.ellip, self.theta0, \
@@ -247,7 +286,80 @@ class SatelliteFinder(object):
             self.ellipCals_f, self.bCals_f = self._getMoments(exp_faint, width=width)
         self.lum_f = self.sumI_f
 
+        if 0:
+            p_value, p_center, p_ellip, p_skew, p_lum, p_b, p_theta, \
+                w_p = pVals(self.center, self.ellip, self.skew, self.sumI,
+                            self.b, self.ellipCals, self.bCals, self.noise, self.theta0, MASK)
+        else:
+            p_value, p_center, p_ellip, p_skew, p_lum, p_b, p_theta, \
+                w_p = pVals(self.center_f, self.ellip_f, self.skew_f, img_faint,
+                            self.b_f, self.ellipCals_f, self.bCals_f, self.noise_f, self.theta0_f, MASK | DET)
+        z_value = np.log(p_value)
 
+        use_p = True
+        
+        if False:
+            fig = figure.Figure(figsize=(10,10))
+            can = FigCanvas(fig)
+            ax = fig.add_subplot(231)
+            a = ax.imshow(img_faint[50:400,50:200], origin='lower')
+            fig.colorbar(a)
+            ax = fig.add_subplot(232)
+            print "B", self.bCals_f
+            a = ax.imshow(self.b_f[50:400,50:200]/self.bCals_f[0], origin='lower')
+            fig.colorbar(a)
+            ax = fig.add_subplot(233)
+            a = ax.imshow(self.ellip_f[50:400,50:200], origin='lower')
+            fig.colorbar(a)
+            ax = fig.add_subplot(234)
+            a = ax.imshow(p_value[50:400,50:200], origin='lower')
+            fig.colorbar(a)
+            ax = fig.add_subplot(235)
+            a = ax.imshow(self.theta0_f[50:400,50:200], origin='lower')
+            fig.colorbar(a)
+            ax = fig.add_subplot(236)
+            a = ax.imshow(self.center_f[50:400,50:200], origin='lower')
+            fig.colorbar(a)
+            fig.savefig("foo.png")
+        
+        fig = figure.Figure(figsize=(14,8))
+        can = FigCanvas(fig)
+        ax = fig.add_subplot(251)
+        a = ax.imshow(p_value, origin='lower', cmap="gray_r")
+        fig.colorbar(a)
+        ax = fig.add_subplot(252)
+        a = ax.imshow(p_ellip, origin='lower', cmap="gray_r")
+        fig.colorbar(a)
+        ax = fig.add_subplot(253)
+        a = ax.imshow(p_b, origin='lower', cmap="gray_r")
+        fig.colorbar(a)
+        
+        ax = fig.add_subplot(254)
+        a = ax.imshow(z_value, origin='lower', cmap="gray_r")
+        fig.colorbar(a)
+        ax = fig.add_subplot(255)
+        a = ax.imshow(p_skew, origin='lower', cmap="gray_r")
+        fig.colorbar(a)
+        ax = fig.add_subplot(256)
+        a = ax.imshow(p_lum, origin='lower', cmap="gray_r")
+        fig.colorbar(a)
+
+        
+        hit = np.zeros(p_value.shape)
+        hit[w_p] = 1.0
+        ax = fig.add_subplot(257)
+        a = ax.imshow(hit, origin='lower', cmap='gray_r')
+        fig.colorbar(a)
+        ax = fig.add_subplot(258)
+        a = ax.imshow(p_center, origin='lower', cmap="gray_r")
+        fig.colorbar(a)
+        ax = fig.add_subplot(259)
+        a = ax.hist(self.theta0[w_p], bins=50, range=(-np.pi, np.pi))
+        ax = fig.add_subplot(2,5,10)
+        a = ax.imshow(p_theta, origin='lower', cmap='gray_r')
+        fig.colorbar(a)
+        fig.savefig("foo.png")
+            
         nCal = len(self.bCals)
         accumulate = np.zeros(img.shape, dtype=np.uint16)
         
@@ -263,17 +375,19 @@ class SatelliteFinder(object):
             
             #   - cull unsuitable pixels
             mask_test = (
-                ( np.abs(self.ellip_f - ellipCal_f) < self.eRange )
-                & (self.lum_f > self.luminosityLimit*self.noise_f) & (self.lum_f < 3.0*self.luminosityLimit*self.noise_f)
-                & (np.abs(self.center_perp_f) < self.centerLimit)
-                & (np.abs(self.center_f) < 2.0*self.centerLimit)
-                & (msk & MASK == 0)
-                & (np.abs(self.skew_perp_f) < self.skewLimit)
-                & (np.abs(self.skew_f) < 2.0*self.skewLimit)
-                & (np.abs(b_f - self.bRatio) < self.widthToPsfLimit)
+                #( np.abs(self.ellip_f - ellipCal_f) < 1.0*self.eRange )
+                (img_faint > 2.5*self.noise_f)
+                & (msk & (MASK | DET) == 0)
             )
-            if not width:
-                mask_test &= 0
+            #    & (np.abs(self.center_perp_f) < 1.0*self.centerLimit)
+            #    & (np.abs(self.center_f) < 2.0*self.centerLimit)
+            #    & (np.abs(self.skew_perp_f) < 1.0*self.skewLimit)
+            #    & (np.abs(self.skew_f) < 2.0*self.skewLimit)
+            #)
+            #    & (np.abs(b_f - self.bRatio) < 1.0*self.widthToPsfLimit)
+            #)
+            #if not width:
+            #    mask_test &= 0
 
             faint_test = (
                 ( np.abs(self.ellip - ellipCal) < self.eRange )
@@ -315,11 +429,18 @@ class SatelliteFinder(object):
                 & (np.abs(b - self.brightScale*self.bRatio) < self.bright_factor*self.widthToPsfLimit)
             )
 
-            print (mask_test == True).sum(), \
-                (faint_test  == True).sum(), \
-                (medium_test == True).sum(), \
-                (bright_test == True).sum()
-            all_test = mask_test | faint_test | medium_test | bright_test
+            nmask,nfaint,nmed,nbright = (mask_test == True).sum(), \
+                                        (faint_test  == True).sum(), \
+                                        (medium_test == True).sum(), \
+                                        (bright_test == True).sum()
+            print nmask, nfaint, nmed, nbright
+            if nfaint + nmed + nbright > 150:
+                mask_test &= 0
+
+            if use_p:
+                all_test = w_p
+            else:
+                all_test = mask_test | faint_test | medium_test | bright_test
 
             wid = 1
             if width:
@@ -452,6 +573,11 @@ class SatelliteFinder(object):
                 ]
                 ax.hlines(fhlines, -np.pi/2.0, np.pi/2.0, color='m', linestyle='--')
                 ax.hlines(bhlines, -np.pi/2.0, np.pi/2.0, color='c', linestyle='--')
+            for i,trail in enumerate(trails):
+                x, y = trail.trace(nx, ny, offset=0, bins=self.bins)
+                x = x.astype(int)
+                y = y.astype(int)
+                ax.plot(self.theta0[y,x], self.ellip[y,x], colors[i%4]+'.', ms=1.0)
             ax.set_xlabel("Theta", size='small')
             ax.set_ylabel("e", size='small')
             ax.set_xlim([-np.pi/2.0, np.pi/2.0])
@@ -515,7 +641,7 @@ class SatelliteFinder(object):
             ax.set_xlabel("Skew", size='small')
             ax.set_ylabel("B", size='small')
             ax.set_xlim([0.0, 3.0*self.skewLimit])
-            ax.set_ylim([0.0, 2.0])
+            ax.set_ylim([0.0, 4.0])
             font(ax)
 
             
@@ -580,10 +706,12 @@ class SatelliteFinder(object):
         ##################################
         ellipCals, thetaCals, bCals = [],[],[]
         for i in range(nCal):
-            calTrail = SatelliteTrail(self.kernelSize//2, 0, width=trailWidth[i]/self.bins)
+            calTrail = SatelliteTrail((self.bins*self.kernelSize)//2, 0, width=trailWidth[i])
             #calTrail = SatelliteTrail(0.0, np.pi/4.0)
-            cal = np.zeros((self.kernelSize, self.kernelSize))
-            calTrail.insert(cal, sigma=psfSigma/self.bins, maskBit=maskBit)
+            _cal = afwImage.ImageF(self.bins*self.kernelSize, self.bins*self.kernelSize)
+            cal = _cal.getArray()
+            calTrail.insert(cal, sigma=psfSigma, maskBit=maskBit)
+            cal = afwMath.binImage(_cal, self.bins).getArray()
             # make sure we smooth in exactly the same way!
             cal = self._smooth(cal, sigmaSmooth)
 
@@ -672,7 +800,7 @@ class SatelliteFinder(object):
 
             
         # improve the r,theta locations
-        self.r_new, self.theta_new, _r, _xx, _yy = hesse.hesse_iter(theta, xx, yy, niter=3)
+        self.r_new, self.theta_new, _r, _xx, _yy = hesse.hesse_iter(theta, xx, yy, niter=1)
 
         r_max = 1.0
         if len(xx):

@@ -232,9 +232,18 @@ def hesse_bin(r0, theta0, bins=200, r_max=4096, ncut=4, navg=0.0):
             max_ti = min(peak_ti+1, bins-1)
             min_ri = max(peak_ri-1, 0)
             max_ri = min(peak_ri+1, bins-1)
+
+            # wider set
+            wmin_ti = max(peak_ti-3, 0)
+            wmax_ti = min(peak_ti+3, bins-1)
+            wmin_ri = max(peak_ri-3, 0)
+            wmax_ri = min(peak_ri+3, bins-1)
             
         tlo, thi = t_edge[min_ti], t_edge[max_ti+1]
         rlo, rhi = r_edge[min_ri], r_edge[max_ri+1]
+        # wide edges
+        wtlo, wthi = t_edge[wmin_ti], t_edge[wmax_ti+1]
+        wrlo, wrhi = r_edge[wmin_ri], r_edge[wmax_ri+1]
         nbox = len(loc_t)
         
         wtmp = np.where((theta >= tlo) & (theta < thi) & (r >= rlo) & (r < rhi))[0]
@@ -242,18 +251,36 @@ def hesse_bin(r0, theta0, bins=200, r_max=4096, ncut=4, navg=0.0):
         dt_tmp = theta[wtmp].std()
         r_tmp = np.median(r[wtmp])
         dr_tmp = r[wtmp].std()
+
+        # wide stats
+        wwtmp = np.where((theta >= wtlo) & (theta < wthi) & (r >= wrlo) & (r < wrhi))[0]
+        wt_tmp = np.median(theta[wwtmp])
+        wdt_tmp = theta[wwtmp].std()
+        wr_tmp = np.median(r[wwtmp])
+        wdr_tmp = r[wwtmp].std()
+
         
         #print "%6.1f %6.1f  %6.3f %6.3f  %6.1f %6.1f   %6.3f %6.1f  %3d  %3d" % (loc_t.mean(), loc_r.mean(), 0.5*(tlo + thi), thi-tlo, 0.50*(rlo+ rhi), rhi-rlo, t_tmp, r_tmp,  len(wtmp), nbox)
 
         # don't accept theta < 0 or > 2pi
         if t_tmp < 0.0 or t_tmp > 2.0*np.pi:
             continue
+
+        # if including neighbouring cells increases our stdev, we didn't converge well and the solution
+        # is probably bad.  If only r or only theta are broad, then it might be ok ... keep it.
+        rgrow = wdr_tmp/dr_tmp
+        tgrow = wdt_tmp/dt_tmp
+        grow = np.sqrt(rgrow**2 + tgrow**2)
+        print r_tmp, t_tmp, rgrow, tgrow, grow
+
+        if rgrow > 2.0 and tgrow > 2.0:
+            continue
             
         rs.append(r_tmp)
         drs.append(dr_tmp)
         ts.append(t_tmp)
         dts.append(dt_tmp)
-
+        
         w = np.where((theta0 >= tlo) & (theta0 < thi) & (r0 >= rlo) & (r0 < rhi))[0]
         idx.append(w)
 

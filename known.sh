@@ -18,6 +18,9 @@ else
 fi
 
 
+# faint candidates
+# 0262-015
+
 
 echo -n "See PNGs? [y/N]: "
 read REPLY
