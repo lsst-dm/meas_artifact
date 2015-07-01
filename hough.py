@@ -1,13 +1,9 @@
 #!/usr/bin/env python
-import time
 
+import time
+import collections
 import numpy as np
 from scipy import ndimage as ndimg
-
-import matplotlib.figure as figure
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigCanvas
-
-import line
 
 
 def hesseForm(theta_in, x, y):
@@ -78,6 +74,8 @@ def hesseCluster(theta, x, y):
     """
 
     dtheta = 0.01
+
+    t1 = time.time()
     
     rdist = 100
     tdist = 0.15
@@ -92,22 +90,35 @@ def hesseCluster(theta, x, y):
     t[cycle] -= 2.0*np.pi
     r = x*np.cos(t) + y*np.sin(t)
     
+    print "clean", time.time() - t1
+        
     t2 = t + dtheta
     r2 = x*np.cos(t2) + y*np.sin(t2)
+    print "cos", time.time() - t1
 
     xx1, xx2 = np.meshgrid(x, x)
     yy1, yy2 = np.meshgrid(y, y)
+
+    print "aftermesh", time.time() - t1
+    
     dx = np.abs(xx1 - xx2)
     dy = np.abs(yy1 - yy2)
     dd = dx + dy
 
+    print "afterabs", time.time() - t1
+    
     # this is the theta we get if we just draw a line between points in pixel space
     w0 = np.where(dx == 0)
     dx[w0] = 1.0
+    print "where", time.time() - t1
+    
     intercept = yy1 - (dy/dx)*xx1
     sign = np.sign(intercept)
+    print "atan0", time.time() - t1
     pixel_theta = np.arctan2(dy, dx) + sign*np.pi/2.0
     
+
+    print "atan", time.time() - t1
     
     # convert each point to a line
     m = (r2 - r)/dtheta
@@ -154,32 +165,33 @@ def hesseCluster(theta, x, y):
     r0 = (r_new < 1.0e-6)
     r_new[r0] = r[r0]
 
+    print time.time() - t1
     return r_new, t_new, r, x, y
 
 
-def hesseIter(theta, xx, yy, niter=3):
+def hesseIter(theta, xx, yy, nIter=3):
 
     r, t, _r, _xx, _yy = hesseCluster(theta, xx, yy)
-    for i in range(niter):
+    for i in range(nIter):
         r, t, _, _xx, _yy = hesseCluster(t, xx, yy)
     return r, t, _r, _xx, _yy 
 
 
-def hesseBin(r0, theta0, bins=200, r_max=4096, ncut=4, navg=0.0):
+def hesseBin(r0, theta0, bins=200, rMax=4096, ncut=4, navg=0.0):
 
     r = r0
     theta = theta0
     
     theta_margin = 0.4
     
-    non_trivial = (np.abs(theta) > 1.0e-2) & (np.abs(r) > 1.0*r_max/bins)
+    non_trivial = (np.abs(theta) > 1.0e-2) & (np.abs(r) > 1.0*rMax/bins)
     non_bleed   = np.abs(theta - np.pi/2.0) > 1.0e-2
 
     ok = non_trivial  & non_bleed
 
                   
     bin2d, r_edge, t_edge = np.histogram2d(r[ok], theta[ok], bins=(bins,bins),
-                                           range=((0.0, r_max), (-theta_margin, theta_margin+2.0*np.pi)) )
+                                           range=((0.0, rMax), (-theta_margin, theta_margin+2.0*np.pi)) )
 
     wrpos, wtpos = np.where(bin2d > 1)
     if len(wrpos):
@@ -287,100 +299,68 @@ def hesseBin(r0, theta0, bins=200, r_max=4096, ncut=4, navg=0.0):
     return bin2d, r_edge, t_edge, rs_good, ts_good, idx_good
 
 
-
     
+HoughSolution = collections.namedtuple('HoughSolution', 'r theta x y rNew thetaNew binMax')
+
+class HoughSolutionList(list):
+    def __init__(self, nSolutions, binMax, r, theta):
+        self.nSolutions = nSolutions
+        self.binMax     = binMax
+        self.r          = r
+        self.theta      = theta
     
-if __name__ == '__main__':
 
-    r0s = [200, 400]
-    theta0s = [np.pi/3.0, np.pi/7.0]
-
-    dtheta = 0.05
-
-    bins = 200
-    n = 200
-    nx, ny = 512, 512
-    
-    # r = x*cos(t) + y*sin(t)
-    # --> y = (r - x*cos(t))/sin(t)
-    x0 = nx*np.arange(0, n)/n
-    #x0 = 0.5*nx + 3.0*np.random.normal(size=n//1)
-    #x0 = np.append(x0, 0.6*nx + 3.0*np.random.normal(size=n//1))
-    xx = np.array([])
-    yy = np.array([])
-    theta = np.array([])
-    for r0, theta0 in zip(r0s, theta0s):
-        x = x0.copy()
-        y = (r0 - x*np.cos(theta0))/np.sin(theta0)
-        w = np.where((y > 0) & (y < ny))[0]
-        n = len(w)
-        xx = np.append(xx, x[w])
-        yy = np.append(yy, y[w])
-
-        # add a random error to theta
-        theta = np.append(theta, theta0 + dtheta*np.random.normal(size=n))
-
-    r_max = 1.0
-    if len(xx):
-        r_max = max(xx.max(), yy.max())
+class HoughTransform(object):
+    def __init__(self, bins, thresh, rMax=None, maxPoints=1000, nIter=1):
+        self.bins   = bins
+        self.thresh = thresh
+        self.rMax   = rMax
         
-    print "N: ", n
+        # things get slow with more than ~1000 points, shuffle and cut
+        self.maxPoints = maxPoints
+        self.nIter = nIter
 
-    # add some totally fake garbage
-    xn = np.random.uniform(nx, size=1)
-    yn = np.random.uniform(ny, size=1)
-    tn = np.random.uniform(np.pi, size=1)
+        self.overlapRange = 0.2
+        
+    def __call__(self, thetaIn, xIn, yIn):
 
-    xx = np.append(xx, xn)
-    yy = np.append(yy, yn)
-    theta = np.append(theta, tn)
+        
+        rIn, thetaIn = hesseForm(thetaIn, xIn, yIn)
 
-    print "Running hesseIter"
-    r_new, t_new, r, _xx, _yy = hesseIter(theta, xx, yy, niter=2)
-    #print t_new.mean(), r_new.mean()
-    bin2d, r_edge, t_edge, rs, ts, idx = hesseBin(r_new, t_new, bins=bins, r_max=r_max)
+        # wrap the points so we don't have a discontinuity at 0 or 2pi
+        theta0, (r0, x0, y0) = twoPiOverlap(thetaIn, (rIn, xIn, yIn), overlapRange=self.overlapRange)
+        
+        nPoints = len(r0)
 
-    print rs, ts, bin2d.shape
-    bin2d0, r_edge, t_edge = np.histogram2d(r, theta, bins=(bins,bins), range=((0.0, r_max),(0.0, np.pi)) )
-    
+        if nPoints == 0:
+            return ()
+        
+        np.random.seed(44)
+        r, theta, x, y = r0, theta0, x0, y0
+        if nPoints > self.maxPoints:
+            idx = np.arange(nPoints, dtype=int)
+            np.random.shuffle(idx)
+            idx = idx[:self.maxPoints]
+            r, theta, x, y = r0[idx], theta0[idx], x0[idx], y0[idx]
 
-    
-    fig = figure.Figure()
-    canvas = FigCanvas(fig)   
-    ax = fig.add_subplot(321)
-    xlo, xhi, ylo, yhi = 0, 512, 0, 512
-    ax.plot(xx, yy, 'r.')
-    ax.set_xlim([xlo, xhi])
-    ax.set_ylim([ylo, yhi])
+            
+        # improve the r,theta locations
+        rNew, thetaNew, _r, _x, _y = hesseIter(theta, x, y, nIter=self.nIter)
 
-    ax = fig.add_subplot(322)
-    ax.imshow(bin2d0, cmap='gray_r', origin='bottom', extent=(0.0, np.pi, 0.0, r_max), aspect='auto', interpolation='none')
-    ax.scatter(theta, r, c='r', s=20.0, marker='.', edgecolor='none')
-    ax.scatter(t_new, r_new, c='g', s=20.0, marker='.', edgecolor='none')
-    ax.set_xlim([min(theta0s)-0.2, max(theta0s)+0.2])
-    ax.set_ylim([min(r0s) - 40, max(r0s) + 40])
-
-    i = 0
-    for r0, theta0 in zip(r0s, theta0s):
-        if i > 3:
-            break
-        ax = fig.add_subplot(3,2,3 + i)
-        i += 1
-        ax.imshow(bin2d, cmap='gray_r', origin='bottom', extent=(0.0, np.pi, 0.0, r_max), aspect='auto', interpolation='none')
-        colors = 'r', 'b', 'c', 'm', 'g'
-        print len(idx)
-        for j in range(len(ts)):
-            ax.scatter(theta[idx[j]], r[idx[j]], c=colors[j % 4], s=20.0, marker='.', edgecolor='none')
-            ax.scatter(ts, rs, c='g', s=30.0, marker='.', edgecolor='none')
-        ax.set_xlim([theta0-0.1, theta0+0.1])
-        ax.set_ylim([r0 - 20, r0 + 20])
-
-    fig.savefig("hesse.png")   
-
-    #fig = figure.Figure()
-    #canvas = FigCanvas(fig)
-    #ax = fig.add_subplot(111)
-    #ax.imshow(bin2d, cmap='gray_r', origin='bottom', interpolation='none', extent=(0.0, np.pi, 0.0, r_max), aspect='auto')
-
-    #fig.savefig("test.png")   
-    
+        rMax = self.rMax
+        if self.rMax is None:
+            rMax = np.sqrt(x.max()**2 + y.max()**2)
+                
+        # bin the data in r,theta space; get r,theta that pass our threshold as a satellite trail
+        bin2d, r_edge, theta_edge, rs, thetas, idx = hesseBin(rNew, thetaNew,
+                                                              bins=self.bins, rMax=rMax,
+                                                              ncut=self.thresh)
+        
+        numLocus = len(thetas)
+        solutions = HoughSolutionList(numLocus, bin2d.max(), rIn, thetaIn)
+        for i in range(numLocus):
+            _x, _y = x[idx[i]], y[idx[i]]
+            rnew, tnew = rNew[idx[i]], thetaNew[idx[i]]
+            solutions.append( HoughSolution(rs[i], thetas[i], _x, _y, rnew, tnew, len(idx[i])) )
+        return solutions
+        

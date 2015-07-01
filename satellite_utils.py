@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
 import numpy as np
-import numpy.fft as fft
-import scipy.signal as signal
 import scipy.ndimage.filters as filt
 
 import lsst.afw.geom as afwGeom
 import lsst.afw.geom.ellipses as ellipses
+
+import collections
 
 def getExposurePsfSigma(exposure, minor=False):
     nx, ny = exposure.getWidth(), exposure.getHeight()
@@ -19,26 +19,6 @@ def getExposurePsfSigma(exposure, minor=False):
     else:
         return np.sqrt(axes.getA()*axes.getB())
 
-    
-def fftConvolve2d(data, kernels):
-
-    ny, nx = data.shape
-    dataF = fft.fft2(data)
-
-    convolved = []
-    for kernel in kernels:
-        ky, kx = kernel.shape
-        kimg  = np.zeros(data.shape)
-        kimg[ny/2-ky/2:ny/2+ky/2+1,nx/2-kx/2:nx/2+kx/2+1] += kernel
-
-        kimgF = fft.fft2(fft.fftshift(kimg))
-        prodF = kimgF * dataF
-        
-        conv  = fft.ifft2(prodF).real
-        convolved.append(conv)
-        
-    return convolved
-
 
 def separableConvolve(data, vx, vy):
     mode = 'reflect'
@@ -46,8 +26,19 @@ def separableConvolve(data, vx, vy):
     out  = filt.correlate1d(out0, vy, mode=mode, axis=0)
     return out
 
+
+def smooth(img, sigma):
     
-def momentConvolve2d(data, k, sigma):
+    k     = 2*int(6.0*sigma) + 1
+    kk    = np.arange(k) - k//2
+    gauss = (1.0/np.sqrt(2.0*np.pi))*np.exp(-kk*kk/(2.0*sigma))
+    smth  = separableConvolve(img, gauss, gauss)
+    return smth
+
+    
+ImageMoment = collections.namedtuple("ImageMoment", "i0 ix iy ixx iyy ixy ixxx iyyy")
+
+def momentConvolve2d(data, k, sigma, middleOnly=False):
 
     # moments are  e.g.   sum(I*x) / sum(I)
     
@@ -73,21 +64,12 @@ def momentConvolve2d(data, k, sigma):
     
     ix3  = filt.correlate1d(gaussY, gauss*k3, mode=mode) /sumI
     iy3  = filt.correlate1d(gaussX, gauss*k3, mode=mode, axis=0) /sumI
-    
-    return sumI, ix, iy, ixx, iyy, ixy, ix3, iy3
+
+    values = sumI, ix, iy, ixx, iyy, ixy, ix3, iy3
+    if middleOnly:
+        ny, nx = data.shape
+        values = [ x[ny//2,nx//2] for x in values ]
+    return ImageMoment(*values)
 
     
     
-def momentToEllipse(ixx, iyy, ixy, lo_clip=0.1):
-
-    tmp   = 0.5*(ixx + iyy)
-    diff  = ixx - iyy
-    tmp2  = np.sqrt(0.25*diff**2 + ixy**2)
-    a2    = np.clip(tmp + tmp2, lo_clip, None)
-    b2    = np.clip(tmp - tmp2, lo_clip, None)
-    ellip = 1.0 - np.sqrt(b2/a2)
-    theta = 0.5*np.arctan2(2.0*ixy, diff)
-
-    return ellip, theta, np.sqrt(b2)
-
-
