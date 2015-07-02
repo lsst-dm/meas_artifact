@@ -204,13 +204,13 @@ def trailPlot(finder, ax, mm, cmm, trail, i):
     tmin, tmax = trail.theta - dt, trail.theta + dt
     ax.set_xlim([tmin, tmax])
     ax.set_ylim([rmin, rmax])
-    w, = np.where( (np.abs(finder._solutions.theta - trail.theta) < dt) &
-                   (np.abs(finder.bins*finder._solutions.r - trail.r) < dr))
-    wNew, = np.where( (np.abs(finder._solutions[i].thetaNew - trail.theta) < dt) &
-                       (np.abs(finder.bins*finder._solutions[i].rNew - trail.r) < dr))
-    ax.text(0.95, 0.95, "N=%d" % (len(w)), size='xx-small',
+    w = (np.abs(finder._solutions.theta - trail.theta) < dt) & \
+        (np.abs(finder.bins*finder._solutions.r - trail.r) < dr)
+    wNew = (np.abs(finder._solutions[i].thetaNew - trail.theta) < dt) & \
+           (np.abs(finder.bins*finder._solutions[i].rNew - trail.r) < dr)
+    ax.text(0.95, 0.95, "N=%d" % (w.sum()), size='xx-small',
             horizontalalignment='right', verticalalignment='center', transform = ax.transAxes)
-    ax.text(0.95, 0.90, "N=%d" % (len(wNew)), size='xx-small',color = 'r',
+    ax.text(0.95, 0.90, "N=%d" % (wNew.sum()), size='xx-small',color = 'r',
             horizontalalignment='right', verticalalignment='center', transform = ax.transAxes)
     font(ax)
 

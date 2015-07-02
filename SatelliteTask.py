@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+
 import os, math, collections
 import lsst.afw.cameraGeom as afwCg
 import lsst.pipe.base as pipeBase
@@ -37,13 +38,26 @@ class SatelliteTask(pipeBase.CmdLineTask):
         except:
             pass
         logfile = os.path.join(path, "log%05d-%03d.txt" % (v,c))
+        
         with open(logfile, 'w') as log:
+            
             # run for regular satellites
             trailsSat = self.runSatellite(exposure, bins=4, log=log)
-            # run for broad linear (aircraft?) features by binning
-            #trailsAc = self.runSatellite(exposure, bins=4, broadTrail=True, log=log)
 
-            trails = trailsSat #.merge(trailsAc)
+            print "Now plotting"
+            filename = os.path.join(path,"satdebug-%05d-%03d-SAT.png" % (v, c))
+            satDebug.debugPlot(self.finder, filename)
+
+
+            # run for broad linear (aircraft?) features by binning
+            trailsAc = self.runSatellite(exposure, bins=4, broadTrail=True, log=log)
+
+            print "Now plotting"
+            filename = os.path.join(path,"satdebug-%05d-%03d-AC.png" % (v, c))
+            satDebug.debugPlot(self.finder, filename)
+
+            
+            trails = trailsSat.merge(trailsAc)
             
             msg = "Detected %d satellite trails.  cand-pix: %d bin-max: %d  psfSigma: %.2f" % \
                   (len(trails), trails.nPixels, trails.binMax, trails.psfSigma)
@@ -59,14 +73,6 @@ class SatelliteTask(pipeBase.CmdLineTask):
                 self.log.info(msg)
                 if log:
                     log.write(msg+"\n")
-
-
-            # debug
-            print "Now plotting"
-            broad = "AC" if trails[0].width > 1 else "SAT"
-            filename = os.path.join(path,"satdebug-%05d-%03d-%s.png" % (v, c, broad))
-        
-            satDebug.debugPlot(self.finder, filename)
             
                     
         exposure.writeFits(os.path.join(path,"exp%04d-%03d.fits"%(v,c)))

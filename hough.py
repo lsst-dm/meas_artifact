@@ -5,6 +5,7 @@ import collections
 import numpy as np
 from scipy import ndimage as ndimg
 
+import matplotlib.pyplot as plt
 
 def hesseForm(theta_in, x, y):
     """Convert theta, x, y   to Hesse normal form
@@ -64,100 +65,93 @@ def twoPiOverlap(theta_in, arrays=None, overlapRange=0.2):
 
     
     
-def hesseCluster(theta, x, y):
+def improveCluster(theta, x, y):
     """
     @theta  angles
-    @x     x coordinates
-    @y     y coordinates
+    @x      x pixel coordinates
+    @y      y pixel coordinates
 
     return list of (r_i,theta_i)
+
+    Due to noise in the original image, the theta values are never quite aligned
+    with the satellite trail.  The conversion to the normal form r = x*cos(t) + y*sin(t)
+    shows that for a given x,y pixel; errors in theta are sinusoids in r(theta).
+    So a cluster in r,theta often has streaks of points passing through the true r,theta
+    of the satellite trail.  Since we know x,y and the form of r(theta) very well, we
+    can compute dr/dtheta = -x*sin(t) + y*cos(t) for each point in r,theta space.  This is a linear
+    approximation to r(theta) near the point.  The idea behind this improvement strategy
+    is that points coming from the same (real) satellite trail will share a common point
+    in r,theta (the premise of the Hough Transform).  For one point, we only know it lies on
+    the r(theta) curve, but for two ... the intersection of the curves is a better estimate of r,theta
+    for each contributing point.
     """
 
     dtheta = 0.01
 
-    t1 = time.time()
-    
     rdist = 100
     tdist = 0.15
     
     t = theta.copy()
-
-    # clean the thetas
-    r = x*np.cos(t) + y*np.sin(t)
-    neg, = np.where(r < 0.0)
-    t[neg] += np.pi
-    cycle, = np.where(t > 2.0*np.pi + 0.2)
-    t[cycle] -= 2.0*np.pi
     r = x*np.cos(t) + y*np.sin(t)
     
-    print "clean", time.time() - t1
-        
-    t2 = t + dtheta
-    r2 = x*np.cos(t2) + y*np.sin(t2)
-    print "cos", time.time() - t1
-
     xx1, xx2 = np.meshgrid(x, x)
     yy1, yy2 = np.meshgrid(y, y)
 
-    print "aftermesh", time.time() - t1
-    
-    dx = np.abs(xx1 - xx2)
-    dy = np.abs(yy1 - yy2)
-    dd = dx + dy
+    dx = xx1 - xx2
+    dy = yy1 - yy2
+    dd = np.sqrt(dx*dx + dy*dy)
 
-    print "afterabs", time.time() - t1
-    
-    # this is the theta we get if we just draw a line between points in pixel space
-    w0 = np.where(dx == 0)
+    w0     = (dx == 0)
     dx[w0] = 1.0
-    print "where", time.time() - t1
-    
-    intercept = yy1 - (dy/dx)*xx1
-    sign = np.sign(intercept)
-    print "atan0", time.time() - t1
-    pixel_theta = np.arctan2(dy, dx) + sign*np.pi/2.0
-    
 
-    print "atan", time.time() - t1
+    # this is the theta we get if we just draw a line between points in pixel space
+    # We could just use this, but (I'm not sure why) it doesn't do as nice a job.
+    intercept   = yy1 - (dy/dx)*xx1
+    sign        = np.sign(intercept)
+    pixel_theta = np.arctan(dy/dx) + sign*np.pi/2.0
+    pixel_theta[(pixel_theta < 0.0)] += np.pi
     
-    # convert each point to a line
-    m = (r2 - r)/dtheta
-    b = r - t*m
+    # convert each point to a line in r,theta space
+    # drdt is slope and 'b' is the intercept
+    drdt = -x*np.sin(t) + y*np.cos(t)
+    b    = r - t*drdt
     
-    # get the distance between points
+    # get the distance between points in r,theta space "good" pairs are close together
     tt1, tt2 = np.meshgrid(t, t)
     rr1, rr2 = np.meshgrid(r, r)
-    good = (np.abs(tt1 - tt2) < tdist) & (np.abs(rr1 - rr2) < rdist)
-    bad  = ~good
+    isGood = (np.abs(tt1 - tt2) < tdist) & (np.abs(rr1 - rr2) < rdist)
+    isBad  = ~isGood
     
-    # solve for the intersections between all lines
-    mm1, mm2 = np.meshgrid(m, m)
-    bb1, bb2 = np.meshgrid(b, b)
-    trace = np.arange(mm1.shape[0], dtype=int)
-    dmm = mm1 - mm2
+    # solve for the intersections between all lines in r,theta space
+    mm1, mm2         = np.meshgrid(drdt, drdt)
+    bb1, bb2         = np.meshgrid(b, b)
+    trace            = np.arange(mm1.shape[0], dtype=int)
+    dmm              = mm1 - mm2
     dmm[trace,trace] = 1.0
-    parallel = np.where(np.abs(dmm) < 0.01)
-    dmm[parallel] = 1.0
-    tt = (bb2 - bb1)/dmm
-    rr = bb1 + mm1*tt
+    parallel         = (np.abs(dmm) < 0.01)
+    dmm[parallel]    = 1.0
+    tt               = (bb2 - bb1)/dmm
+    rr               = bb1 + mm1*tt
     
-    tt[bad] = 0.0
-    rr[bad] = 0.0
+    tt[isBad] = 0.0
+    rr[isBad] = 0.0
 
+    # Create a weight vector to use in a weighted-average
     w = np.zeros(tt.shape) + 1.0e-7
-    
+
     # weight by the pixel distance (farther is better, less degenerate)
-    w[good] += dd[good]
+    w[isGood] += dd[isGood]
 
-    # de-weight points that have moved us far from where we started
-    dtr = np.abs((tt - t)*(rr - r)) + 1.0
-    theta_discrepancy = np.abs( tt - pixel_theta ) + 0.01
+    # de-weight points that have moved us far from where they started
+    dtr               = np.abs((tt - t)*(rr - r)) + 1.0
+    # de-weight points where the solved theta disagrees with delta-x,delta-y in pixel space
+    theta_discrepancy = np.abs(tt - pixel_theta) + 0.01
 
-    w /= dtr*theta_discrepancy
+    w[isGood] /= (dtr*theta_discrepancy)[isGood]
 
+    # for each point, the 'best' theta is the weighted-mean of all places it's line intersects others.
     t_new = np.average(tt, axis=0, weights=w)
-    r_new = np.average(rr, axis=0, weights=w)
-
+    r_new = x*np.cos(t_new) + y*np.sin(t_new)
     
     # use original values for things that didn't converge
     t0 = (t_new < 1.0e-6)
@@ -165,118 +159,134 @@ def hesseCluster(theta, x, y):
     r0 = (r_new < 1.0e-6)
     r_new[r0] = r[r0]
 
-    print time.time() - t1
     return r_new, t_new, r, x, y
 
 
-def hesseIter(theta, xx, yy, nIter=3):
 
-    r, t, _r, _xx, _yy = hesseCluster(theta, xx, yy)
-    for i in range(nIter):
-        r, t, _, _xx, _yy = hesseCluster(t, xx, yy)
-    return r, t, _r, _xx, _yy 
+def hesseBin(r0, theta0, bins=200, rMax=4096, thresh=4):
+    """Bin r,theta values to find clusters above a threshold
 
+    @param r0         List of r values
+    @param theta0     List of theta values
+    @param bins       Number of bins to use in each of r,theta (i.e. total bins*bins will be used)
+    @param rMax       Specify the range in r
+    @param thresh     The count limit in a bin which indicates a detected cluster of points.
 
-def hesseBin(r0, theta0, bins=200, rMax=4096, ncut=4, navg=0.0):
+    @return bin2d, rEdge, tEdge, rsGood, tsGood, idxGood
 
-    r = r0
-    theta = theta0
+    bin2d    the 2D binned data
+    rEdge    the edges of the bins in r
+    tEdge    the edges of the bins in theta
+    rsGood   List of best r values for any loci
+    tsGood   List of best theta values for any loci
+    idxGood  List of indices (from the input arrays) for any points contributing to any loci
     
-    theta_margin = 0.4
+    In principal, this function is simple ... bin-up the values of r,theta and see
+    if any of the bins have more than 'thresh' points.  Take the input r,thetas which landed
+    in any such bin and use them to get the 'best' value of r,theta ... mean, median, whatever.
+    However, we also have the check the neighbouring bins, and we need to do
+    some basic due diligence to assess whether we believe the locus of points is a real
+    satellite trail.  A real trail should converge with almost all points in a 3x3 cell locus, so
+    the r,theta RMS of the locus in 3x3 cell and 5x5 cell regions should be about the same.
+
+    """
+
     
-    non_trivial = (np.abs(theta) > 1.0e-2) & (np.abs(r) > 1.0*rMax/bins)
-    non_bleed   = np.abs(theta - np.pi/2.0) > 1.0e-2
+    r     = r0.copy()
+    theta = theta0.copy()
+    
+    overlapRange = 0.2
 
-    ok = non_trivial  & non_bleed
+    # eliminate any underdesirable r,theta values
+    notTrivial = (np.abs(theta) > 1.0e-2) & (np.abs(r) > 1.0*rMax/bins)
 
-                  
-    bin2d, r_edge, t_edge = np.histogram2d(r[ok], theta[ok], bins=(bins,bins),
-                                           range=((0.0, rMax), (-theta_margin, theta_margin+2.0*np.pi)) )
+    # there actually *are* near vertical trails.  Disable this for now.
+    #notBleed   = np.abs(theta - np.pi/2.0) > 1.0e-2
+    isOk       = notTrivial # & notBleed
 
-    wrpos, wtpos = np.where(bin2d > 1)
-    if len(wrpos):
-        avgPerBin = np.mean(bin2d[wrpos,wtpos])
-    else:
-        avgPerBin = 1.0
-    thresh = max(ncut, navg*avgPerBin)
-
+    bin2d, rEdge, tEdge = np.histogram2d(r[isOk], theta[isOk], bins=(bins,bins),
+                                           range=((0.0, rMax), (-overlapRange, overlapRange+2.0*np.pi)) )
     locus, numLocus = ndimg.label(bin2d > thresh, structure=np.ones((3,3)))
 
     rs, ts, idx, drs, dts = [], [], [], [], []
     for i in range(numLocus):
-        loc_r,loc_t = np.where(locus == i + 1)
+        label = i + 1
+        loc_r,loc_t = np.where(locus == label)
         
-        peak_ti, peak_ri = 0.0, 0.0
+        iThetaPeak, iRPeak = 0.0, 0.0
         max_val = 0.0
         for i in range(len(loc_t)):
             val = bin2d[loc_r[i],loc_t[i]]
             if val > max_val:
                 max_val = val
-                peak_ti = loc_t[i]
-                peak_ri = loc_r[i]
+                iThetaPeak = loc_t[i]
+                iRPeak = loc_r[i]
         
 
-            min_ti = max(peak_ti-1, 0)
-            max_ti = min(peak_ti+1, bins-1)
-            min_ri = max(peak_ri-1, 0)
-            max_ri = min(peak_ri+1, bins-1)
+        # iThetaPeak,iRPeak  is the peak count for this label in bin2d
 
-            # wider set
-            wmin_ti = max(peak_ti-3, 0)
-            wmax_ti = min(peak_ti+3, bins-1)
-            wmin_ri = max(peak_ri-3, 0)
-            wmax_ri = min(peak_ri+3, bins-1)
-            
-        tlo, thi = t_edge[min_ti], t_edge[max_ti+1]
-        rlo, rhi = r_edge[min_ri], r_edge[max_ri+1]
+        # get the indices for a 3x3 box with iThetaPeak,iRPeak at the center
+        iThetaMin = max(iThetaPeak-1, 0)
+        iThetaMax = min(iThetaPeak+1, bins-1)
+        iRMin     = max(iRPeak-1, 0)
+        iRMax     = min(iRPeak+1, bins-1)
+        
+        # get indices for a (wider) 5x5 box
+        iThetaMinWide = max(iThetaPeak-3, 0)
+        iThetaMaxWide = min(iThetaPeak+3, bins-1)
+        iRMinWide     = max(iRPeak-3, 0)
+        iRMaxWide     = min(iRPeak+3, bins-1)
+
+        tlo, thi = tEdge[iThetaMin], tEdge[iThetaMax+1]
+        rlo, rhi = rEdge[iRMin], rEdge[iRMax+1]
         # wide edges
-        wtlo, wthi = t_edge[wmin_ti], t_edge[wmax_ti+1]
-        wrlo, wrhi = r_edge[wmin_ri], r_edge[wmax_ri+1]
+        tloWide, thiWide = tEdge[iThetaMinWide], tEdge[iThetaMaxWide+1]
+        rloWide, rhiWide = rEdge[iRMinWide],     rEdge[iRMaxWide+1]
         nbox = len(loc_t)
-        
-        wtmp = np.where((theta >= tlo) & (theta < thi) & (r >= rlo) & (r < rhi))[0]
-        t_tmp = np.median(theta[wtmp])
-        dt_tmp = theta[wtmp].std()
-        r_tmp = np.median(r[wtmp])
-        dr_tmp = r[wtmp].std()
 
-        # wide stats
-        wwtmp = np.where((theta >= wtlo) & (theta < wthi) & (r >= wrlo) & (r < wrhi))[0]
-        wt_tmp = np.median(theta[wwtmp])
-        wdt_tmp = theta[wwtmp].std()
-        wr_tmp = np.median(r[wwtmp])
-        wdr_tmp = r[wwtmp].std()
 
-        
-        #print "%6.1f %6.1f  %6.3f %6.3f  %6.1f %6.1f   %6.3f %6.1f  %3d  %3d" % (loc_t.mean(), loc_r.mean(), 0.5*(tlo + thi), thi-tlo, 0.50*(rlo+ rhi), rhi-rlo, t_tmp, r_tmp,  len(wtmp), nbox)
+        # for this locus, use the median r,theta for points within the 3x3 box around the peak
+        centeredOnPeak = (theta >= tlo) & (theta < thi) & (r >= rlo) & (r < rhi)
+        tTmp          = np.median(theta[centeredOnPeak])
+        dtTmp         = theta[centeredOnPeak].std()
+        rTmp          = np.median(r[centeredOnPeak])
+        drTmp         = r[centeredOnPeak].std()
+
+        # also get stats for points within the 5x5 box
+        # If there are many points in the 5x5 that aren't in the 3x3, the solution didn't converge
+        centeredOnPeakWide = (theta >= tloWide) & (theta < thiWide) & (r >= rloWide) & (r < rhiWide)
+        tTmpWide           = np.median(theta[centeredOnPeakWide])
+        dtTmpWide          = theta[centeredOnPeakWide].std()
+        rTmpWide           = np.median(r[centeredOnPeakWide])
+        drTmpWide          = r[centeredOnPeakWide].std()
 
         # don't accept theta < 0 or > 2pi
-        if t_tmp < 0.0 or t_tmp > 2.0*np.pi:
+        if tTmp < 0.0 or tTmp > 2.0*np.pi:
             continue
 
         # if including neighbouring cells increases our stdev, we didn't converge well and the solution
         # is probably bad.  If only r or only theta are broad, then it might be ok ... keep it.
-        rgrow = wdr_tmp/dr_tmp
-        tgrow = wdt_tmp/dt_tmp
+        rgrow = drTmpWide/drTmp
+        tgrow = dtTmpWide/dtTmp
         grow = np.sqrt(rgrow**2 + tgrow**2)
-        print r_tmp, t_tmp, rgrow, tgrow, grow
 
         if rgrow > 2.0 and tgrow > 2.0:
             continue
             
-        rs.append(r_tmp)
-        drs.append(dr_tmp)
-        ts.append(t_tmp)
-        dts.append(dt_tmp)
+        rs.append(rTmp)
+        drs.append(drTmp)
+        ts.append(tTmp)
+        dts.append(dtTmp)
         
-        w = np.where((theta0 >= tlo) & (theta0 < thi) & (r0 >= rlo) & (r0 < rhi))[0]
+        w = (theta0 >= tlo) & (theta0 < thi) & (r0 >= rlo) & (r0 < rhi)
         idx.append(w)
 
+        
     # check for wrapped-theta doubles,
     # - pick the one with the lowest stdev
-    # - this is rare, but a bright near-vertical trail can be detected near theta=0 and theta=2pi
+    # - this is rare, but a bright near-vertical trail can be detected near theta=0 *and* theta=2pi
     # --> the real trail is rarely exactly vertical, so one solution will not converge nicely.
-    #     ... the stdev of thetas will be wider (10x).
+    #     ... the stdev of thetas will be wider by a factor of ~10x
     n = len(rs)
     kill_list = []
     for i in range(n):
@@ -284,34 +294,60 @@ def hesseBin(r0, theta0, bins=200, rMax=4096, ncut=4, navg=0.0):
             dr = abs(rs[i] - rs[j])
             dt = abs(ts[i] - ts[j])
             if dr < 10 and dt > 1.9*np.pi:
-                print "d_thetas: ", dts[i], dts[j]
                 bad = i if dts[i] > dts[j] else j
                 kill_list.append(bad)
 
-    rs_good, ts_good, idx_good = [],[],[]
+    rsGood, tsGood, idxGood = [],[],[]
     for i in range(n):
         if i in kill_list:
             continue
-        rs_good.append(rs[i])
-        ts_good.append(ts[i])
-        idx_good.append(idx[i])
+        rsGood.append(rs[i])
+        tsGood.append(ts[i])
+        idxGood.append(idx[i])
                 
-    return bin2d, r_edge, t_edge, rs_good, ts_good, idx_good
+    return bin2d, rEdge, tEdge, rsGood, tsGood, idxGood
 
 
     
 HoughSolution = collections.namedtuple('HoughSolution', 'r theta x y rNew thetaNew binMax')
 
 class HoughSolutionList(list):
-    def __init__(self, nSolutions, binMax, r, theta):
-        self.nSolutions = nSolutions
+    """A list of clusters found in a Hough Transform
+
+    This is used as a return value for a HoughTransform function object.
+    It inherits from a Python list, but includes a few attributes
+    relevant to the overall Hough solution.
+    """
+
+    def __init__(self, binMax, r, theta):
+        """Construct for a HoughSolutionList
+
+        @param binMax   The highest count level found in any bin.
+        @param r        The r values determined as part of the transform
+        @param theta    The theta values input to the houghTransform
+        """
         self.binMax     = binMax
         self.r          = r
         self.theta      = theta
     
 
 class HoughTransform(object):
+    """Compute a Hough Transform for a set of x,y pixel coordinates with an good estimate of theta
+
+    This class is really just a housing for a Hough Transform.  The parameters needed are
+    provided at construction and a __call__ method is defined to do the work.
+    """
+    
     def __init__(self, bins, thresh, rMax=None, maxPoints=1000, nIter=1):
+        """Construct a HoughTransform object.
+
+        @param bins       Number of bins to use in each of r,theta (i.e. total bins*bins will be used)
+        @param thresh     The count limit in a bin which indicates a detected cluster of points.
+        @param rMax       Specify the range in r
+        @param maxPoints  Maximum number of points to allow (solution gets slow for >> 1000)
+        @param nIter      Number of times to iterate the solution (more than ~1-3 rarely makes a difference)
+        """
+        
         self.bins   = bins
         self.thresh = thresh
         self.rMax   = rMax
@@ -320,10 +356,21 @@ class HoughTransform(object):
         self.maxPoints = maxPoints
         self.nIter = nIter
 
+        # You shouldn't need to touch this.  We allow this much slack around theta = 0 or 2*pi
+        # Points within overlapRange of 0 or 2pi are copied to wrap.  The allows good
+        # solutions to be found very near theta = 0 and theta=2pi
         self.overlapRange = 0.2
+
         
     def __call__(self, thetaIn, xIn, yIn):
+        """Compute the Hough Transform
 
+        @param  thetaIn        The local theta values at pixel locations (should be within 0.2 of true value)
+        @param  xIn            The x pixel coordinates corresponding to thetaIn values
+        @param  yIn            the y pixel coordinates corresponding to thetaIn values
+
+        @return solutions      A HoughSolutionList with an entry for each locus found.
+        """
         
         rIn, thetaIn = hesseForm(thetaIn, xIn, yIn)
 
@@ -343,21 +390,23 @@ class HoughTransform(object):
             idx = idx[:self.maxPoints]
             r, theta, x, y = r0[idx], theta0[idx], x0[idx], y0[idx]
 
-            
+
         # improve the r,theta locations
-        rNew, thetaNew, _r, _x, _y = hesseIter(theta, x, y, nIter=self.nIter)
+        rNew, thetaNew, _r, _x, _y = improveCluster(theta, x, y)
+        for i in range(self.nIter):
+            rNew, thetaNew, _r, _x, _y = improveCluster(thetaNew, x, y)
 
         rMax = self.rMax
         if self.rMax is None:
             rMax = np.sqrt(x.max()**2 + y.max()**2)
                 
         # bin the data in r,theta space; get r,theta that pass our threshold as a satellite trail
-        bin2d, r_edge, theta_edge, rs, thetas, idx = hesseBin(rNew, thetaNew,
-                                                              bins=self.bins, rMax=rMax,
-                                                              ncut=self.thresh)
+        bin2d, rEdge, thetaEdge, rs, thetas, idx = hesseBin(rNew, thetaNew,
+                                                            bins=self.bins, rMax=rMax,
+                                                            thresh=self.thresh)
         
         numLocus = len(thetas)
-        solutions = HoughSolutionList(numLocus, bin2d.max(), rIn, thetaIn)
+        solutions = HoughSolutionList(bin2d.max(), rIn, thetaIn)
         for i in range(numLocus):
             _x, _y = x[idx[i]], y[idx[i]]
             rnew, tnew = rNew[idx[i]], thetaNew[idx[i]]

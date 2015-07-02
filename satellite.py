@@ -1,148 +1,21 @@
 #!/usr/bin/env python
 
 import os
-import time, datetime
-import collections
-
+import time
 import numpy as np
-import numpy.fft as fft
 
-import matplotlib.pyplot as plt
 import matplotlib.figure as figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigCanvas
-from matplotlib.patches import Rectangle
 
-import lsst.afw.image as afwImage
-import lsst.afw.geom as afwGeom
-import lsst.afw.geom.ellipses as ellipses
-import lsst.afw.math as afwMath
+import lsst.afw.image   as afwImage
+import lsst.afw.math    as afwMath
 
 import hough
-import satellite_utils as satUtil
-import hesse_cluster as hesse
+import satelliteUtils   as satUtil
+import satelliteTrail   as satTrail
 import momentCalculator as momCalc
-import satelliteDebug as satDebug
+import satelliteDebug   as satDebug
 
-class SatelliteTrailList(list):
-    def __init__(self, nPixels, binMax, psfSigma):
-        self.nPixels = nPixels
-        self.binMax = binMax
-        self.psfSigma = psfSigma
-
-        self.drMax = 50.0
-        self.dthetaMax = 0.1
-        
-    def merge(self, trailList):
-
-        s = SatelliteTrailList(self.nPixels, max(trailList.binMax, self.binMax), self.psfSigma)
-        for t in self:
-            s.append(t)
-            
-        for t in trailList:
-            r     = t.r
-            theta = t.theta
-
-            isDuplicate = False
-            for t2 in self:
-                dr = t2.r - r
-                dt = t2.theta - theta
-                if abs(dr) < self.drMax and abs(dt) < self.dthetaMax:
-                    isDuplicate = True
-            if not isDuplicate:
-                s.append(t)
-        return s
-
-class SatelliteTrail(object):
-    def __init__(self, r, theta, width=None, flux=1.0, f_wing=0.1):
-        if width is None:
-            width = [0.0]
-        self.r     = r
-        self.theta = theta
-        self.width = width
-        self.vx    = np.cos(theta)
-        self.vy    = np.sin(theta)
-        self.flux  = flux
-        self.f_core = 1.0 - f_wing
-        self.f_wing = f_wing
-
-        self.houghBinMax = 0
-        
-    def setMask(self, exposure):
-
-        msk = exposure.getMaskedImage().getMask()
-        sigma = satUtil.getExposurePsfSigma(exposure)
-        satellitePlane = msk.addMaskPlane("SATELLITE")
-        satelliteBit = 1 << satellitePlane
-        tmp = type(msk)(msk.getWidth(), msk.getHeight())
-        self.insert(tmp, sigma=sigma, maskBit=satelliteBit)
-        msk |= tmp
-        # return the number of masked pixels
-        return len(np.where(tmp.getArray() > 0)[0])
-        
-    def trace(self, nx, ny, offset=0, bins=1):
-        x = np.arange(nx)
-        y = (self.r/bins + offset - x*self.vx)/self.vy
-        w, = np.where( (x > 0) & (x < nx) & (y > 0) & (y < ny) )
-        return x[w], y[w]
-
-
-    def insert(self, exposure, sigma=None, maskBit=None):
-
-        if sigma and sigma < 1.0:
-            sigma = 1.0
-        
-        # Handle Exposure, Image, ndarray
-        if isinstance(exposure, afwImage.ExposureF):
-            img = exposure.getMaskedImage().getImage().getArray()
-            nx, ny = exposure.getWidth(), exposure.getHeight()
-            if sigma is None:
-                sigma = satUtil.getExposurePsfSigma(exposure, minor=True)
-                
-        elif isinstance(exposure, afwImage.ImageF):
-            img = exposure.getArray()
-            nx, ny = exposure.getWidth(), exposure.getHeight()
-
-        elif isinstance(exposure, afwImage.MaskU):
-            img = exposure.getArray()
-            nx, ny = exposure.getWidth(), exposure.getHeight()
-        elif isinstance(exposure, np.ndarray):
-            img = exposure
-            ny, nx = img.shape
-
-        if sigma is None:
-            raise ValueError("Must specify sigma for satellite trail width")
-
-            
-        #############################
-        # plant the trail
-        #############################
-        xx, yy = np.meshgrid(np.arange(nx), np.arange(ny))
-
-        # plant the trail using the distance from our line
-        # as the parameter in a 1D DoubleGaussian
-        dot    = xx*self.vx + yy*self.vy
-        offset = np.abs(dot - self.r)
-
-        # go to 4 sigma of the wider gaussian in the double gauss
-        if self.width > 1:
-            hwidth = self.width/2.0
-        else:
-            hwidth = 8.0*sigma
-
-        # only bother updating the pixels within 5-sigma of the line
-        wy,wx  = np.where(offset < hwidth)
-        if maskBit:
-            img[wy,wx] = maskBit
-        else:
-            A1  = 1.0/(2.0*np.pi*sigma**2)
-            g1  = np.exp(-offset[wy,wx]**2/(2.0*sigma**2))
-            A2  = 1.0/(2.0*np.pi*(2.0*sigma)**2)
-            g2  = np.exp(-offset[wy,wx]**2/(2.0*(2.0*sigma)**2))
-            img[wy,wx] += self.flux*(self.f_core*A1*g1 + self.f_wing*A2*g2)
-        
-        return img
-
-        
 
 class SatelliteFinder(object):
 
@@ -178,7 +51,8 @@ class SatelliteFinder(object):
         self.bLimit            = bLimit
         
         self.debugInfo = {}
-        
+
+
     def _makeCalibrationImage(self, psfSigma, width):
         """Make a fake satellite trail with the PSF to calibrate moments we measure.
 
@@ -196,7 +70,7 @@ class SatelliteFinder(object):
         calArr   = calImg.getArray()
 
         # Make a trail with the requested (unbinned) width
-        calTrail = SatelliteTrail(cx, cy, width=width)
+        calTrail = satTrail.SatelliteTrail(cx, cy, width=width)
         maskBit  = 1.0 if width > 1.0 else None
         calTrail.insert(calArr, sigma=psfSigma, maskBit=maskBit)
 
@@ -209,7 +83,7 @@ class SatelliteFinder(object):
             can = FigCanvas(fig)
             ax = fig.add_subplot(111)
             ax.imshow(calArr, interpolation='none', cmap='gray')
-            fig.savefig("junk.png")
+            fig.savefig("satellite-calib-image.png")
 
         return calArr
 
@@ -254,7 +128,6 @@ class SatelliteFinder(object):
         exp_faint.setPsf(exposure.getPsf())
         msk_faint = exp_faint.getMaskedImage().getMask().getArray()
         img_faint = exp_faint.getMaskedImage().getImage().getArray()
-        UNWANT = MASK | DET
         img_faint[(msk_faint & (MASK | DET) > 0)] = 0.0
         rms_faint = img_faint.std()
         #img_faint[(img_faint < rms_faint)] = rms_faint
@@ -335,7 +208,7 @@ class SatelliteFinder(object):
 
             # faint trails
             faint_limits = {
-                'sumI'         : -2.5*rms_faint,
+                'sumI'         : -2.5*rms,
                 #'center'       : 8.0*self.centerLimit,
                 #'center_perp'  : 4.0*self.centerLimit,
                 #'skew'         : 8.0*self.skewLimit,
@@ -345,7 +218,9 @@ class SatelliteFinder(object):
             }                
             selector = Selector(mm_faint, mmCal, faint_limits)
             faint_pixels = selector.getPixels() & (msk & (MASK | DET) == 0)
-            #pixels |= faint_pixels
+            
+            if pixels.sum() < 150:
+                pixels |= faint_pixels
 
             nHits.append((widths[i], pixels.sum()))
 
@@ -369,10 +244,10 @@ class SatelliteFinder(object):
         #################################################
         # Trail objects
         #################################################
-        trails = SatelliteTrailList(nCandidatePixels, solutions.binMax, psfSigma)
+        trails = satTrail.SatelliteTrailList(nCandidatePixels, solutions.binMax, psfSigma)
         for s in solutions:
             print "Trail: ", self.bins*s.r, s.theta, bestWidth, s.binMax
-            trail = SatelliteTrail(self.bins*s.r, s.theta, width=bestWidth)
+            trail = satTrail.SatelliteTrail(self.bins*s.r, s.theta, width=bestWidth)
             trail.houghBinMax = s.binMax
             trails.append(trail)
 
