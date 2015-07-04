@@ -3,6 +3,7 @@
 import copy
 import functools
 import numpy as np
+import matplotlib.pyplot as plt
 
 import satellite_utils as satUtil
 
@@ -57,8 +58,8 @@ class MomentManager(object):
     @property
     def sumI(self):
         if self._sumI is None:
-            #self._sumI = 0.0 if self.isCal else self.img
-            self._sumI = 0.0 if self.isCal else self.imageMoment.i0
+            self._sumI = 0.0 if self.isCal else self.img
+            #self._sumI = 0.0 if self.isCal else self.imageMoment.i0
             #self._sumI = self.imageMoment.i0
         return self._sumI
 
@@ -153,7 +154,7 @@ class PixelSelector(object):
             test = np.abs(getattr(self, name)) < 1.0
         return test
 
-    def getPixels(self):
+    def getPixels(self, binOnTheta=False):
 
         keys = getattr(self, 'keys')
         accumulator = np.ones(self.momentManager.shape, dtype=bool)
@@ -161,6 +162,13 @@ class PixelSelector(object):
             test = self._test(key)
             accumulator &= test
             #print key, accumulator.sum(), test.sum()
+
+        if binOnTheta:
+            t = getattr(self.momentManager, 'theta')
+            hist, edges = np.histogram(t[accumulator], bins=40)
+            best = np.argmax(hist)
+            tbest = 0.5*(edges[best] + edges[best+1])
+            accumulator &= (np.abs(tbest - t) < 0.2)
         return accumulator
 
 
@@ -176,11 +184,13 @@ class PValuePixelSelector(PixelSelector):
         limit = self.momentLimits[name]
         z     = getattr(self, name)
         if limit and limit < 0.0:
-            return np.log(1.0 - np.exp(-0.5*z*z))
+            # the real answer is np.log(1.0001 - np.exp(-0.5*z*z)), but is very slow
+            # This approx is actually really close 
+            return -0.5/(z*z + 0.0001)
         else:
             return -0.5*z*z
 
-    def getPixels(self):
+    def getPixels(self, binOnTheta=False):
         keys = getattr(self, 'keys')
         logp = self._test(keys[0])
         n = 0
@@ -188,9 +198,29 @@ class PValuePixelSelector(PixelSelector):
             if key in self.momentLimits:
                 n += 1
             logp += self._test(key)
-        p = np.exp(logp)
-        thresh = self.thresh or np.exp(-0.5*n)
-        return p > thresh
+
+        if binOnTheta:
+            t = getattr(self.momentManager, 'theta')
+            tProb = t[logp > -0.5*n]
+            hist, edges = np.histogram(tProb, bins=120)
+
+            #print len(tProb)
+            #plt.plot(edges[:-1], hist, 'r-')
+            #plt.savefig("junk.png")
+
+            best = np.argmax(hist)
+            tbest = 0.5*(edges[best] + edges[best+1])
+            z = (t - tbest)/0.1
+            logp += -0.5*z*z
+            n += 1
+
+        thresh1 = self.thresh or -0.5*n
+        nth = 1000.0/logp.size
+        ret = logp > thresh1
+        if ret.sum() > 1000:
+            thresh2 = np.percentile(logp, 100*(1.0-nth))
+            ret = logp > thresh2
+        return ret
 
 
 

@@ -36,8 +36,8 @@ class SatelliteFinder(object):
         
         self.kernelSigma       = kernelSigma        
         self.kernelWidth       = kernelWidth
-        self.kx = np.arange(kernelWidth) - kernelWidth//2
-        self.ky = np.arange(kernelWidth) - kernelWidth//2
+        self.kx                = np.arange(kernelWidth) - kernelWidth//2
+        self.ky                = np.arange(kernelWidth) - kernelWidth//2
         self.bins              = bins
         self.sigmaSmooth       = 1.0
 
@@ -109,14 +109,15 @@ class SatelliteFinder(object):
             exp.setMetadata(exposure.getMetadata())
             exp.setPsf(exposure.getPsf())
 
-        img           = exp.getMaskedImage().getImage().getArray()
-        msk           = exp.getMaskedImage().getMask().getArray()
-        whereBad      = msk & MASK > 0
-        whereGood     = ~whereBad
-        img[whereBad] = 0.0         # convolution will smear bad pixels.  Zero them out.
-        rms           = img[whereGood].std()
-        psfSigma      = satUtil.getExposurePsfSigma(exposure, minor=True)
-
+        img         = exp.getMaskedImage().getImage().getArray()
+        msk         = exp.getMaskedImage().getMask().getArray()
+        isBad       = msk & MASK > 0
+        isGood      = ~isBad
+        img[isBad]  = 0.0         # convolution will smear bad pixels.  Zero them out.
+        rms         = img[isGood].std()
+        psfSigma    = satUtil.getExposurePsfSigma(exposure, minor=True)
+        #goodDet     = (msk & DET > 0) & isGood
+        
         #################################################
         # Faint-trail detection image
         #################################################
@@ -132,9 +133,17 @@ class SatelliteFinder(object):
         rms_faint = img_faint.std()
         #img_faint[(img_faint < rms_faint)] = rms_faint
 
+        if True:
+            back = satUtil.medianRing(img_faint, 20.0, 2.0*self.sigmaSmooth)
+            img  -= back
+            img_faint -= back
+        
         #   - smooth 
         img       = satUtil.smooth(img,       self.sigmaSmooth)
         img_faint = satUtil.smooth(img_faint, self.sigmaSmooth)
+
+        
+        rms = img_faint[(msk_faint & (MASK | DET) == 0)].std()
         
         #################################################
         # Calibration images
@@ -158,8 +167,8 @@ class SatelliteFinder(object):
         mmCals = []
         nHits = []
 
-        Selector = momCalc.PixelSelector
-        #Selector = momCalc.PValuePixelSelector
+        #Selector = momCalc.PixelSelector
+        Selector = momCalc.PValuePixelSelector
 
         for i, calImg in enumerate(calImages):
             mmCal = momCalc.MomentManager(calImg, kernelWidth=self.kernelWidth, kernelSigma=self.kernelSigma, 
@@ -200,33 +209,34 @@ class SatelliteFinder(object):
                 'b'            : brightFactor*self.bLimit,
                 }
 
-            pixels = np.zeros(img.shape, dtype=bool)
-            for lim in limits, mediumLimits, brightLimits:
-                selector = Selector(mm, mmCal, lim)
-                pixels |= selector.getPixels()
-
+            selector       = Selector(mm, mmCal, limits)
+            pixels         = selector.getPixels()              & isGood
+            mediumSelector = Selector(mm, mmCal, mediumLimits)
+            mediumPixels   = mediumSelector.getPixels()        & isGood
+            brightSelector = Selector(mm, mmCal, brightLimits)
+            brightPixels   = brightSelector.getPixels()        & isGood
 
             # faint trails
             faint_limits = {
-                'sumI'         : -2.5*rms,
-                #'center'       : 8.0*self.centerLimit,
-                #'center_perp'  : 4.0*self.centerLimit,
-                #'skew'         : 8.0*self.skewLimit,
-                #'skew_per'     : 4.0*self.skewLimit,
-                #'ellip'        : 8.0*self.eRange,
-                #'b'            : 2.0,
+                'sumI'         : -3.0*rms,
+                'center'       : 1.0*self.centerLimit,
+                #'center_perp'  : 1.0*self.centerLimit,
+                'skew'         : 1.0*self.skewLimit,
+                #'skew_per'     : 1.0*self.skewLimit,
+                #'ellip'        : 1.0*self.eRange,
+                #'b'            : 1.0*self.bLimit,
             }                
             selector = Selector(mm_faint, mmCal, faint_limits)
-            faint_pixels = selector.getPixels() & (msk & (MASK | DET) == 0)
+            faintPixels = selector.getPixels(binOnTheta=False) & (msk & (MASK | DET) == 0)
+
+            print pixels.sum(), mediumPixels.sum(), brightPixels.sum(), faintPixels.sum()
+
+            isCandidate |= pixels | mediumPixels | brightPixels
+            if isCandidate.sum() < 250:
+                isCandidate |= faintPixels
+
+            nHits.append((widths[i], isCandidate.sum()))
             
-            if pixels.sum() < 150:
-                pixels |= faint_pixels
-
-            nHits.append((widths[i], pixels.sum()))
-
-            isCandidate |= pixels
-
-        isCandidate &= ~whereBad
         bestCal = sorted(nHits, key=lambda x: x[1], reverse=True)[0]
         bestWidth = bestCal[0]
 
@@ -238,7 +248,8 @@ class SatelliteFinder(object):
         xx, yy = np.meshgrid(np.arange(img.shape[1], dtype=int), np.arange(img.shape[0], dtype=int))
 
         rMax           = sum([q**2 for q in img.shape])**0.5
-        houghTransform = hough.HoughTransform(self.bins, self.houghThresh, rMax=rMax, maxPoints=1000, nIter=1)
+        houghTransform = hough.HoughTransform(self.houghBins, self.houghThresh,
+                                              rMax=rMax, maxPoints=1000, nIter=1)
         solutions      = houghTransform(mm.theta[isCandidate], xx[isCandidate], yy[isCandidate])
 
         #################################################
@@ -248,6 +259,7 @@ class SatelliteFinder(object):
         for s in solutions:
             print "Trail: ", self.bins*s.r, s.theta, bestWidth, s.binMax
             trail = satTrail.SatelliteTrail(self.bins*s.r, s.theta, width=bestWidth)
+            trail.measure(exp, bins=self.bins)
             trail.houghBinMax = s.binMax
             trails.append(trail)
 

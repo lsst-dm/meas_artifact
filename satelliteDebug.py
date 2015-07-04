@@ -72,7 +72,7 @@ def pixelPlot(finder, ax, mm, cmm, trails):
     xx, yy = np.meshgrid(np.arange(mm.img.shape[1], dtype=int), np.arange(mm.img.shape[0], dtype=int))
 
     ax.imshow(np.arcsinh(mm.img), cmap="gray", origin='lower')
-    ax.plot(xx[finder._isCandidate], yy[finder._isCandidate], 'r.', ms=1.0)
+    ax.scatter(xx[finder._isCandidate], yy[finder._isCandidate], c=mm.theta[finder._isCandidate], s=3.0, edgecolor='none')
     ny, nx = mm.img.shape
     for i,trail in enumerate(trails):
         x, y = trail.trace(nx, ny, offset=30, bins=finder.bins)
@@ -86,7 +86,7 @@ def pixelPlot(finder, ax, mm, cmm, trails):
 def houghPlot(finder, ax, mm, cmm, trails):
     
     ny, nx = mm.img.shape
-    ax.plot(finder._solutions.theta, finder.bins*finder._solutions.r, 'k.', ms=1.0, alpha=0.5)
+    ax.plot(finder._solutions.theta, finder.bins*finder._solutions.r, 'k.', ms=1.0, alpha=0.1)
     for i,trail in enumerate(trails):
         ax.plot(trail.theta, trail.r, 'o', mfc='none', mec=colors[i%4], ms=10)
         ax.add_patch(Rectangle( (trail.theta - dt, trail.r - finder.bins*dr),
@@ -189,7 +189,7 @@ def bvskewPlot(finder, ax, mm, cmm, trails):
     ax.set_xlabel("Skew", size='small')
     ax.set_ylabel("B", size='small')
     ax.set_xlim([0.0, 3.0*finder.skewLimit])
-    ax.set_ylim([-2.0, 2.0])
+    ax.set_ylim([-2.0, 4.0])
     font(ax)
 
 

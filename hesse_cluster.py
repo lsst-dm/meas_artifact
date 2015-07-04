@@ -165,28 +165,28 @@ def hesseIter(theta, xx, yy, niter=3):
     return r, t, _r, _xx, _yy 
 
 
-def hesseBin(r0, theta0, bins=200, r_max=4096, ncut=4, navg=0.0):
+def hesseBin(r0, theta0, bins=200, rMax=4096, thresh=4, navg=0.0):
 
     r = r0
     theta = theta0
     
     theta_margin = 0.4
     
-    non_trivial = (np.abs(theta) > 1.0e-2) & (np.abs(r) > 1.0*r_max/bins)
+    non_trivial = (np.abs(theta) > 1.0e-2) & (np.abs(r) > 1.0*rMax/bins)
     non_bleed   = np.abs(theta - np.pi/2.0) > 1.0e-2
 
     ok = non_trivial  & non_bleed
 
                   
     bin2d, r_edge, t_edge = np.histogram2d(r[ok], theta[ok], bins=(bins,bins),
-                                           range=((0.0, r_max), (-theta_margin, theta_margin+2.0*np.pi)) )
+                                           range=((0.0, rMax), (-theta_margin, theta_margin+2.0*np.pi)) )
 
     wrpos, wtpos = np.where(bin2d > 1)
     if len(wrpos):
         avgPerBin = np.mean(bin2d[wrpos,wtpos])
     else:
         avgPerBin = 1.0
-    thresh = max(ncut, navg*avgPerBin)
+    thresh = max(thresh, navg*avgPerBin)
 
     locus, numLocus = ndimg.label(bin2d > thresh, structure=np.ones((3,3)))
 
@@ -320,9 +320,9 @@ if __name__ == '__main__':
         # add a random error to theta
         theta = np.append(theta, theta0 + dtheta*np.random.normal(size=n))
 
-    r_max = 1.0
+    rMax = 1.0
     if len(xx):
-        r_max = max(xx.max(), yy.max())
+        rMax = max(xx.max(), yy.max())
         
     print "N: ", n
 
@@ -338,10 +338,10 @@ if __name__ == '__main__':
     print "Running hesseIter"
     r_new, t_new, r, _xx, _yy = hesseIter(theta, xx, yy, niter=2)
     #print t_new.mean(), r_new.mean()
-    bin2d, r_edge, t_edge, rs, ts, idx = hesseBin(r_new, t_new, bins=bins, r_max=r_max)
+    bin2d, r_edge, t_edge, rs, ts, idx = hesseBin(r_new, t_new, bins=bins, rMax=rMax)
 
     print rs, ts, bin2d.shape
-    bin2d0, r_edge, t_edge = np.histogram2d(r, theta, bins=(bins,bins), range=((0.0, r_max),(0.0, np.pi)) )
+    bin2d0, r_edge, t_edge = np.histogram2d(r, theta, bins=(bins,bins), range=((0.0, rMax),(0.0, np.pi)) )
     
 
     
@@ -354,7 +354,7 @@ if __name__ == '__main__':
     ax.set_ylim([ylo, yhi])
 
     ax = fig.add_subplot(322)
-    ax.imshow(bin2d0, cmap='gray_r', origin='bottom', extent=(0.0, np.pi, 0.0, r_max), aspect='auto', interpolation='none')
+    ax.imshow(bin2d0, cmap='gray_r', origin='bottom', extent=(0.0, np.pi, 0.0, rMax), aspect='auto', interpolation='none')
     ax.scatter(theta, r, c='r', s=20.0, marker='.', edgecolor='none')
     ax.scatter(t_new, r_new, c='g', s=20.0, marker='.', edgecolor='none')
     ax.set_xlim([min(theta0s)-0.2, max(theta0s)+0.2])
@@ -366,7 +366,7 @@ if __name__ == '__main__':
             break
         ax = fig.add_subplot(3,2,3 + i)
         i += 1
-        ax.imshow(bin2d, cmap='gray_r', origin='bottom', extent=(0.0, np.pi, 0.0, r_max), aspect='auto', interpolation='none')
+        ax.imshow(bin2d, cmap='gray_r', origin='bottom', extent=(0.0, np.pi, 0.0, rMax), aspect='auto', interpolation='none')
         colors = 'r', 'b', 'c', 'm', 'g'
         print len(idx)
         for j in range(len(ts)):
@@ -380,7 +380,7 @@ if __name__ == '__main__':
     #fig = figure.Figure()
     #canvas = FigCanvas(fig)
     #ax = fig.add_subplot(111)
-    #ax.imshow(bin2d, cmap='gray_r', origin='bottom', interpolation='none', extent=(0.0, np.pi, 0.0, r_max), aspect='auto')
+    #ax.imshow(bin2d, cmap='gray_r', origin='bottom', interpolation='none', extent=(0.0, np.pi, 0.0, rMax), aspect='auto')
 
     #fig.savefig("test.png")   
     

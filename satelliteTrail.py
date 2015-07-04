@@ -42,15 +42,15 @@ class SatelliteTrailList(list):
         for t in trailList:
             r     = t.r
             theta = t.theta
-
             isDuplicate = False
             for t2 in self:
-                dr = t2.r - r
-                dt = t2.theta - theta
-                if abs(dr) < drMax and abs(dt) < dthetaMax:
+                if t.isNear(t2):
                     isDuplicate = True
             if not isDuplicate:
                 s.append(t)
+            else:
+                # here, we should pick the best one.  check width ?
+                pass
         return s
 
 
@@ -62,7 +62,7 @@ class SatelliteTrail(object):
     or to set mask bits in an exposure.
     """
     
-    def __init__(self, r, theta, width=0.0, flux=1.0, fWing=0.1):
+    def __init__(self, r, theta, width=0.0, flux=1.0, center=0.0, fWing=0.1):
         """Construct a SatelliteTrail with specified parameters.
 
         @param r        r from Hesse normal form of the trail
@@ -72,18 +72,18 @@ class SatelliteTrail(object):
         @param fWing    For double-Gaussian PSF model.  Fraction of flux in larger Gaussian.
         """
 
-        self.r     = r
-        self.theta = theta
-        self.width = width
-        self.vx    = np.cos(theta)
-        self.vy    = np.sin(theta)
-        self.flux  = flux
-        self.fCore = 1.0 - fWing
-        self.fWing = fWing
+        self.r      = r
+        self.theta  = theta
+        self.width  = width
+        self.vx     = np.cos(theta)
+        self.vy     = np.sin(theta)
+        self.flux   = flux
+        self.center = center
+        self.fCore  = 1.0 - fWing
+        self.fWing  = fWing
 
         self.houghBinMax = 0
 
-        
     def setMask(self, exposure):
         """Set the mask plane near this trail in an exposure.
 
@@ -191,4 +191,81 @@ class SatelliteTrail(object):
             img[w] += self.flux*(self.fCore*A1*g1 + self.fWing*A2*g2)
         
         return img
+
+
+
+    def measure(self, exposure, bins=1, widthIn=None):
+        """Measure an aperture flux, a centroid, and a width for this satellite trail in a given exposure.
+
+        @param exposure       The exposure to measure in (accepts ExposureF, ImageF, ndarray)
+
+        """
+
+        aperture = self.width
+        
+        # Handle Exposure, Image, ndarray
+        if isinstance(exposure, afwImage.ExposureF):
+            img = exposure.getMaskedImage().getImage().getArray()
+            nx, ny = exposure.getWidth(), exposure.getHeight()
+            
+            # If we're a PSF trail, our width is 0.0 ... use an aperture based on the PSF
+            if np.abs(self.width) < 1.0e-6:
+                aperture = 4.0*satUtil.getExposurePsfSigma(exposure, minor=True)
+
+        elif isinstance(exposure, afwImage.ImageF):
+            img = exposure.getArray()
+            nx, ny = exposure.getWidth(), exposure.getHeight()
+
+        elif isinstance(exposure, np.ndarray):
+            img = exposure
+            ny, nx = img.shape
+
+        # always obey the user
+        if widthIn:
+            aperture = widthIn
+
+        # Only ExposureF knows its PSF width, so we might not have an aperture
+        if aperture is None:
+            raise ValueError("Must specify width for satellite trail flux")
+
+            
+        #############################
+        # plant the trail
+        #############################
+        xx, yy = np.meshgrid(np.arange(nx), np.arange(ny))
+
+        # plant the trail using the distance from our line
+        # as the parameter in a 1D DoubleGaussian
+        dot    = xx*self.vx + yy*self.vy
+        offset = np.abs(dot - self.r/bins)
+
+        hwidth = aperture/2.0
+
+        # only bother updating the pixels within 5-sigma of the line
+        w = (offset < hwidth) & (np.isfinite(img))
+        self.flux     = img[w].sum()
+        self.center   = (img[w]*offset[w]).sum()/self.flux
+        self.width    = np.sqrt((img[w]*offset[w]**2).sum()/self.flux)
+
+        return self.flux
+
+        
+    def __str__(self):
+        rep = "SatelliteTrail(r=%.1f, theta=%.3f, width=%.2f, flux=%.2f, center=%.2f)" % \
+              (self.r, self.theta, self.width, self.flux, self.center)
+        return rep
+        
+    def __repr__(self):
+        rep = "SatelliteTrail(r=%r, theta=%r, width=%r, flux=%r, center=%r, fWing=%r)" % \
+              (self.r, self.theta, self.width, self.flux, self.center, self.fWing)
+        return rep
+
+    def __eq__(self, trail):
+        isEq = (self.r == trail.r) and (self.theta == trail.theta) and \
+               (self.width == trail.width) and (self.flux == trail.flux) and (self.fWing == trail.fWing)
+        return isEq
+        
+    def isNear(self, trail, rTol=1.0, thetaTol=0.01):
+        isNear = (np.abs(self.r - trail.r) < rTol) and (np.abs(self.theta - trail.theta) < thetaTol)
+        return isNear
 

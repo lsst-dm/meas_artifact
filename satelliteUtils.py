@@ -4,6 +4,9 @@ import collections
 import numpy                  as np
 import scipy.ndimage.filters  as filt
 
+import matplotlib.figure as figure
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigCanvas
+
 import lsst.afw.geom          as afwGeom
 import lsst.afw.geom.ellipses as ellipses
 
@@ -42,7 +45,7 @@ def separableConvolve(data, vx, vy):
 
 
 def smooth(img, sigma):
-    """Gaussian mmooth an image.
+    """Gaussian smooth an image.
 
     @param img     The image to smooth
     @param sigma   The 'sigma' of the smoothing Gaussian
@@ -56,6 +59,53 @@ def smooth(img, sigma):
     return smth
 
 
+def medianRing(img, radius, width):
+
+    k = 2.0*int(radius + width) + 1
+    ring = np.zeros((k,k), dtype=bool)
+    a = np.arange(k) - k//2
+    x, y = np.meshgrid(a, a)
+    r = x*x + y*y
+    w = (r > radius**2) & (r < (radius + width)**2)
+    ring[w] = True
+    return filt.median_filter(img, footprint=ring)
+
+    
+def boxSmooth(img, width, sigma):
+    """Box-smooth an image.  Only the edges of the box are included.
+
+    @param img     The image to smooth
+    @param width   The width of the box
+    @param sigma   The 'sigma' of the smoothing Gaussian
+
+    @return smth   The smoothed image
+
+    This is a cheap (separable) ring smooth.
+    """
+    hwidth = width/2.0
+    k     = 2*int(hwidth + 3.0*sigma) + 1
+    kk1   = np.arange(k) - k//2 + hwidth
+    kk2   = np.arange(k) - k//2 - hwidth
+    box1  = (1.0/np.sqrt(2.0*np.pi))*np.exp(-kk1*kk1/(2.0*sigma))
+    box2  = (1.0/np.sqrt(2.0*np.pi))*np.exp(-kk2*kk2/(2.0*sigma))
+    box   = box1 + box2
+
+    w = (kk1 > 0) & (kk2 < 0)
+    line  = box.copy()
+    line[w] = (1.0/np.sqrt(2.0*np.pi))
+
+    box /= box.sum()
+    line /= line.sum()
+    
+    mode = 'reflect'
+    out0 = filt.correlate1d(img, box, mode=mode)
+    out1 = filt.correlate1d(out0, line, mode=mode, axis=0)
+    out2 = filt.correlate1d(img, box, mode=mode, axis=0)
+    out3 = filt.correlate1d(out2, line, mode=mode)
+    smth = out1 + out3
+    return smth
+
+    
 
 # No docstring for a namedtuple (make it a class?)
 # It's just a return value for the momentConvolve2d() function below
@@ -120,3 +170,17 @@ def momentConvolve2d(data, k, sigma, middleOnly=False):
 
     
     
+if __name__ == '__main__':
+    n = 256
+    data = np.zeros((n,n))
+    data[n//2,n//2] += 1
+
+    smth = medianRing(data, 10.0, 2.0)
+
+    fig = figure.Figure()
+    can = FigCanvas(fig)
+    ax = fig.add_subplot(121)
+    ax.imshow(data)
+    ax = fig.add_subplot(122)
+    ax.imshow(smth)
+    fig.savefig("ring.png")

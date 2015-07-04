@@ -7,6 +7,8 @@ from scipy import ndimage as ndimg
 
 import matplotlib.pyplot as plt
 
+import hesse_cluster as hesse
+
 def hesseForm(theta_in, x, y):
     """Convert theta, x, y   to Hesse normal form
 
@@ -93,6 +95,11 @@ def improveCluster(theta, x, y):
     
     t = theta.copy()
     r = x*np.cos(t) + y*np.sin(t)
+    neg       = (r < -0.2)
+    t[neg]   += np.pi
+    cycle     = (t > 2.0*np.pi + 0.2)
+    t[cycle] -= 2.0*np.pi
+
     
     xx1, xx2 = np.meshgrid(x, x)
     yy1, yy2 = np.meshgrid(y, y)
@@ -163,7 +170,7 @@ def improveCluster(theta, x, y):
 
 
 
-def hesseBin(r0, theta0, bins=200, rMax=4096, thresh=4):
+def hesseBin(r0, theta0, bins=200, rMax=4096, thresh=40):
     """Bin r,theta values to find clusters above a threshold
 
     @param r0         List of r values
@@ -214,36 +221,35 @@ def hesseBin(r0, theta0, bins=200, rMax=4096, thresh=4):
         loc_r,loc_t = np.where(locus == label)
         
         iThetaPeak, iRPeak = 0.0, 0.0
-        max_val = 0.0
+        maxVal = 0.0
         for i in range(len(loc_t)):
             val = bin2d[loc_r[i],loc_t[i]]
-            if val > max_val:
-                max_val = val
+            if val > maxVal:
+                maxVal    = val
                 iThetaPeak = loc_t[i]
-                iRPeak = loc_r[i]
+                iRPeak     = loc_r[i]
         
 
-        # iThetaPeak,iRPeak  is the peak count for this label in bin2d
+            # iThetaPeak,iRPeak  is the peak count for this label in bin2d
 
-        # get the indices for a 3x3 box with iThetaPeak,iRPeak at the center
-        iThetaMin = max(iThetaPeak-1, 0)
-        iThetaMax = min(iThetaPeak+1, bins-1)
-        iRMin     = max(iRPeak-1, 0)
-        iRMax     = min(iRPeak+1, bins-1)
-        
-        # get indices for a (wider) 5x5 box
-        iThetaMinWide = max(iThetaPeak-3, 0)
-        iThetaMaxWide = min(iThetaPeak+3, bins-1)
-        iRMinWide     = max(iRPeak-3, 0)
-        iRMaxWide     = min(iRPeak+3, bins-1)
+            # get the indices for a 3x3 box with iThetaPeak,iRPeak at the center
+            iThetaMin = max(iThetaPeak - 1, 0)
+            iThetaMax = min(iThetaPeak + 1, bins - 1)
+            iRMin     = max(iRPeak - 1,     0)
+            iRMax     = min(iRPeak + 1,     bins - 1)
 
-        tlo, thi = tEdge[iThetaMin], tEdge[iThetaMax+1]
-        rlo, rhi = rEdge[iRMin], rEdge[iRMax+1]
+            # get indices for a (wider) 5x5 box
+            iThetaMinWide = max(iThetaPeak - 3, 0)
+            iThetaMaxWide = min(iThetaPeak + 3, bins - 1)
+            iRMinWide     = max(iRPeak - 3,     0)
+            iRMaxWide     = min(iRPeak + 3,     bins - 1)
+
+        tlo, thi = tEdge[iThetaMin], tEdge[iThetaMax + 1]
+        rlo, rhi = rEdge[iRMin],     rEdge[iRMax + 1]
         # wide edges
-        tloWide, thiWide = tEdge[iThetaMinWide], tEdge[iThetaMaxWide+1]
-        rloWide, rhiWide = rEdge[iRMinWide],     rEdge[iRMaxWide+1]
+        tloWide, thiWide = tEdge[iThetaMinWide], tEdge[iThetaMaxWide + 1]
+        rloWide, rhiWide = rEdge[iRMinWide],     rEdge[iRMaxWide + 1]
         nbox = len(loc_t)
-
 
         # for this locus, use the median r,theta for points within the 3x3 box around the peak
         centeredOnPeak = (theta >= tlo) & (theta < thi) & (r >= rlo) & (r < rhi)
@@ -270,14 +276,16 @@ def hesseBin(r0, theta0, bins=200, rMax=4096, thresh=4):
         tgrow = dtTmpWide/dtTmp
         grow = np.sqrt(rgrow**2 + tgrow**2)
 
-        if rgrow > 2.0 and tgrow > 2.0:
+        if rgrow > 3.0 and tgrow > 3.0:
+            print "Warning: Discarding locus at %.1f,%.3f due to poor convergence (%.2f/%.2f, %.2f/%2.f)." % \
+                (rTmp, tTmp, drTmp, rgrow, dtTmp, tgrow)
             continue
-            
+
         rs.append(rTmp)
         drs.append(drTmp)
         ts.append(tTmp)
         dts.append(dtTmp)
-        
+
         w = (theta0 >= tlo) & (theta0 < thi) & (r0 >= rlo) & (r0 < rhi)
         idx.append(w)
 
@@ -380,7 +388,8 @@ class HoughTransform(object):
         nPoints = len(r0)
 
         if nPoints == 0:
-            return ()
+            print "Bark"
+            return HoughSolutionList(0, rIn, thetaIn)
         
         np.random.seed(44)
         r, theta, x, y = r0, theta0, x0, y0
@@ -401,15 +410,14 @@ class HoughTransform(object):
             rMax = np.sqrt(x.max()**2 + y.max()**2)
                 
         # bin the data in r,theta space; get r,theta that pass our threshold as a satellite trail
-        bin2d, rEdge, thetaEdge, rs, thetas, idx = hesseBin(rNew, thetaNew,
-                                                            bins=self.bins, rMax=rMax,
-                                                            thresh=self.thresh)
+        bin2d, rEdge, thetaEdge, rs, thetas, idx = hesseBin(rNew, thetaNew, thresh=self.thresh,
+                                                            bins=self.bins, rMax=rMax)
         
         numLocus = len(thetas)
         solutions = HoughSolutionList(bin2d.max(), rIn, thetaIn)
         for i in range(numLocus):
             _x, _y = x[idx[i]], y[idx[i]]
             rnew, tnew = rNew[idx[i]], thetaNew[idx[i]]
-            solutions.append( HoughSolution(rs[i], thetas[i], _x, _y, rnew, tnew, len(idx[i])) )
+            solutions.append( HoughSolution(rs[i], thetas[i], _x, _y, rnew, tnew, idx[i].sum()) )
         return solutions
         

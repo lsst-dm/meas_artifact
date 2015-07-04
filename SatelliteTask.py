@@ -67,9 +67,8 @@ class SatelliteTask(pipeBase.CmdLineTask):
         
             for i, trail in enumerate(trails):
                 maskedPixels = trail.setMask(exposure)
-                msg = "Trail %d of %d (r: %.1f,theta: %.4f, w: %d):  cand-pix: %d mask-pix: %d" % \
-                      (i+1, len(trails), trail.r, trail.theta, trail.width or 1,
-                       trail.houghBinMax, maskedPixels)          
+                msg = "Trail %d/%d %s:  cand-pix: %d mask-pix: %d" % \
+                      (i+1, len(trails), trail, trail.houghBinMax, maskedPixels)          
                 self.log.info(msg)
                 if log:
                     log.write(msg+"\n")
@@ -81,31 +80,31 @@ class SatelliteTask(pipeBase.CmdLineTask):
     def runSatellite(self, exposure, bins=None, broadTrail=False, log=None):
             
         if broadTrail:
-            luminosityLimit = 50.0 # low cut on pixel flux
-            luminosityMax   = 500.0
+            luminosityLimit = 0.2 # low cut on pixel flux
+            luminosityMax   = 50.0
             maskNPsfSigma   = 3.0*bins
-            centerLimit     = 1.5   # about 1 pixel
-            eRange          = 0.05  # about +/- 0.1
-            houghBins       = 128   # number of r,theta bins (i.e. 256x256)
+            centerLimit     = 0.5   # about 1 pixel
+            eRange          = 0.04  # about +/- 0.1
+            houghBins       = 256   # number of r,theta bins (i.e. 256x256)
             kernelSigma     = 21    # pixels
             kernelWidth     = 41   # pixels
             widths          = [90.0, 180.0]  #width of an out of focus aircraft (unbinned)
-            houghThresh     = 30    # counts in a r,theta bins
-            skewLimit       = 150.0
-            bLimit          = 0.5
+            houghThresh     = 50    # counts in a r,theta bins
+            skewLimit       = 120.0
+            bLimit          = 1.0
         else:
-            luminosityLimit = 6.0   # low cut on pixel flux
-            luminosityMax   = 1.0e4 # max luminsity for pixel flux
+            luminosityLimit = 0.05   # low cut on pixel flux
+            luminosityMax   = 4.0e2 # max luminsity for pixel flux
             maskNPsfSigma   = 7.0
             centerLimit     = 0.8  # about 1 pixel
-            eRange          = 0.05  # about +/- 0.1
+            eRange          = 0.04  # about +/- 0.1
             houghBins       = 256   # number of r,theta bins (i.e. 256x256)
             kernelSigma     = 9    # pixels
             kernelWidth     = 17   # pixels
             widths          = [0.0]
-            houghThresh     = 50    # counts in a r,theta bins
-            skewLimit       = 40.0
-            bLimit          = 0.5
+            houghThresh     = 20    # counts in a r,theta bins
+            skewLimit       = 30.0
+            bLimit          = 0.8
 
         self.finder = satell.SatelliteFinder(
             kernelSigma=kernelSigma,
