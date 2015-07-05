@@ -65,7 +65,74 @@ def twoPiOverlap(theta_in, arrays=None, overlapRange=0.2):
             
     return theta, outArray
 
+
+
+def thetaAlignment(theta, x, y, limit=None, tolerance=0.15, minLimit=3):
+
+    t1 = time.time()
+    n = len(theta)
     
+    tightTolerance = 0.002
+    fillFactor = tightTolerance/tolerance
+    
+    if limit is None:
+        p = tolerance/(np.pi/2)
+        expect = n*p*p
+        limit = expect
+        if limit < minLimit:
+            limit = minLimit
+            
+    xx1, xx2 = np.meshgrid(x, x)
+    yy1, yy2 = np.meshgrid(y, y)
+    tt1, tt2 = np.meshgrid(theta, theta)
+
+    dydx = (yy2 - yy1)/(xx2 - xx1 + 0.01)
+    pixelTheta = np.arctan(dydx)
+     
+    aligned1 = np.abs(tt1 - pixelTheta) < tolerance
+    aligned2 = np.abs(tt2 - pixelTheta) < tolerance
+    aligned  = aligned1 & aligned2
+
+    nthNearest = np.zeros(n)
+    expNearest = np.zeros(n)
+    
+    diffs = np.array([])
+    for i in range(n):
+        sort   = np.sort(pixelTheta[i,aligned[i,:]])
+        expNearest[i] = len(sort)
+        if len(sort) < 2: #minLimit + 2:
+            continue
+        diff   = np.abs(sort[1:] - sort[:-1])
+        diffs  = np.append(diffs, diff)
+        if False:
+            part   = np.partition(diff, minLimit)
+            nthNearest[i] = part[minLimit - 1]
+        diffsort = np.sort(diff)
+        nthNearest[i] = (diffsort < tightTolerance).sum()
+
+        nCand = len(diffsort)
+        pTight = np.exp(-2.0*nCand*fillFactor)
+        expectTight = nCand*pTight
+        expNearest[i] = expectTight
+        
+    nAligned = (aligned1 & aligned2).sum(axis=1)
+    isAligned = nAligned >= limit
+    isCandidate = nthNearest >= expNearest
+
+    print "Expect:", len(theta), expect, expNearest.mean(), isCandidate.sum(), isAligned.sum()
+    if False:
+        fig, ax = plt.subplots(nrows=2, ncols=3)
+        ax[0,0].hist(theta, bins=500)
+        ax[0,1].hist(pixelTheta.ravel(), bins=500)
+        ax[1,0].hist(nAligned, bins=40)
+        ax[1,1].hist(theta[isAligned], bins=50, edgecolor='none')
+        ax[1,1].hist(theta[isCandidate], bins=50, edgecolor='none', facecolor='r')
+        ax[1,2].hist(diffs, bins=200)
+        ax[1,2].set_xlim([0.0, 0.01])
+        fig.savefig("hist.png")
+
+    return isCandidate
+
     
 def improveCluster(theta, x, y):
     """
@@ -279,7 +346,7 @@ def hesseBin(r0, theta0, bins=200, rMax=4096, thresh=40):
         if rgrow > 3.0 and tgrow > 3.0:
             print "Warning: Discarding locus at %.1f,%.3f due to poor convergence (%.2f/%.2f, %.2f/%2.f)." % \
                 (rTmp, tTmp, drTmp, rgrow, dtTmp, tgrow)
-            continue
+            #continue
 
         rs.append(rTmp)
         drs.append(drTmp)

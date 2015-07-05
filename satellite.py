@@ -158,6 +158,7 @@ class SatelliteFinder(object):
         # Moments
         #
         #################################################
+        xx, yy = np.meshgrid(np.arange(img.shape[1], dtype=int), np.arange(img.shape[0], dtype=int))
         
         mm       = momCalc.MomentManager(img, kernelWidth=self.kernelWidth, kernelSigma=self.kernelSigma)
         mm_faint = momCalc.MomentManager(img_faint, kernelWidth=self.kernelWidth, kernelSigma=self.kernelSigma)
@@ -167,8 +168,8 @@ class SatelliteFinder(object):
         mmCals = []
         nHits = []
 
-        #Selector = momCalc.PixelSelector
-        Selector = momCalc.PValuePixelSelector
+        Selector = momCalc.PixelSelector
+        #Selector = momCalc.PValuePixelSelector
 
         for i, calImg in enumerate(calImages):
             mmCal = momCalc.MomentManager(calImg, kernelWidth=self.kernelWidth, kernelSigma=self.kernelSigma, 
@@ -232,7 +233,14 @@ class SatelliteFinder(object):
             print pixels.sum(), mediumPixels.sum(), brightPixels.sum(), faintPixels.sum()
 
             isCandidate |= pixels | mediumPixels | brightPixels
-            if isCandidate.sum() < 250:
+
+            print "Before:", isCandidate.sum(), time.time() - t1
+            thetaMatch = hough.thetaAlignment(mm.theta[isCandidate], xx[isCandidate], yy[isCandidate],
+                                              minLimit=5)
+            isCandidate[isCandidate] &= thetaMatch
+            print "After:", isCandidate.sum(), time.time() - t1
+            
+            if False: #isCandidate.sum() < 250:
                 isCandidate |= faintPixels
 
             nHits.append((widths[i], isCandidate.sum()))
@@ -245,8 +253,6 @@ class SatelliteFinder(object):
         ################################################
         # Hough transform
         #################################################
-        xx, yy = np.meshgrid(np.arange(img.shape[1], dtype=int), np.arange(img.shape[0], dtype=int))
-
         rMax           = sum([q**2 for q in img.shape])**0.5
         houghTransform = hough.HoughTransform(self.houghBins, self.houghThresh,
                                               rMax=rMax, maxPoints=1000, nIter=1)
