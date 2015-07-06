@@ -118,7 +118,7 @@ def thetaAlignment(theta, x, y, limit=4, tolerance=0.15):
     diffs = np.array([])
     
     # Using variable names  pCloseNeighbour = e^(2*nCand*closeNeighbourTolerance/tolerance)
-    pZeroCloseNeighbour     = 0.95 
+    pZeroCloseNeighbour     = 0.99
     # compute the closeNeighbourTolerance for which we expect 1 collision
     phi                     = -0.5*np.log(pZeroCloseNeighbour)
     

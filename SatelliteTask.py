@@ -80,31 +80,31 @@ class SatelliteTask(pipeBase.CmdLineTask):
     def runSatellite(self, exposure, bins=None, broadTrail=False, log=None):
             
         if broadTrail:
-            luminosityLimit = 0.1 # low cut on pixel flux
+            luminosityLimit = 0.06 # low cut on pixel flux
             luminosityMax   = 50.0
             maskNPsfSigma   = 3.0*bins
-            centerLimit     = 0.5   # about 1 pixel
+            centerLimit     = 1.0   # about 1 pixel
             eRange          = 0.04  # about +/- 0.1
             houghBins       = 256   # number of r,theta bins (i.e. 256x256)
             kernelSigma     = 21    # pixels
             kernelWidth     = 41   # pixels
             widths          = [90.0, 180.0]  #width of an out of focus aircraft (unbinned)
-            houghThresh     = 50    # counts in a r,theta bins
+            houghThresh     = 20    # counts in a r,theta bins
             skewLimit       = 120.0
             bLimit          = 1.0
         else:
-            luminosityLimit = 0.1   # low cut on pixel flux
+            luminosityLimit = 0.08   # low cut on pixel flux
             luminosityMax   = 4.0e2 # max luminsity for pixel flux
             maskNPsfSigma   = 7.0
             centerLimit     = 0.5  # about 1 pixel
-            eRange          = 0.04  # about +/- 0.1
+            eRange          = 0.03  # about +/- 0.1
             houghBins       = 256   # number of r,theta bins (i.e. 256x256)
             kernelSigma     = 9    # pixels
             kernelWidth     = 17   # pixels
             widths          = [0.0]
             houghThresh     = 20    # counts in a r,theta bins
-            skewLimit       = 30.0
-            bLimit          = 0.8
+            skewLimit       = 20.0
+            bLimit          = 0.6
 
         self.finder = satell.SatelliteFinder(
             kernelSigma=kernelSigma,

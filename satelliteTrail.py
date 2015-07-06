@@ -27,7 +27,7 @@ class SatelliteTrailList(list):
         self.binMax = binMax
         self.psfSigma = psfSigma
 
-    def merge(self, trailList, drMax=20.0, dThetaMax=0.1):
+    def merge(self, trailList, drMax=40.0, dThetaMax=0.15):
         """Merge trails from trailList to this SatelliteTrailList.  Returns a new SatelliteTrailList.
 
         @param trailList     The trailList to merge in
