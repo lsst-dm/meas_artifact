@@ -80,7 +80,7 @@ class SatelliteTask(pipeBase.CmdLineTask):
     def runSatellite(self, exposure, bins=None, broadTrail=False, log=None):
             
         if broadTrail:
-            luminosityLimit = 0.2 # low cut on pixel flux
+            luminosityLimit = 0.1 # low cut on pixel flux
             luminosityMax   = 50.0
             maskNPsfSigma   = 3.0*bins
             centerLimit     = 0.5   # about 1 pixel
@@ -93,10 +93,10 @@ class SatelliteTask(pipeBase.CmdLineTask):
             skewLimit       = 120.0
             bLimit          = 1.0
         else:
-            luminosityLimit = 0.05   # low cut on pixel flux
+            luminosityLimit = 0.1   # low cut on pixel flux
             luminosityMax   = 4.0e2 # max luminsity for pixel flux
             maskNPsfSigma   = 7.0
-            centerLimit     = 0.8  # about 1 pixel
+            centerLimit     = 0.5  # about 1 pixel
             eRange          = 0.04  # about +/- 0.1
             houghBins       = 256   # number of r,theta bins (i.e. 256x256)
             kernelSigma     = 9    # pixels

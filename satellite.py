@@ -133,9 +133,10 @@ class SatelliteFinder(object):
         rms_faint = img_faint.std()
         #img_faint[(img_faint < rms_faint)] = rms_faint
 
-        if True:
-            back = satUtil.medianRing(img_faint, 20.0, 2.0*self.sigmaSmooth)
-            img  -= back
+        # subtract a small scale background when we search for PSFs
+        if np.abs(widths[0]) < 0.1:
+            back       = satUtil.medianRing(img_faint, 20.0, 2.0*self.sigmaSmooth)
+            img       -= back
             img_faint -= back
         
         #   - smooth 
@@ -168,9 +169,9 @@ class SatelliteFinder(object):
         mmCals = []
         nHits = []
 
-        Selector = momCalc.PixelSelector
-        #Selector = momCalc.PValuePixelSelector
-
+        #Selector = momCalc.PixelSelector
+        Selector = momCalc.PValuePixelSelector
+        maxPixels = 1000
         for i, calImg in enumerate(calImages):
             mmCal = momCalc.MomentManager(calImg, kernelWidth=self.kernelWidth, kernelSigma=self.kernelSigma, 
                                           isCalibration=True)
@@ -211,11 +212,11 @@ class SatelliteFinder(object):
                 }
 
             selector       = Selector(mm, mmCal, limits)
-            pixels         = selector.getPixels()              & isGood
+            pixels         = selector.getPixels(maxPixels=maxPixels)              & isGood
             mediumSelector = Selector(mm, mmCal, mediumLimits)
-            mediumPixels   = mediumSelector.getPixels()        & isGood
+            mediumPixels   = mediumSelector.getPixels(maxPixels=maxPixels)        & isGood
             brightSelector = Selector(mm, mmCal, brightLimits)
-            brightPixels   = brightSelector.getPixels()        & isGood
+            brightPixels   = brightSelector.getPixels(maxPixels=maxPixels)        & isGood
 
             # faint trails
             faint_limits = {
@@ -227,22 +228,32 @@ class SatelliteFinder(object):
                 #'ellip'        : 1.0*self.eRange,
                 #'b'            : 1.0*self.bLimit,
             }                
-            selector = Selector(mm_faint, mmCal, faint_limits)
-            faintPixels = selector.getPixels(binOnTheta=False) & (msk & (MASK | DET) == 0)
-
-            print pixels.sum(), mediumPixels.sum(), brightPixels.sum(), faintPixels.sum()
+            selector     = Selector(mm_faint, mmCal, faint_limits)
+            faintPixels  = selector.getPixels(binOnTheta=False, maxPixels=maxPixels) \
+                           & (msk & (MASK | DET)==0)
 
             isCandidate |= pixels | mediumPixels | brightPixels
 
-            print "Before:", isCandidate.sum(), time.time() - t1
-            thetaMatch = hough.thetaAlignment(mm.theta[isCandidate], xx[isCandidate], yy[isCandidate],
-                                              minLimit=5)
+            nCandidatesBeforeCull = isCandidate.sum()
+            thetaMatch   = hough.thetaAlignment(mm.theta[isCandidate], xx[isCandidate], yy[isCandidate])
             isCandidate[isCandidate] &= thetaMatch
-            print "After:", isCandidate.sum(), time.time() - t1
-            
-            if False: #isCandidate.sum() < 250:
-                isCandidate |= faintPixels
+            nCandidatesAfterCull = isCandidate.sum()
 
+            nFaintBeforeCull = faintPixels.sum()
+            faintMatch = hough.thetaAlignment(mm_faint.theta[faintPixels], xx[faintPixels], yy[faintPixels])
+            faintPixels[faintPixels] &= faintMatch
+            nFaintAfterCull = faintPixels.sum()
+            
+            isCandidate |= faintPixels
+
+                
+            msg = "nPix/med/bri: %d/ %d/ %d   bef/aft: %d/ %d   faint: %d/ %d" % (
+                pixels.sum(), mediumPixels.sum(), brightPixels.sum(),
+                nCandidatesBeforeCull, nCandidatesAfterCull, nFaintBeforeCull, nFaintAfterCull,
+            )
+            print msg
+            
+                
             nHits.append((widths[i], isCandidate.sum()))
             
         bestCal = sorted(nHits, key=lambda x: x[1], reverse=True)[0]
@@ -263,12 +274,11 @@ class SatelliteFinder(object):
         #################################################
         trails = satTrail.SatelliteTrailList(nCandidatePixels, solutions.binMax, psfSigma)
         for s in solutions:
-            print "Trail: ", self.bins*s.r, s.theta, bestWidth, s.binMax
             trail = satTrail.SatelliteTrail(self.bins*s.r, s.theta, width=bestWidth)
             trail.measure(exp, bins=self.bins)
             trail.houghBinMax = s.binMax
             trails.append(trail)
-
+            print trail
 
         print "Done.", time.time() - t1
 

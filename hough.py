@@ -67,21 +67,41 @@ def twoPiOverlap(theta_in, arrays=None, overlapRange=0.2):
 
 
 
-def thetaAlignment(theta, x, y, limit=None, tolerance=0.15, minLimit=3):
+def thetaAlignment(theta, x, y, limit=4, tolerance=0.15):
+    """A helper function to cull the candidate points.
 
-    t1 = time.time()
+    @param theta      ndarray of thetas
+    @param x          ndarray of x pixel coordinates
+    @param y          ndarray of y pixel coordinates
+
+    The basic idea here is that for any pair of points, each has a local measure of theta
+    and also vector connecting the two points, which also defines a third theta.
+    All of these should agree, so we can eliminate any candidate points for which
+    either local theta is more than 'tolerance' different from that defined by the
+    dx,dy pixel coordinates.
+
+    This only gets you so far.  With ~1000 candidate points, each one will have ~10 chance
+    alignments for a reasonable tolerance.  Though the local theta values are uncertain at the +/-0.1
+    level, the pixel coordinate-based thetas are much more precise.  So from those ~10, we can
+    search for pairs which have pixelTheta values which line up 'too well'.
+
+    The final step is choosing an delta-angle to define as the smallest separation we'd expect
+    to see between any two points.  If we assume the points are uniformly distributed, the probability
+    1 point will we be found within 'delta' of another is e^(-2*phi) where fill-factor phi=n*delta/range.
+    This might look familiar as the Poisson prob for zero events with rate u=-2*phi:
+    
+       P(x=k) = u^k/k! e^(-u)   -->  P(x=0) = e^(-u)
+    
+    What we're saying is that if we sit on one of n points in a region 'range',
+    the probability of observing 0 points within 'delta' of our position is:
+    
+       P(x=0) = e^(-2*n*delta/range)
+    
+    The factor of 2 arises because a point may preceed or follow.
+    """
+    
     n = len(theta)
-    
-    tightTolerance = 0.002
-    fillFactor = tightTolerance/tolerance
-    
-    if limit is None:
-        p = tolerance/(np.pi/2)
-        expect = n*p*p
-        limit = expect
-        if limit < minLimit:
-            limit = minLimit
-            
+                
     xx1, xx2 = np.meshgrid(x, x)
     yy1, yy2 = np.meshgrid(y, y)
     tt1, tt2 = np.meshgrid(theta, theta)
@@ -93,34 +113,34 @@ def thetaAlignment(theta, x, y, limit=None, tolerance=0.15, minLimit=3):
     aligned2 = np.abs(tt2 - pixelTheta) < tolerance
     aligned  = aligned1 & aligned2
 
-    nthNearest = np.zeros(n)
-    expNearest = np.zeros(n)
+    nNearNeighbours = np.zeros(n)
     
     diffs = np.array([])
+    
+    # Using variable names  pCloseNeighbour = e^(2*nCand*closeNeighbourTolerance/tolerance)
+    pZeroCloseNeighbour     = 0.95 
+    # compute the closeNeighbourTolerance for which we expect 1 collision
+    phi                     = -0.5*np.log(pZeroCloseNeighbour)
+    
     for i in range(n):
-        sort   = np.sort(pixelTheta[i,aligned[i,:]])
-        expNearest[i] = len(sort)
-        if len(sort) < 2: #minLimit + 2:
+        cand   = pixelTheta[i,aligned[i,:]]
+        nCand  = len(cand)
+        if nCand < max(limit, 2):
             continue
-        diff   = np.abs(sort[1:] - sort[:-1])
-        diffs  = np.append(diffs, diff)
-        if False:
-            part   = np.partition(diff, minLimit)
-            nthNearest[i] = part[minLimit - 1]
-        diffsort = np.sort(diff)
-        nthNearest[i] = (diffsort < tightTolerance).sum()
+        sort   = np.sort(cand)
+        diff   = np.sort(np.abs(sort[1:] - sort[:-1]))
+        #diffs  = np.append(diffs, diff)
 
-        nCand = len(diffsort)
-        pTight = np.exp(-2.0*nCand*fillFactor)
-        expectTight = nCand*pTight
-        expNearest[i] = expectTight
+        closeNeighbourTolerance = phi*tolerance/nCand
+        # how many collisions do we actually have?
+        nNearNeighbours[i]      = (diff < closeNeighbourTolerance).sum()
         
-    nAligned = (aligned1 & aligned2).sum(axis=1)
-    isAligned = nAligned >= limit
-    isCandidate = nthNearest >= expNearest
+    isCandidate = nNearNeighbours >= limit
 
-    print "Expect:", len(theta), expect, expNearest.mean(), isCandidate.sum(), isAligned.sum()
     if False:
+        nAligned    = (aligned1 & aligned2).sum(axis=1)
+        isAligned   = nAligned >= limit
+        
         fig, ax = plt.subplots(nrows=2, ncols=3)
         ax[0,0].hist(theta, bins=500)
         ax[0,1].hist(pixelTheta.ravel(), bins=500)

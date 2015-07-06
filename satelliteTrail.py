@@ -27,7 +27,7 @@ class SatelliteTrailList(list):
         self.binMax = binMax
         self.psfSigma = psfSigma
 
-    def merge(self, trailList, drMax=50.0, dthetaMax=0.1):
+    def merge(self, trailList, drMax=20.0, dThetaMax=0.1):
         """Merge trails from trailList to this SatelliteTrailList.  Returns a new SatelliteTrailList.
 
         @param trailList     The trailList to merge in
@@ -44,7 +44,7 @@ class SatelliteTrailList(list):
             theta = t.theta
             isDuplicate = False
             for t2 in self:
-                if t.isNear(t2):
+                if t.isNear(t2, drMax, dThetaMax):
                     isDuplicate = True
             if not isDuplicate:
                 s.append(t)
@@ -198,7 +198,11 @@ class SatelliteTrail(object):
         """Measure an aperture flux, a centroid, and a width for this satellite trail in a given exposure.
 
         @param exposure       The exposure to measure in (accepts ExposureF, ImageF, ndarray)
+        @param bins           The binning used in the image.  Needed as r is in pixels.
+        @param widthIn        The aperture within which to measure.  Default = existing width
 
+        For a PSF trail, our width is 0.0.  A call with an exposure will use the PSF and
+        select 4*psfSigma as a widthIn value.
         """
 
         aperture = self.width
@@ -265,7 +269,12 @@ class SatelliteTrail(object):
                (self.width == trail.width) and (self.flux == trail.flux) and (self.fWing == trail.fWing)
         return isEq
         
-    def isNear(self, trail, rTol=1.0, thetaTol=0.01):
-        isNear = (np.abs(self.r - trail.r) < rTol) and (np.abs(self.theta - trail.theta) < thetaTol)
+    def isNear(self, trail, drMax, dThetaMax):
+        """Fuzzy-compare two trails.
+
+        It's quite possible that the same trail will be detected in a searches for satellites and
+        aircraft.  The parameters won't be identical, but they'll be close.
+        """
+        isNear = (np.abs(self.r - trail.r) < drMax) and (np.abs(self.theta - trail.theta) < dThetaMax)
         return isNear
 

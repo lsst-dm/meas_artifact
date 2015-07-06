@@ -154,7 +154,7 @@ class PixelSelector(object):
             test = np.abs(getattr(self, name)) < 1.0
         return test
 
-    def getPixels(self, binOnTheta=False):
+    def getPixels(self, binOnTheta=False, maxPixels=None):
 
         keys = getattr(self, 'keys')
         accumulator = np.ones(self.momentManager.shape, dtype=bool)
@@ -169,6 +169,12 @@ class PixelSelector(object):
             best = np.argmax(hist)
             tbest = 0.5*(edges[best] + edges[best+1])
             accumulator &= (np.abs(tbest - t) < 0.2)
+            
+        if maxPixels:
+            # a no-op since we have no way to choose.  We could selected randomly?
+            # The parameter can be used by the PValuePixelSelector, which can sort by probability.
+            pass
+            
         return accumulator
 
 
@@ -190,7 +196,7 @@ class PValuePixelSelector(PixelSelector):
         else:
             return -0.5*z*z
 
-    def getPixels(self, binOnTheta=False):
+    def getPixels(self, binOnTheta=False, maxPixels=None):
         keys = getattr(self, 'keys')
         logp = self._test(keys[0])
         n = 0
@@ -215,11 +221,12 @@ class PValuePixelSelector(PixelSelector):
             n += 1
 
         thresh1 = self.thresh or -0.5*n
-        nth = 1000.0/logp.size
         ret = logp > thresh1
-        if ret.sum() > 1000:
-            thresh2 = np.percentile(logp, 100*(1.0-nth))
-            ret = logp > thresh2
+        if maxPixels:
+            nth = 1.0*maxPixels/logp.size
+            if ret.sum() > maxPixels:
+                thresh2 = np.percentile(logp, 100*(1.0-nth))
+                ret = logp > thresh2
         return ret
 
 
