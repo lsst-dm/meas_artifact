@@ -36,21 +36,21 @@ class SatelliteTrailList(list):
         """
         
         s = SatelliteTrailList(self.nPixels, max(trailList.binMax, self.binMax), self.psfSigma)
-        for t in self:
-            s.append(t)
-            
+
+        # get everything from list 1, and check for duplicates
         for t in trailList:
-            r     = t.r
-            theta = t.theta
-            isDuplicate = False
+            best  = t
             for t2 in self:
                 if t.isNear(t2, drMax, dThetaMax):
-                    isDuplicate = True
-            if not isDuplicate:
+                    best = t.chooseBest(t, t2)
+            s.append(best)
+
+        # get everything from list 2, and throw out duplicates (we already chose the best one)
+        for t in self:
+            haveIt = [t.isNear(t2, drMax, dThetaMax) for t2 in s]
+            if not any(haveIt):
                 s.append(t)
-            else:
-                # here, we should pick the best one.  check width ?
-                pass
+
         return s
 
 
@@ -62,7 +62,7 @@ class SatelliteTrail(object):
     or to set mask bits in an exposure.
     """
     
-    def __init__(self, r, theta, width=0.0, flux=1.0, center=0.0, fWing=0.1):
+    def __init__(self, r, theta, width=0.0, flux=1.0, center=0.0, fWing=0.1, binMax=None, resid=None):
         """Construct a SatelliteTrail with specified parameters.
 
         @param r        r from Hesse normal form of the trail
@@ -70,20 +70,36 @@ class SatelliteTrail(object):
         @param width    The width of the trail (0 for a PSF, out-of-focus aircraft are wider)
         @param flux     Flux of the trail
         @param fWing    For double-Gaussian PSF model.  Fraction of flux in larger Gaussian.
+        @param binMax   The max bin count for the Hough solution
+        @param resid    The coordinate resid tuple (median,inter_quart_range) for residuals from the solution
         """
 
-        self.r      = r
-        self.theta  = theta
-        self.width  = width
-        self.vx     = np.cos(theta)
-        self.vy     = np.sin(theta)
-        self.flux   = flux
-        self.center = center
-        self.fCore  = 1.0 - fWing
-        self.fWing  = fWing
+        self.r        = r
+        self.theta    = theta
+        self.vx       = np.cos(theta)
+        self.vy       = np.sin(theta)
+        
+        self.flux     = flux
+        self.width    = width
+        self.center   = center
+        self.fCore    = 1.0 - fWing
+        self.fWing    = fWing
 
-        self.houghBinMax = 0
+        self.binMax   = binMax
+        self.resid    = resid
+        
+    @classmethod
+    def fromHoughSolution(cls, solution, bins):
+        """A constructor to create a SatelliteTrail from a HoughSolution Object
 
+        @param solution      The HoughSolution from which to construct ourself.
+        @param bins          Binning used in solution image.
+        """
+        
+        trail = cls(bins*solution.r, solution.theta, binMax=solution.binMax, resid=solution.resid)
+        return trail
+        
+        
     def setMask(self, exposure):
         """Set the mask plane near this trail in an exposure.
 
@@ -100,7 +116,8 @@ class SatelliteTrail(object):
         # create a fresh mask and add to that.
         tmp            = type(msk)(msk.getWidth(), msk.getHeight())
         sigma          = satUtil.getExposurePsfSigma(exposure)
-        self.insert(tmp, sigma=sigma, maskBit=satelliteBit)
+        # if this is being called, we probably have a width measured with our measure() method
+        self.insert(tmp, sigma=sigma, maskBit=satelliteBit, width=4.0*self.width)
 
         # OR it in to the existing plane, return the number of pixels we set
         msk     |= tmp
@@ -123,7 +140,17 @@ class SatelliteTrail(object):
         return x[w], y[w]
 
 
-    def insert(self, exposure, sigma=None, maskBit=None):
+    def residual(self, x, y, bins=1):
+        """Get residuals of this fit compared to given x,y coords.
+
+        @param x   array of x pixel coord
+        @param y   array of y pixel coord
+        """
+
+        dr = x*cos(t) + y*sin(t) - self.r/bins
+        return dr
+        
+    def insert(self, exposure, sigma=None, maskBit=None, width=None):
         """Plant this satellite trail in a given exposure.
 
         @param exposure       The exposure to plant in (accepts ExposureF, ImageF, MaskU or ndarray)
@@ -159,10 +186,7 @@ class SatelliteTrail(object):
             img = exposure
             ny, nx = img.shape
 
-        if sigma is None:
-            raise ValueError("Must specify sigma for satellite trail width")
 
-            
         #############################
         # plant the trail
         #############################
@@ -173,11 +197,18 @@ class SatelliteTrail(object):
         dot    = xx*self.vx + yy*self.vy
         offset = np.abs(dot - self.r)
 
-        # go to 4 sigma of the wider gaussian in the double gauss
-        if self.width > 1:
-            hwidth = self.width/2.0
+        # obey the caller
+        if width:
+            hwidth = width/2.0
+            
         else:
-            hwidth = 8.0*sigma
+            # maybe we know our width already
+            if self.width > 1:
+                hwidth = self.width/2.0
+                
+            # otherwise try goind 8*sigma (from exposure PSF or provided by caller)
+            else:
+                hwidth = 8.0*sigma
 
         # only bother updating the pixels within 5-sigma of the line
         w = (offset < hwidth)
@@ -198,7 +229,7 @@ class SatelliteTrail(object):
         """Measure an aperture flux, a centroid, and a width for this satellite trail in a given exposure.
 
         @param exposure       The exposure to measure in (accepts ExposureF, ImageF, ndarray)
-        @param bins           The binning used in the image.  Needed as r is in pixels.
+        @param bins           The binning used in the given exposure.  Needed as r is in pixels.
         @param widthIn        The aperture within which to measure.  Default = existing width
 
         For a PSF trail, our width is 0.0.  A call with an exposure will use the PSF and
@@ -248,20 +279,22 @@ class SatelliteTrail(object):
         # only bother updating the pixels within 5-sigma of the line
         w = (offset < hwidth) & (np.isfinite(img))
         self.flux     = img[w].sum()
-        self.center   = (img[w]*offset[w]).sum()/self.flux
-        self.width    = np.sqrt((img[w]*offset[w]**2).sum()/self.flux)
+        self.center   = bins*(img[w]*offset[w]).sum()/self.flux
+        sigma         = bins*np.sqrt((img[w]*offset[w]**2).sum()/self.flux)
+        self.width    = 2.0*sigma
 
         return self.flux
 
         
     def __str__(self):
-        rep = "SatelliteTrail(r=%.1f, theta=%.3f, width=%.2f, flux=%.2f, center=%.2f)" % \
-              (self.r, self.theta, self.width, self.flux, self.center)
+        rep = "SatelliteTrail(r=%.1f,th=%.3f,wid=%.2f,f=%.2f,cen=%.2f,binMax=%d,res=(%.2f,%.2f))" % \
+              (self.r, self.theta, self.width, self.flux, self.center, self.binMax,
+               self.resid.med, self.resid.iqr)
         return rep
         
     def __repr__(self):
-        rep = "SatelliteTrail(r=%r, theta=%r, width=%r, flux=%r, center=%r, fWing=%r)" % \
-              (self.r, self.theta, self.width, self.flux, self.center, self.fWing)
+        rep = "SatelliteTrail(r=%r,theta=%r,width=%r,flux=%r,center=%r,fWing=%r,binMax=%r,resid=(%r))" % \
+              (self.r, self.theta, self.width, self.flux, self.center, self.fWing, self.binMax, self.resid)
         return rep
 
     def __eq__(self, trail):
@@ -278,3 +311,14 @@ class SatelliteTrail(object):
         isNear = (np.abs(self.r - trail.r) < drMax) and (np.abs(self.theta - trail.theta) < dThetaMax)
         return isNear
 
+    @staticmethod
+    def chooseBest(trail1, trail2):
+        """A single place to choose the best trail, if two solutions exist.
+
+        @param trail1   SatelliteTrail object #1
+        @param trail2   SatelliteTrail object #2
+        """
+        err1 = trail1.resid.iqr
+        err2 = trail2.resid.iqr
+        return trail1 if (err1 < err2) else trail2
+        

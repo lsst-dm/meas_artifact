@@ -70,15 +70,15 @@ class SatelliteFinder(object):
         calArr   = calImg.getArray()
 
         # Make a trail with the requested (unbinned) width
-        calTrail = satTrail.SatelliteTrail(cx, cy, width=width)
+        calTrail = satTrail.SatelliteTrail(cx, cy)
         maskBit  = 1.0 if width > 1.0 else None
-        calTrail.insert(calArr, sigma=psfSigma, maskBit=maskBit)
+        calTrail.insert(calArr, sigma=psfSigma, maskBit=maskBit, width=width)
 
         # Now bin and smooth, just as we did the real image
         calArr   = afwMath.binImage(calImg, self.bins).getArray()
         calArr   = satUtil.smooth(calArr, self.sigmaSmooth)
 
-        if False:
+        if True: #False:
             fig = figure.Figure()
             can = FigCanvas(fig)
             ax = fig.add_subplot(111)
@@ -177,84 +177,74 @@ class SatelliteFinder(object):
                                           isCalibration=True)
             mmCals.append(mmCal)
 
-            limits = {
-                'sumI'         : -self.luminosityLimit*rms,
-                'center'       : 2.0*self.centerLimit,
-                'center_perp'  : self.centerLimit,
-                'skew'         : 2.0*self.skewLimit,
-                'skew_perp'    : self.skewLimit,
-                'ellip'        : self.eRange,
-                'b'            : self.bLimit,
-                }
+            sumI  = momCalc.MomentLimit('sumI',        self.luminosityLimit*rms, 'lower')
+            cent  = momCalc.MomentLimit('center',      2.0*self.centerLimit,     'center')
+            centP = momCalc.MomentLimit('center_perp', self.centerLimit,         'center')
+            skew  = momCalc.MomentLimit('skew',        2.0*self.skewLimit,       'center')
+            skewP = momCalc.MomentLimit('skew_perp',   self.skewLimit,           'center')
+            ellip = momCalc.MomentLimit('ellip',       self.eRange,              'center')
+            b     = momCalc.MomentLimit('b',           self.bLimit,              'center')
 
-            mediumFactor = 2.0
-            mediumLimit   = 10.0*self.luminosityLimit
-            mediumLimits = {
-                'sumI'         : -mediumLimit*rms,
-                'center'       : 2.0*self.centerLimit/mediumFactor,
-                'center_perp'  : self.centerLimit/mediumFactor,
-                'skew'         : 2.0*self.skewLimit/  mediumFactor,
-                'skew_perp'    : self.skewLimit/  mediumFactor,
-                'ellip'        : mediumFactor*self.eRange,
-                'b'            : mediumFactor*self.bLimit,
-                }
-            
-            brightFactor = 6.0
-            brightLimit = 20.0*self.luminosityLimit
-            brightLimits = {
-                'sumI'         : -brightLimit*rms,
-                'center'       : 2.0*self.centerLimit/brightFactor,
-                'center_perp'  : self.centerLimit/brightFactor,
-                'skew'         : 2.0*self.skewLimit/  brightFactor,
-                'skew_perp'    : self.skewLimit/  brightFactor,
-                'ellip'        : brightFactor*self.eRange,
-                'b'            : brightFactor*self.bLimit,
-                }
+            selector = Selector(mm, mmCal)
+            for limit in sumI, cent, centP, skew, skewP, ellip, b:
+                selector.append(limit)
 
-            selector       = Selector(mm, mmCal, limits)
-            pixels         = selector.getPixels(maxPixels=maxPixels)              & isGood
-            mediumSelector = Selector(mm, mmCal, mediumLimits)
-            mediumPixels   = mediumSelector.getPixels(maxPixels=maxPixels)        & isGood
-            brightSelector = Selector(mm, mmCal, brightLimits)
-            brightPixels   = brightSelector.getPixels(maxPixels=maxPixels)        & isGood
+            isCand = np.zeros(img.shape, dtype=bool)
+            pixelSums = []
+            luminFactors = 1.0, 10.0, 2.0
+            scaleFactors = 1.0,  2.0, 3.0
+            for luminFactor, scaleFactor in zip(luminFactors, scaleFactors):
+                sumI.norm  *= luminFactor
+                cent.norm  /= scaleFactor
+                centP.norm /= scaleFactor
+                skew.norm  /= scaleFactor
+                skewP.norm /= scaleFactor
+                ellip.norm *= scaleFactor
+                b.norm     *= scaleFactor
+                
+                pixels      = selector.getPixels(maxPixels=maxPixels)
+                isCand |= pixels
+                pixelSums.append(pixels.sum())
 
-            # faint trails
-            faint_limits = {
-                'sumI'         : -3.0*rms,
-                'center'       : 1.0*self.centerLimit,
-                #'center_perp'  : 1.0*self.centerLimit,
-                'skew'         : 1.0*self.skewLimit,
-                #'skew_per'     : 1.0*self.skewLimit,
-                #'ellip'        : 1.0*self.eRange,
-                #'b'            : 1.0*self.bLimit,
-            }                
-            selector     = Selector(mm_faint, mmCal, faint_limits)
-            faintPixels  = selector.getPixels(binOnTheta=False, maxPixels=maxPixels) \
-                           & (msk & (MASK | DET)==0)
 
-            isCandidate |= pixels | mediumPixels | brightPixels
+            nCandidatesBeforeCull = isCand.sum()
+            thetaMatch   = hough.thetaAlignment(mm.theta[isCand], xx[isCand], yy[isCand])
+            isCand[isCand] &= thetaMatch
+            nCandidatesAfterCull = isCand.sum()
 
-            nCandidatesBeforeCull = isCandidate.sum()
-            thetaMatch   = hough.thetaAlignment(mm.theta[isCandidate], xx[isCandidate], yy[isCandidate])
-            isCandidate[isCandidate] &= thetaMatch
-            nCandidatesAfterCull = isCandidate.sum()
+            nFaintBeforeCull = 0
+            nFaintAfterCull = 0
+            if True:
 
-            nFaintBeforeCull = faintPixels.sum()
-            faintMatch = hough.thetaAlignment(mm_faint.theta[faintPixels], xx[faintPixels], yy[faintPixels])
-            faintPixels[faintPixels] &= faintMatch
-            nFaintAfterCull = faintPixels.sum()
-            
-            isCandidate |= faintPixels
+                selector = Selector(mm_faint, mmCal)
+                sumI    = momCalc.MomentLimit('sumI',        3.0*rms,                  'lower')
+                cent    = momCalc.MomentLimit('center',      2.0*self.centerLimit,     'center')
+                skew    = momCalc.MomentLimit('skew',        2.0*self.skewLimit,       'center')
+                ellipLo = momCalc.MomentLimit('ellip',       0.05,                     'lower')
+                ellipHi = momCalc.MomentLimit('ellip',       0.90,                     'upper')
+                for limit in sumI, cent, skew, ellipHi, ellipLo:
+                    selector.append(limit)
+                    
+                faintPixels  = selector.getPixels(maxPixels=maxPixels) & (msk & (MASK | DET)==0)
+
+                nFaintBeforeCull = faintPixels.sum()
+                faintMatch = hough.thetaAlignment(mm_faint.theta[faintPixels],xx[faintPixels],yy[faintPixels])
+                faintPixels[faintPixels] &= faintMatch
+                nFaintAfterCull = faintPixels.sum()
+
+                isCand |= faintPixels
 
                 
-            msg = "nPix/med/bri: %d/ %d/ %d   bef/aft: %d/ %d   faint: %d/ %d" % (
-                pixels.sum(), mediumPixels.sum(), brightPixels.sum(),
+            msg = "nPix/med/bri: %d/ %d/ %d   bef/aft: %d/ %d   faint: %d/ %d  totals: %d/ %d" % (
+                pixelSums[0], pixelSums[1], pixelSums[2],
                 nCandidatesBeforeCull, nCandidatesAfterCull, nFaintBeforeCull, nFaintAfterCull,
+                isCand.sum(), isCandidate.sum()
             )
             print msg
             
                 
-            nHits.append((widths[i], isCandidate.sum()))
+            nHits.append((widths[i], isCand.sum()))
+            isCandidate |= isCand
             
         bestCal = sorted(nHits, key=lambda x: x[1], reverse=True)[0]
         bestWidth = bestCal[0]
@@ -266,7 +256,7 @@ class SatelliteFinder(object):
         #################################################
         rMax           = sum([q**2 for q in img.shape])**0.5
         houghTransform = hough.HoughTransform(self.houghBins, self.houghThresh,
-                                              rMax=rMax, maxPoints=1000, nIter=1)
+                                              rMax=rMax, maxPoints=1000, nIter=1) #, maxResid=0.5)
         solutions      = houghTransform(mm.theta[isCandidate], xx[isCandidate], yy[isCandidate])
 
         #################################################
@@ -274,9 +264,8 @@ class SatelliteFinder(object):
         #################################################
         trails = satTrail.SatelliteTrailList(nCandidatePixels, solutions.binMax, psfSigma)
         for s in solutions:
-            trail = satTrail.SatelliteTrail(self.bins*s.r, s.theta, width=bestWidth)
+            trail = satTrail.SatelliteTrail.fromHoughSolution(s, self.bins)
             trail.measure(exp, bins=self.bins)
-            trail.houghBinMax = s.binMax
             trails.append(trail)
             print trail
 
@@ -285,7 +274,7 @@ class SatelliteFinder(object):
         self._mm           = mm
         self._mmCals       = mmCals
         self._isCandidate  = isCandidate
-        self._brightFactor = brightFactor
+        self._brightFactor = 10
         self._trails       = trails
         self._solutions    = solutions
         

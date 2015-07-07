@@ -110,66 +110,57 @@ class MomentManager(object):
         return self._b
 
 
-                
-        
-class PixelSelector(object):
+class MomentLimit(object):
+    def __init__(self, name, norm, limitType):
+        self.name = name
+        self.norm = norm
+        self.limitType = limitType
 
-    def __init__(self, momentManager, calMomentManager, momentLimits):
+        
+class PixelSelector(list):
+
+    def __init__(self, momentManager, calMomentManager):
+        super(PixelSelector, self).__init__()
         
         assert(momentManager.kernelWidth == calMomentManager.kernelWidth)
         self.keys = copy.copy(MomentManager.keys)
         
         self.momentManager      = momentManager
         self.calMomentManager   = calMomentManager
-        self.momentLimits       = {}
 
-        for attr in self.keys:
-            self.momentLimits[attr] = momentLimits.get(attr, None)
-            setattr(self, attr, functools.partial(self._norm, attr))
+    def append(self, limit):
+        if limit.name not in self.keys:
+            raise ValueError("Limit name must be in:" + str(self.keys))
+        limitTypes = ('lower', 'center', 'upper')
+        if limit.limitType not in limitTypes:
+            raise ValueError("Limit limitType must be in:" + str(limitTypes))
+        super(PixelSelector, self).append(limit)
 
-    def __getattribute__(self, attr):
-        keys   = super(PixelSelector, self).__getattribute__('keys')
-        method = super(PixelSelector, self).__getattribute__(attr)
-        if attr in keys:
-            return method()
-        else:
-            return method
-            
-    def _norm(self, name):
-        limit       = self.momentLimits[name]
-        if limit is None:
-            return np.zeros(self.momentManager.shape)
-        else:
-            mid = self.momentManager.kernelWidth//2
-            val         = getattr(self.momentManager, name)
-            expectation = getattr(self.calMomentManager, name)
-            #print name, expectation, limit
-            return (val - expectation)/np.abs(limit)
+        
+    def _norm(self, limit):
+        val         = getattr(self.momentManager,    limit.name)
+        expectation = getattr(self.calMomentManager, limit.name)
+        norm        = (val - expectation)/np.abs(limit.norm)
+        return norm
 
-    def _test(self, name):
-        limit       = self.momentLimits[name]
-        if limit and limit < 0.0:
-            test = np.abs(getattr(self, name)) > 1.0
-        else:
-            test = np.abs(getattr(self, name)) < 1.0
+    def _test(self, limit):
+        if limit.limitType == 'lower':
+            test = self._norm(limit) > 1.0
+        elif limit.limitType == 'center':
+            test = np.abs(self._norm(limit)) < 1.0
+        elif limit.limitType == 'upper':
+            test = self._norm(limit) < 1.0
         return test
 
-    def getPixels(self, binOnTheta=False, maxPixels=None):
+    def getPixels(self, maxPixels=None):
 
         keys = getattr(self, 'keys')
         accumulator = np.ones(self.momentManager.shape, dtype=bool)
-        for key in keys:
-            test = self._test(key)
+        for limit in self:
+            test = self._test(limit)
             accumulator &= test
             #print key, accumulator.sum(), test.sum()
 
-        if binOnTheta:
-            t = getattr(self.momentManager, 'theta')
-            hist, edges = np.histogram(t[accumulator], bins=40)
-            best = np.argmax(hist)
-            tbest = 0.5*(edges[best] + edges[best+1])
-            accumulator &= (np.abs(tbest - t) < 0.2)
-            
         if maxPixels:
             # a no-op since we have no way to choose.  We could selected randomly?
             # The parameter can be used by the PValuePixelSelector, which can sort by probability.
@@ -186,39 +177,35 @@ class PValuePixelSelector(PixelSelector):
         self.thresh = kwargs.get('thresh')
         super(PValuePixelSelector, self).__init__(*args, **kwargs)
     
-    def _test(self, name):
-        limit = self.momentLimits[name]
-        z     = getattr(self, name)
-        if limit and limit < 0.0:
-            # the real answer is np.log(1.0001 - np.exp(-0.5*z*z)), but is very slow
-            # This approx is actually really close 
-            return -0.5/(z*z + 0.0001)
-        else:
-            return -0.5*z*z
+    def _test(self, limit):
+        z     = self._norm(limit)
 
-    def getPixels(self, binOnTheta=False, maxPixels=None):
-        keys = getattr(self, 'keys')
-        logp = self._test(keys[0])
+        # These aren't real probabilities, just functions with properties that go to 1 or 0 as needed.
+        # This would be trivial with exp() and log() functions, but they're very expensive,
+        # so these approximations use only simple arithmatic.
+        
+        # Go to 1 for z > 1.  the function is very close to 1 - exp(-x**2)
+        # it would go to 1 at large z for both +ve and -ve, so we have to suppress the negative side.
+        if limit.limitType == 'lower':
+            logp = -0.5/(z*z + 0.0001)
+            logp[z < 0.0] = 0.0001
+        elif limit.limitType == 'center':
+            logp = -0.5*z*z
+
+        # This is the opposite of 'lower'.  I use the same function, but shift it by 2
+        # it keeps the values below z~1 and suppresses those above z=2
+        elif limit.limitType == 'upper':
+            z -= 2
+            logp = -0.5/(z*z + 0.0001)
+            logp[z > 0.0] = 0.0001
+        return logp
+        
+    def getPixels(self, maxPixels=None):
         n = 0
-        for key in keys:
-            if key in self.momentLimits:
-                n += 1
-            logp += self._test(key)
-
-        if binOnTheta:
-            t = getattr(self.momentManager, 'theta')
-            tProb = t[logp > -0.5*n]
-            hist, edges = np.histogram(tProb, bins=120)
-
-            #print len(tProb)
-            #plt.plot(edges[:-1], hist, 'r-')
-            #plt.savefig("junk.png")
-
-            best = np.argmax(hist)
-            tbest = 0.5*(edges[best] + edges[best+1])
-            z = (t - tbest)/0.1
-            logp += -0.5*z*z
+        logp = np.zeros(self.momentManager.shape)
+        for limit in self:
             n += 1
+            logp += self._test(limit)
 
         thresh1 = self.thresh or -0.5*n
         ret = logp > thresh1

@@ -67,7 +67,7 @@ def twoPiOverlap(theta_in, arrays=None, overlapRange=0.2):
 
 
 
-def thetaAlignment(theta, x, y, limit=4, tolerance=0.15):
+def thetaAlignment(theta, x, y, limit=4, tolerance=0.199):
     """A helper function to cull the candidate points.
 
     @param theta      ndarray of thetas
@@ -127,11 +127,12 @@ def thetaAlignment(theta, x, y, limit=4, tolerance=0.15):
         nCand  = len(cand)
         if nCand < max(limit, 2):
             continue
+        closeNeighbourTolerance = phi*tolerance/nCand
+        
         sort   = np.sort(cand)
-        diff   = np.sort(np.abs(sort[1:] - sort[:-1]))
+        diff   = np.abs(sort[1:] - sort[:-1])
         #diffs  = np.append(diffs, diff)
 
-        closeNeighbourTolerance = phi*tolerance/nCand
         # how many collisions do we actually have?
         nNearNeighbours[i]      = (diff < closeNeighbourTolerance).sum()
         
@@ -403,8 +404,11 @@ def hesseBin(r0, theta0, bins=200, rMax=4096, thresh=40):
     return bin2d, rEdge, tEdge, rsGood, tsGood, idxGood
 
 
-    
-HoughSolution = collections.namedtuple('HoughSolution', 'r theta x y rNew thetaNew binMax')
+HoughSolution = collections.namedtuple('HoughSolution', 'r theta x y rNew thetaNew binMax resid')
+"""A container for results from a HoughSolution"""
+
+Residual = collections.namedtuple('Residual', 'med iqr')
+"""A container for stats on the residuals of a HoughSolution"""
 
 class HoughSolutionList(list):
     """A list of clusters found in a Hough Transform
@@ -433,14 +437,22 @@ class HoughTransform(object):
     provided at construction and a __call__ method is defined to do the work.
     """
     
-    def __init__(self, bins, thresh, rMax=None, maxPoints=1000, nIter=1):
+    def __init__(self, bins, thresh, rMax=None, maxPoints=1000, nIter=1, maxResid=3.0):
         """Construct a HoughTransform object.
 
-        @param bins       Number of bins to use in each of r,theta (i.e. total bins*bins will be used)
-        @param thresh     The count limit in a bin which indicates a detected cluster of points.
-        @param rMax       Specify the range in r
-        @param maxPoints  Maximum number of points to allow (solution gets slow for >> 1000)
-        @param nIter      Number of times to iterate the solution (more than ~1-3 rarely makes a difference)
+        @param bins           Number of bins to use in each of r,theta (i.e. total bins*bins will be used)
+        @param thresh         The count limit in a bin which indicates a detected cluster of points.
+        @param rMax           Specify the range in r
+        @param maxPoints      Maximum number of points to allow (solution gets slow for >> 1000)
+        @param nIter          No. of times to iterate the solution (more than ~1-3 rarely makes a difference)
+        @param maxResid       The max coordinate residual (pixels) to accept a solution (currently an IQR).
+
+        fitResid requires explanation.  The final hurdle in assessing a solution is to compute residuals
+        for any points we have which contributed to the final r,theta.  For a good solution, all points
+        should lie close to the line defined by r,theta.  This is currently implemented as an
+        inter-quartile-range of the residuals.  It should be a few pixels.  If half the points are off by
+        this much, it's probably not a great solution.  Other options might have been a 'max' or an 'rms',
+        but the IQR is robust against bad solutions while still forgiving of few bad points.
         """
         
         self.bins   = bins
@@ -451,6 +463,7 @@ class HoughTransform(object):
         self.maxPoints = maxPoints
         self.nIter = nIter
 
+        self.maxResid = maxResid
         # You shouldn't need to touch this.  We allow this much slack around theta = 0 or 2*pi
         # Points within overlapRange of 0 or 2pi are copied to wrap.  The allows good
         # solutions to be found very near theta = 0 and theta=2pi
@@ -475,7 +488,6 @@ class HoughTransform(object):
         nPoints = len(r0)
 
         if nPoints == 0:
-            print "Bark"
             return HoughSolutionList(0, rIn, thetaIn)
         
         np.random.seed(44)
@@ -505,6 +517,26 @@ class HoughTransform(object):
         for i in range(numLocus):
             _x, _y = x[idx[i]], y[idx[i]]
             rnew, tnew = rNew[idx[i]], thetaNew[idx[i]]
-            solutions.append( HoughSolution(rs[i], thetas[i], _x, _y, rnew, tnew, idx[i].sum()) )
+            residual = _x*np.cos(thetas[i]) + _y*np.sin(thetas[i]) - rs[i]
+            if False:
+                #fig, ax = plt.subplots(nrows=2, ncols=3)
+                #ax[0,0].hist(theta, bins=500)
+                plt.hist(residual, bins=50)
+                plt.savefig("resid.png")
+                
+            med = np.percentile(residual, 50.0)
+            q1  = np.percentile(residual, 25.0)
+            q3  = np.percentile(residual, 75.0)
+            iqr = q3 - q1
+            n   = idx[i].sum()
+            if iqr < self.maxResid: 
+                residStat = Residual(med, q3 - q1)
+                solution = HoughSolution(rs[i], thetas[i], _x, _y, rnew, tnew, n, residStat)
+                solutions.append(solution)
+            else:
+                print "WARNING: Rejecting solution: r=%.1f,theta=%.3f  " \
+                    "(IQR/sqrt(n)=%.2f/%.2f=%.3f [limit=%.2f])" % \
+                    (rs[i], thetas[i], iqr, np.sqrt(n), iqr/np.sqrt(n), self.maxResid)
+                
         return solutions
         

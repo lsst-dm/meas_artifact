@@ -66,13 +66,13 @@ def debugPlot(finder, pngfile):
         fig.savefig(pngfile)
 
 
-
+ 
         
 def pixelPlot(finder, ax, mm, cmm, trails):
     xx, yy = np.meshgrid(np.arange(mm.img.shape[1], dtype=int), np.arange(mm.img.shape[0], dtype=int))
 
     ax.imshow(np.arcsinh(mm.img), cmap="gray", origin='lower')
-    ax.scatter(xx[finder._isCandidate], yy[finder._isCandidate], c=mm.theta[finder._isCandidate], s=3.0, edgecolor='none')
+    ax.scatter(xx[finder._isCandidate], yy[finder._isCandidate], c=mm.theta[finder._isCandidate], s=3.0, edgecolor='none', vmin=0.0, vmax=2.0*np.pi)
     ny, nx = mm.img.shape
     for i,trail in enumerate(trails):
         x, y = trail.trace(nx, ny, offset=30, bins=finder.bins)
