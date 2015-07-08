@@ -18,7 +18,6 @@ import numpy as np
 #np.seterr(all='raise')
 
 import satellite as satell
-
 import satelliteDebug as satDebug
 
 class SatelliteTask(pipeBase.CmdLineTask):
@@ -42,12 +41,13 @@ class SatelliteTask(pipeBase.CmdLineTask):
         with open(logfile, 'w') as log:
             
             # run for regular satellites
-            trailsSat = self.runSatellite(exposure, bins=4, log=log)
-
-            print "Now plotting"
-            filename = os.path.join(path,"satdebug-%05d-%03d-SAT.png" % (v, c))
-            satDebug.debugPlot(self.finder, filename)
-
+            if True:
+                trailsSat = self.runSatellite(exposure, bins=4, log=log)
+                print "Now plotting"
+                filename = os.path.join(path,"satdebug-%05d-%03d-SAT.png" % (v, c))
+                satDebug.debugPlot(self.finder, filename)
+            else:
+                trailsSat = None
 
             # run for broad linear (aircraft?) features by binning
             trailsAc = self.runSatellite(exposure, bins=4, broadTrail=True, log=log)
@@ -56,8 +56,7 @@ class SatelliteTask(pipeBase.CmdLineTask):
             filename = os.path.join(path,"satdebug-%05d-%03d-AC.png" % (v, c))
             satDebug.debugPlot(self.finder, filename)
 
-            
-            trails = trailsSat.merge(trailsAc)
+            trails = trailsSat.merge(trailsAc) if trailsSat else trailsAc
             
             msg = "(%s,%s) Detected %d trail(s).  candPix: %d binMax: %d psfSigma: %.2f" % \
                   (v, c, len(trails), trails.nPixels, trails.binMax, trails.psfSigma)

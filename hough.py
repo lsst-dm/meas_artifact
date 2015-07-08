@@ -67,7 +67,7 @@ def twoPiOverlap(theta_in, arrays=None, overlapRange=0.2):
 
 
 
-def thetaAlignment(theta, x, y, limit=4, tolerance=0.199):
+def thetaAlignment(theta, x, y, limit=4, tolerance=0.15):
     """A helper function to cull the candidate points.
 
     @param theta      ndarray of thetas
@@ -103,6 +103,8 @@ def thetaAlignment(theta, x, y, limit=4, tolerance=0.199):
     n = len(theta)
 
     dydx      = np.subtract.outer(y, y)/(np.subtract.outer(x, x) + 0.01)
+    # we could call arctan(dydx) here but it's very expensive.
+    # We faster if we instead convert our tolerance to test dydx directly.
     tanTheta  = np.tan(theta)
     dTanTheta = tolerance*(1.0 + tanTheta**2)
     aligned1  = np.abs((dydx - tanTheta)/dTanTheta) < 1.0
@@ -111,27 +113,23 @@ def thetaAlignment(theta, x, y, limit=4, tolerance=0.199):
 
     nNearNeighbours = np.zeros(n)
     
-    diffs = np.array([])
-    
     # Using variable names  pCloseNeighbour = e^(2*nCand*closeNeighbourTolerance/tolerance)
     pZeroCloseNeighbour     = 0.99
     # compute the closeNeighbourTolerance for which we expect 1 collision
     phi                     = -0.5*np.log(pZeroCloseNeighbour)
-    
-    for i in range(n):
-        cand   = dydx[i,aligned[i,:]]
-        nCand  = len(cand)
-        if nCand < max(limit, 2):
-            continue
-        closeNeighbourTolerance = phi*tolerance/nCand
-        
-        pixelTheta = np.arctan(cand)
+
+    nCand = aligned.sum(axis=1)
+    closeNeighbourTolerance = phi*tolerance/nCand
+
+    cut = max(limit, 2)
+    w, = np.where(nCand > cut)
+    for i in w:
+        pixelTheta = np.arctan(dydx[i,aligned[i,:]])
         sort       = np.sort(pixelTheta)
-        diff       = np.abs(sort[1:] - sort[:-1])
-        #diffs  = np.append(diffs, diff)
+        diff       = np.diff(sort)
 
         # how many collisions do we actually have?
-        nNearNeighbours[i]      = (diff < closeNeighbourTolerance).sum()
+        nNearNeighbours[i]      = (diff < closeNeighbourTolerance[i]).sum()
         
     isCandidate = nNearNeighbours >= limit
 
@@ -180,10 +178,10 @@ def improveCluster(theta, x, y):
     
     t = theta.copy()
     r = x*np.cos(t) + y*np.sin(t)
-    neg       = (r < -0.2)
-    t[neg]   += np.pi
-    cycle     = (t > 2.0*np.pi + 0.2)
-    t[cycle] -= 2.0*np.pi
+    #neg       = (r < -0.2)
+    #t[neg]   += np.pi
+    #cycle     = (t > 2.0*np.pi + 0.2)
+    #t[cycle] -= 2.0*np.pi
 
     dx = np.subtract.outer(x, x)
     dy = np.subtract.outer(y, y)

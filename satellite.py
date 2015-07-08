@@ -78,7 +78,7 @@ class SatelliteFinder(object):
         calArr   = afwMath.binImage(calImg, self.bins).getArray()
         calArr   = satUtil.smooth(calArr, self.sigmaSmooth)
 
-        if True: #False:
+        if False:
             fig = figure.Figure()
             can = FigCanvas(fig)
             ax = fig.add_subplot(111)
@@ -135,7 +135,7 @@ class SatelliteFinder(object):
 
         # subtract a small scale background when we search for PSFs
         if np.abs(widths[0]) < 0.1:
-            back       = satUtil.medianRing(img_faint, 20.0, 2.0*self.sigmaSmooth)
+            back       = satUtil.medianRing(img_faint, 16.0, 1.0*self.sigmaSmooth)
             img       -= back
             img_faint -= back
         
@@ -229,20 +229,17 @@ class SatelliteFinder(object):
                 
             nHits.append((widths[i], isCand.sum()))
             isCandidate |= isCand
-
-
-
-        nCandBeforeCull     = isCandidate.sum()
-        thetaMatch                = hough.thetaAlignment(mm.theta[isCandidate],xx[isCandidate],yy[isCandidate])
-        isCandidate[isCandidate] &= thetaMatch
-        nCandAfterCull      = isCandidate.sum()
-
-        print "Before/after: %d / %d" % (nCandBeforeCull, nCandAfterCull)
         
         bestCal = sorted(nHits, key=lambda x: x[1], reverse=True)[0]
         bestWidth = bestCal[0]
 
-        ################################################
+        nBeforeAlignment = isCandidate.sum()
+        thetaMatch = hough.thetaAlignment(mm.theta[isCandidate],xx[isCandidate],yy[isCandidate])
+        isCandidate[isCandidate] = thetaMatch
+        nAfterAlignment = isCandidate.sum()
+        print "Before/after: %d / %d" % (nBeforeAlignment, nAfterAlignment)
+
+        #################################################
         # Hough transform
         #################################################
         rMax           = sum([q**2 for q in img.shape])**0.5
@@ -253,7 +250,7 @@ class SatelliteFinder(object):
         #################################################
         # Trail objects
         #################################################
-        trails = satTrail.SatelliteTrailList(nCandAfterCull, solutions.binMax, psfSigma)
+        trails = satTrail.SatelliteTrailList(nAfterAlignment, solutions.binMax, psfSigma)
         for s in solutions:
             trail = satTrail.SatelliteTrail.fromHoughSolution(s, self.bins)
             trail.measure(exp, bins=self.bins)

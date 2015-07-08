@@ -136,20 +136,16 @@ class PixelSelector(list):
             raise ValueError("Limit limitType must be in:" + str(limitTypes))
         super(PixelSelector, self).append(limit)
 
-        
-    def _norm(self, limit):
+    def _test(self, limit):
         val         = getattr(self.momentManager,    limit.name)
         expectation = getattr(self.calMomentManager, limit.name)
         norm        = (val - expectation)/np.abs(limit.norm)
-        return norm
-
-    def _test(self, limit):
         if limit.limitType == 'lower':
-            test = self._norm(limit) > 1.0
+            test = norm > 1.0
         elif limit.limitType == 'center':
-            test = np.abs(self._norm(limit)) < 1.0
+            test = np.abs(norm) < 1.0
         elif limit.limitType == 'upper':
-            test = self._norm(limit) < 1.0
+            test = norm < 1.0
         return test
 
     def getPixels(self, maxPixels=None):
@@ -176,10 +172,22 @@ class PValuePixelSelector(PixelSelector):
     def __init__(self, *args, **kwargs):
         self.thresh = kwargs.get('thresh')
         super(PValuePixelSelector, self).__init__(*args, **kwargs)
-    
-    def _test(self, limit):
-        z     = self._norm(limit)
 
+        self.cache = {}
+        
+    def _test(self, limit):
+        if limit.name in self.cache:
+            delta, delta2, neg = self.cache[limit.name]
+        else:
+            val         = getattr(self.momentManager,    limit.name)
+            expectation = getattr(self.calMomentManager, limit.name)
+            delta       = val - expectation
+            neg         = delta < 0.0
+            delta2      = delta**2
+            self.cache[limit.name] = (delta, delta2, neg)
+            
+        zz = delta2/limit.norm**2 + 0.0001
+        
         # These aren't real probabilities, just functions with properties that go to 1 or 0 as needed.
         # This would be trivial with exp() and log() functions, but they're very expensive,
         # so these approximations use only simple arithmatic.
@@ -187,26 +195,30 @@ class PValuePixelSelector(PixelSelector):
         # Go to 1 for z > 1.  the function is very close to 1 - exp(-x**2)
         # it would go to 1 at large z for both +ve and -ve, so we have to suppress the negative side.
         if limit.limitType == 'lower':
-            logp = -0.5/(z*z + 0.0001)
-            logp[z < 0.0] = 0.0001
+            neg2logp      = 1.0/zz
+            neg2logp[neg] = 0.0001
+            
         elif limit.limitType == 'center':
-            logp = -0.5*z*z
+            neg2logp = zz
 
         # This is the opposite of 'lower'.  I use the same function, but shift it by 2
         # it keeps the values below z~1 and suppresses those above z=2
         elif limit.limitType == 'upper':
-            z -= 2
-            logp = -0.5/(z*z + 0.0001)
-            logp[z > 0.0] = 0.0001
-        return logp
+            z = delta - 2
+            zz = z*z + 0.0001
+            neg2logp = 1.0/zz
+            neg2logp[~neg] = 0.0001
+            
+        return neg2logp
         
     def getPixels(self, maxPixels=None):
         n = 0
-        logp = np.zeros(self.momentManager.shape)
+        neg2logp = np.zeros(self.momentManager.shape)
         for limit in self:
             n += 1
-            logp += self._test(limit)
-
+            neg2logp += self._test(limit)
+        logp = -0.5*neg2logp
+        
         thresh1 = self.thresh or -0.5*n
         ret = logp > thresh1
         if maxPixels:
