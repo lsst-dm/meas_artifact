@@ -101,17 +101,13 @@ def thetaAlignment(theta, x, y, limit=4, tolerance=0.199):
     """
     
     n = len(theta)
-                
-    xx1, xx2 = np.meshgrid(x, x)
-    yy1, yy2 = np.meshgrid(y, y)
-    tt1, tt2 = np.meshgrid(theta, theta)
 
-    dydx = (yy2 - yy1)/(xx2 - xx1 + 0.01)
-    pixelTheta = np.arctan(dydx)
-     
-    aligned1 = np.abs(tt1 - pixelTheta) < tolerance
-    aligned2 = np.abs(tt2 - pixelTheta) < tolerance
-    aligned  = aligned1 & aligned2
+    dydx      = np.subtract.outer(y, y)/(np.subtract.outer(x, x) + 0.01)
+    tanTheta  = np.tan(theta)
+    dTanTheta = tolerance*(1.0 + tanTheta**2)
+    aligned1  = np.abs((dydx - tanTheta)/dTanTheta) < 1.0
+    aligned2  = np.abs((dydx.transpose() - tanTheta).transpose()/dTanTheta) < 1.0
+    aligned   = aligned1 & aligned2
 
     nNearNeighbours = np.zeros(n)
     
@@ -123,14 +119,15 @@ def thetaAlignment(theta, x, y, limit=4, tolerance=0.199):
     phi                     = -0.5*np.log(pZeroCloseNeighbour)
     
     for i in range(n):
-        cand   = pixelTheta[i,aligned[i,:]]
+        cand   = dydx[i,aligned[i,:]]
         nCand  = len(cand)
         if nCand < max(limit, 2):
             continue
         closeNeighbourTolerance = phi*tolerance/nCand
         
-        sort   = np.sort(cand)
-        diff   = np.abs(sort[1:] - sort[:-1])
+        pixelTheta = np.arctan(cand)
+        sort       = np.sort(pixelTheta)
+        diff       = np.abs(sort[1:] - sort[:-1])
         #diffs  = np.append(diffs, diff)
 
         # how many collisions do we actually have?
@@ -144,7 +141,7 @@ def thetaAlignment(theta, x, y, limit=4, tolerance=0.199):
         
         fig, ax = plt.subplots(nrows=2, ncols=3)
         ax[0,0].hist(theta, bins=500)
-        ax[0,1].hist(pixelTheta.ravel(), bins=500)
+        ax[0,1].hist(np.arctan(dydx).ravel(), bins=500)
         ax[1,0].hist(nAligned, bins=40)
         ax[1,1].hist(theta[isAligned], bins=50, edgecolor='none')
         ax[1,1].hist(theta[isCandidate], bins=50, edgecolor='none', facecolor='r')
@@ -188,20 +185,16 @@ def improveCluster(theta, x, y):
     cycle     = (t > 2.0*np.pi + 0.2)
     t[cycle] -= 2.0*np.pi
 
-    
-    xx1, xx2 = np.meshgrid(x, x)
-    yy1, yy2 = np.meshgrid(y, y)
-
-    dx = xx1 - xx2
-    dy = yy1 - yy2
-    dd = np.sqrt(dx*dx + dy*dy)
+    dx = np.subtract.outer(x, x)
+    dy = np.subtract.outer(y, y)
+    dd = np.sqrt(dx**2 + dy**2)
 
     w0     = (dx == 0)
     dx[w0] = 1.0
 
     # this is the theta we get if we just draw a line between points in pixel space
     # We could just use this, but (I'm not sure why) it doesn't do as nice a job.
-    intercept   = yy1 - (dy/dx)*xx1
+    intercept   = y - (dy/dx)*x
     sign        = np.sign(intercept)
     pixel_theta = np.arctan(dy/dx) + sign*np.pi/2.0
     pixel_theta[(pixel_theta < 0.0)] += np.pi
@@ -212,21 +205,15 @@ def improveCluster(theta, x, y):
     b    = r - t*drdt
     
     # get the distance between points in r,theta space "good" pairs are close together
-    tt1, tt2 = np.meshgrid(t, t)
-    rr1, rr2 = np.meshgrid(r, r)
-    isGood = (np.abs(tt1 - tt2) < tdist) & (np.abs(rr1 - rr2) < rdist)
+    isGood = (np.abs(np.subtract.outer(t, t)) < tdist) & (np.abs(np.subtract.outer(r, r)) < rdist)
     isBad  = ~isGood
     
     # solve for the intersections between all lines in r,theta space
-    mm1, mm2         = np.meshgrid(drdt, drdt)
-    bb1, bb2         = np.meshgrid(b, b)
-    trace            = np.arange(mm1.shape[0], dtype=int)
-    dmm              = mm1 - mm2
-    dmm[trace,trace] = 1.0
-    parallel         = (np.abs(dmm) < 0.01)
-    dmm[parallel]    = 1.0
-    tt               = (bb2 - bb1)/dmm
-    rr               = bb1 + mm1*tt
+    dm           = np.subtract.outer(drdt, drdt).transpose()
+    parallel     = (np.abs(dm) < 0.01)
+    dm[parallel] = 1.0
+    tt           = np.subtract.outer(b, b)/dm
+    rr           = b + tt*drdt
     
     tt[isBad] = 0.0
     rr[isBad] = 0.0

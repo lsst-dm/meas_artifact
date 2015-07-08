@@ -5,7 +5,7 @@ import functools
 import numpy as np
 import matplotlib.pyplot as plt
 
-import satellite_utils as satUtil
+import satelliteUtils as satUtil
 
 
 def momentToEllipse(ixx, iyy, ixy, lo_clip=0.1):

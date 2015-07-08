@@ -168,7 +168,7 @@ class SatelliteFinder(object):
                 
         mmCals = []
         nHits = []
-
+        
         #Selector = momCalc.PixelSelector
         Selector = momCalc.PValuePixelSelector
         maxPixels = 1000
@@ -206,16 +206,8 @@ class SatelliteFinder(object):
                 isCand |= pixels
                 pixelSums.append(pixels.sum())
 
-
-            nCandidatesBeforeCull = isCand.sum()
-            thetaMatch   = hough.thetaAlignment(mm.theta[isCand], xx[isCand], yy[isCand])
-            isCand[isCand] &= thetaMatch
-            nCandidatesAfterCull = isCand.sum()
-
-            nFaintBeforeCull = 0
-            nFaintAfterCull = 0
+                
             if True:
-
                 selector = Selector(mm_faint, mmCal)
                 sumI    = momCalc.MomentLimit('sumI',        3.0*rms,                  'lower')
                 cent    = momCalc.MomentLimit('center',      2.0*self.centerLimit,     'center')
@@ -226,30 +218,29 @@ class SatelliteFinder(object):
                     selector.append(limit)
                     
                 faintPixels  = selector.getPixels(maxPixels=maxPixels) & (msk & (MASK | DET)==0)
-
-                nFaintBeforeCull = faintPixels.sum()
-                faintMatch = hough.thetaAlignment(mm_faint.theta[faintPixels],xx[faintPixels],yy[faintPixels])
-                faintPixels[faintPixels] &= faintMatch
-                nFaintAfterCull = faintPixels.sum()
-
                 isCand |= faintPixels
+                pixelSums.append(faintPixels.sum())
 
-                
-            msg = "nPix/med/bri: %d/ %d/ %d   bef/aft: %d/ %d   faint: %d/ %d  totals: %d/ %d" % (
-                pixelSums[0], pixelSums[1], pixelSums[2],
-                nCandidatesBeforeCull, nCandidatesAfterCull, nFaintBeforeCull, nFaintAfterCull,
+            msg = "nPix/med/bri: %d/ %d/ %d   faint: %d  totals: %d/ %d" % (
+                pixelSums[0], pixelSums[1], pixelSums[2], pixelSums[3],
                 isCand.sum(), isCandidate.sum()
             )
             print msg
-            
                 
             nHits.append((widths[i], isCand.sum()))
             isCandidate |= isCand
-            
+
+
+
+        nCandBeforeCull     = isCandidate.sum()
+        thetaMatch                = hough.thetaAlignment(mm.theta[isCandidate],xx[isCandidate],yy[isCandidate])
+        isCandidate[isCandidate] &= thetaMatch
+        nCandAfterCull      = isCandidate.sum()
+
+        print "Before/after: %d / %d" % (nCandBeforeCull, nCandAfterCull)
+        
         bestCal = sorted(nHits, key=lambda x: x[1], reverse=True)[0]
         bestWidth = bestCal[0]
-
-        nCandidatePixels = isCandidate.sum()
 
         ################################################
         # Hough transform
@@ -262,7 +253,7 @@ class SatelliteFinder(object):
         #################################################
         # Trail objects
         #################################################
-        trails = satTrail.SatelliteTrailList(nCandidatePixels, solutions.binMax, psfSigma)
+        trails = satTrail.SatelliteTrailList(nCandAfterCull, solutions.binMax, psfSigma)
         for s in solutions:
             trail = satTrail.SatelliteTrail.fromHoughSolution(s, self.bins)
             trail.measure(exp, bins=self.bins)
