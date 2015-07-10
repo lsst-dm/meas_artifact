@@ -145,7 +145,7 @@ class SatelliteTrail(object):
         sigma          = satUtil.getExposurePsfSigma(exposure)
         # if this is being called, we probably have a width measured with our measure() method
 
-        width          = 6.0*self.width
+        width          = 8.0*self.width
         profile        = ConstantProfile(satelliteBit, width)
         self.insert(tmp, profile, width)
 
@@ -287,8 +287,7 @@ class SatelliteTrail(object):
         
     def __str__(self):
         rep = "SatelliteTrail(r=%.1f,theta=%.3f,width=%.2f,flux=%.2f,binMax=%d,resid=(%.2f,%.2f))" % \
-              (self.r, self.theta, self.width, self.flux, self.center, self.binMax,
-               self.resid.med, self.resid.iqr)
+              (self.r, self.theta, self.width, self.flux, self.binMax, self.resid.med, self.resid.iqr)
         return rep
         
     def __repr__(self):
