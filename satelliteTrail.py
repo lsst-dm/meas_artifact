@@ -53,7 +53,37 @@ class SatelliteTrailList(list):
 
         return s
 
+    def __str__(self):
+        msg = "SatelliteTrailList(nPixels=%d, binMax=%d, psfSigma=%.2f)" % (self.nPixels, self.binMax, self.psfSigma)
+        return msg
+        
+        
+class ConstantProfile(object):
+    def __init__(self, value, width):
+        self.value = value
+        self.width = width
+    def __call__(self, offset):
+        w  = (offset < self.width/2)
+        out = np.zeros(offset.shape, dtype=type(self.value))
+        out[w] = self.value
+        return out
+        
+class DoubleGaussianProfile(object):
+    def __init__(self, flux, sigma, fWing=0.1):
+        self.flux  = flux
+        self.sigma = sigma
+        self.fWing = fWing
+        self.fCore = 1.0 - fWing
+        
+    def __call__(self, offset):
+        A1  = 1.0/(2.0*np.pi*self.sigma**2)
+        g1  = np.exp(-offset**2/(2.0*self.sigma**2))
+        A2  = 1.0/(2.0*np.pi*(2.0*self.sigma)**2)
+        g2  = np.exp(-offset**2/(2.0*(2.0*self.sigma)**2))
+        out = self.flux*(self.fCore*A1*g1 + self.fWing*A2*g2)
+        return out
 
+        
 class SatelliteTrail(object):
     """Hold parameters related to a satellite trail.
 
@@ -62,14 +92,13 @@ class SatelliteTrail(object):
     or to set mask bits in an exposure.
     """
     
-    def __init__(self, r, theta, width=0.0, flux=1.0, center=0.0, fWing=0.1, binMax=None, resid=None):
+    def __init__(self, r, theta, width=0.0, flux=1.0, center=0.0, binMax=None, resid=None):
         """Construct a SatelliteTrail with specified parameters.
 
         @param r        r from Hesse normal form of the trail
         @param theta    theta from Hesse normal form of the trail
         @param width    The width of the trail (0 for a PSF, out-of-focus aircraft are wider)
         @param flux     Flux of the trail
-        @param fWing    For double-Gaussian PSF model.  Fraction of flux in larger Gaussian.
         @param binMax   The max bin count for the Hough solution
         @param resid    The coordinate resid tuple (median,inter_quart_range) for residuals from the solution
         """
@@ -82,8 +111,6 @@ class SatelliteTrail(object):
         self.flux     = flux
         self.width    = width
         self.center   = center
-        self.fCore    = 1.0 - fWing
-        self.fWing    = fWing
 
         self.binMax   = binMax
         self.resid    = resid
@@ -117,7 +144,10 @@ class SatelliteTrail(object):
         tmp            = type(msk)(msk.getWidth(), msk.getHeight())
         sigma          = satUtil.getExposurePsfSigma(exposure)
         # if this is being called, we probably have a width measured with our measure() method
-        self.insert(tmp, sigma=sigma, maskBit=satelliteBit, width=4.0*self.width)
+
+        width          = 6.0*self.width
+        profile        = ConstantProfile(satelliteBit, width)
+        self.insert(tmp, profile, width)
 
         # OR it in to the existing plane, return the number of pixels we set
         msk     |= tmp
@@ -149,8 +179,9 @@ class SatelliteTrail(object):
 
         dr = x*cos(t) + y*sin(t) - self.r/bins
         return dr
+
         
-    def insert(self, exposure, sigma=None, maskBit=None, width=None):
+    def insert(self, exposure, profile, width):
         """Plant this satellite trail in a given exposure.
 
         @param exposure       The exposure to plant in (accepts ExposureF, ImageF, MaskU or ndarray)
@@ -162,30 +193,20 @@ class SatelliteTrail(object):
         (1) To search for a trail with profile similar to a PSF, we plant a PSF-shaped trail
             and measure its parameters for use in calibrating detection limits.
         (2) When we find a trail, our setMask() method calls this method with a maskBit to set.
-        (3) For testing, we can insert trails.
+        (3) For testing, we can insert fake trails and try to find them.
         """
-        
-        if sigma and sigma < 1.0:
-            sigma = 1.0
-        
+
         # Handle Exposure, Image, ndarray
         if isinstance(exposure, afwImage.ExposureF):
             img = exposure.getMaskedImage().getImage().getArray()
-            nx, ny = exposure.getWidth(), exposure.getHeight()
-            if sigma is None:
-                sigma = satUtil.getExposurePsfSigma(exposure, minor=True)
-                
         elif isinstance(exposure, afwImage.ImageF):
             img = exposure.getArray()
-            nx, ny = exposure.getWidth(), exposure.getHeight()
-
         elif isinstance(exposure, afwImage.MaskU):
             img = exposure.getArray()
-            nx, ny = exposure.getWidth(), exposure.getHeight()
         elif isinstance(exposure, np.ndarray):
             img = exposure
-            ny, nx = img.shape
-
+            
+        ny, nx = img.shape
 
         #############################
         # plant the trail
@@ -197,32 +218,10 @@ class SatelliteTrail(object):
         dot    = xx*self.vx + yy*self.vy
         offset = np.abs(dot - self.r)
 
-        # obey the caller
-        if width:
-            hwidth = width/2.0
-            
-        else:
-            # maybe we know our width already
-            if self.width > 1:
-                hwidth = self.width/2.0
-                
-            # otherwise try goind 8*sigma (from exposure PSF or provided by caller)
-            else:
-                hwidth = 8.0*sigma
-
         # only bother updating the pixels within 5-sigma of the line
-        w = (offset < hwidth)
-        if maskBit:
-            img[w] = maskBit
-        else:
-            A1  = 1.0/(2.0*np.pi*sigma**2)
-            g1  = np.exp(-offset[w]**2/(2.0*sigma**2))
-            A2  = 1.0/(2.0*np.pi*(2.0*sigma)**2)
-            g2  = np.exp(-offset[w]**2/(2.0*(2.0*sigma)**2))
-            img[w] += self.flux*(self.fCore*A1*g1 + self.fWing*A2*g2)
-        
+        w = (offset < width/2)
+        img[w] = profile(offset[w])
         return img
-
 
 
     def measure(self, exposure, bins=1, widthIn=None):
@@ -287,7 +286,7 @@ class SatelliteTrail(object):
 
         
     def __str__(self):
-        rep = "SatelliteTrail(r=%.1f,th=%.3f,wid=%.2f,f=%.2f,cen=%.2f,binMax=%d,res=(%.2f,%.2f))" % \
+        rep = "SatelliteTrail(r=%.1f,theta=%.3f,width=%.2f,flux=%.2f,binMax=%d,resid=(%.2f,%.2f))" % \
               (self.r, self.theta, self.width, self.flux, self.center, self.binMax,
                self.resid.med, self.resid.iqr)
         return rep

@@ -67,7 +67,7 @@ def twoPiOverlap(theta_in, arrays=None, overlapRange=0.2):
 
 
 
-def thetaAlignment(theta, x, y, limit=4, tolerance=0.15):
+def thetaAlignment(theta, x, y, limit=3, tolerance=0.19):
     """A helper function to cull the candidate points.
 
     @param theta      ndarray of thetas
@@ -114,7 +114,7 @@ def thetaAlignment(theta, x, y, limit=4, tolerance=0.15):
     nNearNeighbours = np.zeros(n)
     
     # Using variable names  pCloseNeighbour = e^(2*nCand*closeNeighbourTolerance/tolerance)
-    pZeroCloseNeighbour     = 0.99
+    pZeroCloseNeighbour     = 0.95
     # compute the closeNeighbourTolerance for which we expect 1 collision
     phi                     = -0.5*np.log(pZeroCloseNeighbour)
 
@@ -514,7 +514,7 @@ class HoughTransform(object):
             q3  = np.percentile(residual, 75.0)
             iqr = q3 - q1
             n   = idx[i].sum()
-            if iqr < self.maxResid: 
+            if iqr < self.maxResid:
                 residStat = Residual(med, q3 - q1)
                 solution = HoughSolution(rs[i], thetas[i], _x, _y, rnew, tnew, n, residStat)
                 solutions.append(solution)

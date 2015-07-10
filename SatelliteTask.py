@@ -20,62 +20,78 @@ import numpy as np
 import satellite as satell
 import satelliteDebug as satDebug
 
+try:
+    import debug
+except:
+    pass
+
 class SatelliteTask(pipeBase.CmdLineTask):
     _DefaultName = 'satellite'
     ConfigClass = pexConfig.Config
 
+
+    @pipeBase.timeMethod
     def run(self, dataRef):
 
+        import lsstDebug
+        dbg = lsstDebug.Info(__name__).dbg
+
+        self.log.info("lsstDebug.Info(%s).debug = %s" % (str(__name__), str(dbg)))
         self.log.info("Detecting satellite trails in %s" % (str(dataRef.dataId)))
         
         exposure = dataRef.get('calexp', immediate=True)
         v,c = dataRef.dataId['visit'], dataRef.dataId['ccd']
-        basedir = os.environ.get('SATELLITE_DATA', '/home/bick/sandbox/hough/data')
-        path = os.path.join(basedir, "%04d" %(v))
-        try:
-            os.mkdir(path)
-        except:
-            pass
-        logfile = os.path.join(path, "log%05d-%03d.txt" % (v,c))
-        
-        with open(logfile, 'w') as log:
-            
-            # run for regular satellites
-            if True:
-                trailsSat = self.runSatellite(exposure, bins=4, log=log)
-                print "Now plotting"
-                filename = os.path.join(path,"satdebug-%05d-%03d-SAT.png" % (v, c))
-                satDebug.debugPlot(self.finder, filename)
-            else:
-                trailsSat = None
 
-            # run for broad linear (aircraft?) features by binning
-            trailsAc = self.runSatellite(exposure, bins=4, broadTrail=True, log=log)
+        if dbg:
+            basedir = os.environ.get('SATELLITE_DATA')
+            if basedir:
+                basedir = os.path.join(os.environ.get("PWD"), "data")
+            path = os.path.join(basedir, "%04d" %(v))
+            try:
+                os.mkdir(path)
+            except:
+                pass
 
-            print "Now plotting"
-            filename = os.path.join(path,"satdebug-%05d-%03d-AC.png" % (v, c))
+
+        # run for regular satellites
+        trailsSat = self.runSatellite(exposure, bins=4)
+        if dbg:
+            self.log.info("DEBUGGING: Now plotting SATELLITE detections.")
+            filename = os.path.join(path,"satdebug-%05d-%03d.png" % (v, c))
             satDebug.debugPlot(self.finder, filename)
 
-            trails = trailsSat.merge(trailsAc) if trailsSat else trailsAc
-            
-            msg = "(%s,%s) Detected %d trail(s).  candPix: %d binMax: %d psfSigma: %.2f" % \
-                  (v, c, len(trails), trails.nPixels, trails.binMax, trails.psfSigma)
-            self.log.info(msg)
-            if log:
-                log.write(msg+"\n")
-        
-            for i, trail in enumerate(trails):
-                maskedPixels = trail.setMask(exposure)
-                msg = "(%s,%s) Trail %d/%d %s:  maskPix: %d" % (v, c, i+1, len(trails), trail, maskedPixels)
-                self.log.info(msg)
-                if log:
-                    log.write(msg+"\n")
-            
-                    
-        exposure.writeFits(os.path.join(path,"exp%04d-%03d.fits"%(v,c)))
+        # run for broad linear (aircraft?) features by binning
+        trailsAc = self.runSatellite(exposure, bins=4, broadTrail=True)
+        if dbg:
+            self.log.info("DEBUGGING: Now plotting AIRCRAFT detections.")
+            filename = os.path.join(path,"acdebug-%05d-%03d.png" % (v, c))
+            satDebug.debugPlot(self.finder, filename)
 
+        trails = trailsSat.merge(trailsAc)
+
+        listMsg = "(%s,%s) Detected %d trail(s).  %s" % (v, c, len(trails), trails)
+        self.log.info(listMsg)
+
+        trailMsgs = []
+        for i, trail in enumerate(trails):
+            maskedPixels = trail.setMask(exposure)
+            msg = "(%s,%s) Trail %d/%d %s:  maskPix: %d" % (v, c, i+1, len(trails), trail, maskedPixels)
+            self.log.info(msg)
+            trailMsgs.append(msg)
         
-    def runSatellite(self, exposure, bins=None, broadTrail=False, log=None):
+        if dbg:
+            logfile = os.path.join(path, "log%05d-%03d.txt" % (v,c))
+            with open(logfile, 'w') as log:
+                log.write(listMsg+"\n")
+                for msg in trailMsgs:
+                    log.write(msg+'\n')
+
+            exposure.writeFits(os.path.join(path,"exp%04d-%03d.fits"%(v,c)))
+        
+        return trails
+        
+    @pipeBase.timeMethod
+    def runSatellite(self, exposure, bins=None, broadTrail=False):
             
         if broadTrail:
             luminosityLimit = 0.06 # low cut on pixel flux
@@ -91,18 +107,18 @@ class SatelliteTask(pipeBase.CmdLineTask):
             skewLimit       = 120.0
             bLimit          = 1.0
         else:
-            luminosityLimit = 0.08   # low cut on pixel flux
+            luminosityLimit = 0.05   # low cut on pixel flux
             luminosityMax   = 4.0e2 # max luminsity for pixel flux
             maskNPsfSigma   = 7.0
-            centerLimit     = 0.8  # about 1 pixel
-            eRange          = 0.04  # about +/- 0.1
+            centerLimit     = 0.6  # about 1 pixel
+            eRange          = 0.02  # about +/- 0.1
             houghBins       = 256   # number of r,theta bins (i.e. 256x256)
-            kernelSigma     = 9    # pixels
+            kernelSigma     = 9   # pixels
             kernelWidth     = 17   # pixels
-            widths          = [0.0]
+            widths          = [1.0, 10.0]
             houghThresh     = 40    # counts in a r,theta bins
             skewLimit       = 20.0
-            bLimit          = 0.8
+            bLimit          = 0.6
 
         self.finder = satell.SatelliteFinder(
             kernelSigma=kernelSigma,

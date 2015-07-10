@@ -4,6 +4,8 @@ import copy
 import functools
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.figure as figure
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigCanvas
 
 import satelliteUtils as satUtil
 
@@ -67,7 +69,7 @@ class MomentManager(object):
     def center(self):
         if self._center is None:
             ix, iy = self.imageMoment.ix, self.imageMoment.iy
-            self._center = np.sqrt(ix*ix + iy*iy)
+            self._center = np.sqrt(ix**2 + iy**2)
         return self._center
 
     @property
@@ -93,7 +95,7 @@ class MomentManager(object):
     def skew(self):
         if self._skew is None:
             ixxx, iyyy = self.imageMoment.ixxx, self.imageMoment.iyyy
-            self._skew = np.sqrt(ixxx*ixxx + iyyy*iyyy)
+            self._skew = np.sqrt(ixxx**2 + iyyy**2)
         return self._skew
         
     @property
@@ -174,10 +176,12 @@ class PValuePixelSelector(PixelSelector):
         super(PValuePixelSelector, self).__init__(*args, **kwargs)
 
         self.cache = {}
+        self.done = []
         
     def _test(self, limit):
         if limit.name in self.cache:
             delta, delta2, neg = self.cache[limit.name]
+            expectation = getattr(self.calMomentManager, limit.name)
         else:
             val         = getattr(self.momentManager,    limit.name)
             expectation = getattr(self.calMomentManager, limit.name)
@@ -186,7 +190,7 @@ class PValuePixelSelector(PixelSelector):
             delta2      = delta**2
             self.cache[limit.name] = (delta, delta2, neg)
             
-        zz = delta2/limit.norm**2 + 0.0001
+        zz = delta2/(limit.norm**2) + 0.0001
         
         # These aren't real probabilities, just functions with properties that go to 1 or 0 as needed.
         # This would be trivial with exp() and log() functions, but they're very expensive,
@@ -196,7 +200,7 @@ class PValuePixelSelector(PixelSelector):
         # it would go to 1 at large z for both +ve and -ve, so we have to suppress the negative side.
         if limit.limitType == 'lower':
             neg2logp      = 1.0/zz
-            neg2logp[neg] = 0.0001
+            neg2logp[neg] = 1.0/0.0001
             
         elif limit.limitType == 'center':
             neg2logp = zz
@@ -204,11 +208,15 @@ class PValuePixelSelector(PixelSelector):
         # This is the opposite of 'lower'.  I use the same function, but shift it by 2
         # it keeps the values below z~1 and suppresses those above z=2
         elif limit.limitType == 'upper':
-            z = delta - 2
-            zz = z*z + 0.0001
+            x = delta/limit.norm
+            z = x - 2.0
+            zz = z**2 + 0.0001
+            pos = x > 2.0
             neg2logp = 1.0/zz
-            neg2logp[~neg] = 0.0001
-            
+            neg2logp[pos] = 1.0/0.0001
+        else:
+            raise ValueError("Unknown limit type.")
+
         return neg2logp
         
     def getPixels(self, maxPixels=None):
@@ -216,9 +224,20 @@ class PValuePixelSelector(PixelSelector):
         neg2logp = np.zeros(self.momentManager.shape)
         for limit in self:
             n += 1
-            neg2logp += self._test(limit)
+            val = self._test(limit)
+            neg2logp += val
+
         logp = -0.5*neg2logp
-        
+
+        if False:
+            fig = figure.Figure()
+            can = FigCanvas(fig)
+            ax = fig.add_subplot(111)
+            qq = logp.ravel()
+            ax.hist(qq, bins=200, range=(-2*0.5*n, 0), edgecolor='none')
+            fig.savefig('phist.png')
+            self.done.append(limit.name)
+
         thresh1 = self.thresh or -0.5*n
         ret = logp > thresh1
         if maxPixels:

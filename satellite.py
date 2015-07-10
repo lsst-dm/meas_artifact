@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib.figure as figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigCanvas
 
+import lsst.pex.logging as pexLog
 import lsst.afw.image   as afwImage
 import lsst.afw.math    as afwMath
 
@@ -31,6 +32,8 @@ class SatelliteFinder(object):
                  luminosityMax   = 10.0,
                  skewLimit       = 40.0,
                  bLimit          = 0.5,
+                 log             = None,
+                 verbose         = False,
              ):
         """ """
         
@@ -49,6 +52,13 @@ class SatelliteFinder(object):
         self.luminosityMax     = luminosityMax
         self.skewLimit         = skewLimit
         self.bLimit            = bLimit
+
+        if log is None:
+            logLevel = pexLog.Log.INFO
+            if verbose:
+                logLevel = pexLog.Log.DEBUG
+            log = pexLog.Log(pexLog.Log.getDefaultLog(), 'satelliteFinder', logLevel)
+        self.log = log
         
         self.debugInfo = {}
 
@@ -71,8 +81,16 @@ class SatelliteFinder(object):
 
         # Make a trail with the requested (unbinned) width
         calTrail = satTrail.SatelliteTrail(cx, cy)
-        maskBit  = 1.0 if width > 1.0 else None
-        calTrail.insert(calArr, sigma=psfSigma, maskBit=maskBit, width=width)
+
+        # for wide trails, just add a constant with the stated width
+        if width > 8.0*psfSigma:
+            profile = satTrail.ConstantProfile(1.0, width)
+            insertWidth = width
+        # otherwise, use a double gaussian
+        else:
+            profile  = satTrail.DoubleGaussianProfile(1.0, width/2.0 + psfSigma)
+            insertWidth = 4.0*(width/2.0 + psfSigma)
+        calTrail.insert(calArr, profile, insertWidth)
 
         # Now bin and smooth, just as we did the real image
         calArr   = afwMath.binImage(calImg, self.bins).getArray()
@@ -134,8 +152,8 @@ class SatelliteFinder(object):
         #img_faint[(img_faint < rms_faint)] = rms_faint
 
         # subtract a small scale background when we search for PSFs
-        if np.abs(widths[0]) < 0.1:
-            back       = satUtil.medianRing(img_faint, 16.0, 1.0*self.sigmaSmooth)
+        if np.abs(widths[0]) < 1.1:
+            back       = satUtil.medianRing(img_faint, 20.0, 2.0*self.sigmaSmooth)
             img       -= back
             img_faint -= back
         
@@ -177,7 +195,12 @@ class SatelliteFinder(object):
                                           isCalibration=True)
             mmCals.append(mmCal)
 
+            maxFactors   = 10.0, 20.0, 500.0
+            luminFactors = 1.0,  10.0,   2.0
+            scaleFactors = 1.0,   2.0,   3.0
+            
             sumI  = momCalc.MomentLimit('sumI',        self.luminosityLimit*rms, 'lower')
+            lumX  = momCalc.MomentLimit('sumI',        self.luminosityLimit*rms, 'upper')
             cent  = momCalc.MomentLimit('center',      2.0*self.centerLimit,     'center')
             centP = momCalc.MomentLimit('center_perp', self.centerLimit,         'center')
             skew  = momCalc.MomentLimit('skew',        2.0*self.skewLimit,       'center')
@@ -186,21 +209,20 @@ class SatelliteFinder(object):
             b     = momCalc.MomentLimit('b',           self.bLimit,              'center')
 
             selector = Selector(mm, mmCal)
-            for limit in sumI, cent, centP, skew, skewP, ellip, b:
+            for limit in sumI,  cent, centP, skew, skewP, ellip, b:
                 selector.append(limit)
 
             isCand = np.zeros(img.shape, dtype=bool)
             pixelSums = []
-            luminFactors = 1.0, 10.0, 2.0
-            scaleFactors = 1.0,  2.0, 3.0
-            for luminFactor, scaleFactor in zip(luminFactors, scaleFactors):
-                sumI.norm  *= luminFactor
-                cent.norm  /= scaleFactor
-                centP.norm /= scaleFactor
-                skew.norm  /= scaleFactor
-                skewP.norm /= scaleFactor
-                ellip.norm *= scaleFactor
-                b.norm     *= scaleFactor
+            for maxFact, luminFact, scaleFact in zip(maxFactors, luminFactors, scaleFactors):
+                sumI.norm  *= luminFact
+                lumX.norm   = maxFact*self.luminosityLimit*rms
+                cent.norm  /= scaleFact
+                centP.norm /= scaleFact
+                skew.norm  /= scaleFact
+                skewP.norm /= scaleFact
+                ellip.norm *= scaleFact
+                b.norm     *= scaleFact
                 
                 pixels      = selector.getPixels(maxPixels=maxPixels)
                 isCand |= pixels
@@ -221,30 +243,31 @@ class SatelliteFinder(object):
                 isCand |= faintPixels
                 pixelSums.append(faintPixels.sum())
 
-            msg = "nPix/med/bri: %d/ %d/ %d   faint: %d  totals: %d/ %d" % (
+            isCandidate |= isCand
+            
+            msg = "Candidates: nPix/med/bri = %d/ %d/ %d   faint: %d  totals: %d/ %d" % (
                 pixelSums[0], pixelSums[1], pixelSums[2], pixelSums[3],
                 isCand.sum(), isCandidate.sum()
             )
-            print msg
+            self.log.logdebug(msg)
                 
             nHits.append((widths[i], isCand.sum()))
-            isCandidate |= isCand
         
         bestCal = sorted(nHits, key=lambda x: x[1], reverse=True)[0]
         bestWidth = bestCal[0]
 
         nBeforeAlignment = isCandidate.sum()
-        thetaMatch = hough.thetaAlignment(mm.theta[isCandidate],xx[isCandidate],yy[isCandidate])
+        thetaMatch = hough.thetaAlignment(mm.theta[isCandidate],xx[isCandidate],yy[isCandidate], limit=8)
         isCandidate[isCandidate] = thetaMatch
         nAfterAlignment = isCandidate.sum()
-        print "Before/after: %d / %d" % (nBeforeAlignment, nAfterAlignment)
+        self.log.logdebug("theta-alignment Bef/aft: %d / %d" % (nBeforeAlignment, nAfterAlignment))
 
         #################################################
         # Hough transform
         #################################################
         rMax           = sum([q**2 for q in img.shape])**0.5
         houghTransform = hough.HoughTransform(self.houghBins, self.houghThresh,
-                                              rMax=rMax, maxPoints=1000, nIter=1) #, maxResid=0.5)
+                                              rMax=rMax, maxPoints=1000, nIter=1, maxResid=4.0)
         solutions      = houghTransform(mm.theta[isCandidate], xx[isCandidate], yy[isCandidate])
 
         #################################################
@@ -255,9 +278,6 @@ class SatelliteFinder(object):
             trail = satTrail.SatelliteTrail.fromHoughSolution(s, self.bins)
             trail.measure(exp, bins=self.bins)
             trails.append(trail)
-            print trail
-
-        print "Done.", time.time() - t1
 
         self._mm           = mm
         self._mmCals       = mmCals
