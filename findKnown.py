@@ -32,8 +32,8 @@ def color(text, color, bold=False):
 
 class Candidate(object):
     
-    positiveKinds = set(("satellite", "aircraft"))
-    negativeKinds = set(("empty",))
+    positiveKinds = set(("satellite", "aircraft", "vertical", "meteor"))
+    negativeKinds = set(("empty","scattered"))
     validKinds    = positiveKinds | negativeKinds
     
     def __init__(self, kind, visit, ccd, trail):
@@ -49,35 +49,40 @@ class Candidate(object):
 knownCandidates = [
     
     # satellites
-    Candidate("satellite", 1236, 65, satTrail.SatelliteTrail(r=1580.0, theta=0.286, width= 7.94)),
     Candidate("satellite",  242, 95, satTrail.SatelliteTrail(r=1497.8, theta=1.245, width=21.12)),
     Candidate("satellite",  270, 78, satTrail.SatelliteTrail(r=1195.6, theta=5.871, width=14.58)),
-    Candidate("satellite", 1184, 78, satTrail.SatelliteTrail(r=2218.0, theta=0.841, width=19.96)),
-    Candidate("satellite", 1168, 47, satTrail.SatelliteTrail(r=2492.8, theta=1.430, width=12.91)),
     Candidate("satellite", 1166, 96, satTrail.SatelliteTrail(r=1177.4, theta=6.162, width=11.57)),
+    Candidate("satellite", 1168, 47, satTrail.SatelliteTrail(r=2492.8, theta=1.430, width=12.91)),
+    Candidate("satellite", 1184, 78, satTrail.SatelliteTrail(r=2218.0, theta=0.841, width=19.96)),
+    Candidate("satellite", 1236, 65, satTrail.SatelliteTrail(r=1580.0, theta=0.286, width= 7.94)),
 
+    # near vertical
+    Candidate("vertical",   246, 50, satTrail.SatelliteTrail(r=1553.8, theta=6.272, width=19.10)),
+    
     # meteors
+    Candidate("meteor",    1184, 84, satTrail.SatelliteTrail(r=3621.9, theta=0.859, width=11.90)),
     
     # aircraft
-    Candidate("aircraft", 1166, 65, satTrail.SatelliteTrail(r= 791.9, theta=6.058, width=22.55)),
-    Candidate("aircraft", 1166, 70, satTrail.SatelliteTrail(r= 244.4, theta=2.905, width=25.09)),
-    Candidate("aircraft", 1188, 18, satTrail.SatelliteTrail(r=1140.0, theta=6.183, width=18.73)),
-    Candidate("aircraft", 1240, 51, satTrail.SatelliteTrail(r= 885.4, theta=2.379, width=19.34)),
-    Candidate("aircraft", 1248, 43, satTrail.SatelliteTrail(r= 606.7, theta=6.013, width=15.81)),
+    Candidate("aircraft",  1166, 65, satTrail.SatelliteTrail(r= 791.9, theta=6.058, width=22.55)),
+    Candidate("aircraft",  1166, 70, satTrail.SatelliteTrail(r= 244.4, theta=2.905, width=25.09)),
+    Candidate("aircraft",  1188, 18, satTrail.SatelliteTrail(r=1140.0, theta=6.183, width=18.73)),
+    Candidate("aircraft",  1240, 51, satTrail.SatelliteTrail(r= 885.4, theta=2.379, width=19.34)),
+    Candidate("aircraft",  1248, 43, satTrail.SatelliteTrail(r= 606.7, theta=6.013, width=15.81)),
 
     # empty
-    Candidate("empty",    1236, 50, None),
+    Candidate("empty",     1236, 50, None),
 
 
     # previous false positives (scattered light)
-    Candidate("scattered",) 
+    Candidate("scattered",  248, 15, None),
+    Candidate("scattered",  260, 98, None),
     
 ]
 
 if False:
     knownCandidates = [
-        Candidate("satellite", 1236, 65, satTrail.SatelliteTrail(r=1580.0, theta=0.286, width= 7.94)),    
         Candidate("aircraft",  1166, 65, satTrail.SatelliteTrail(r= 791.9, theta=6.058, width=22.55)),
+        Candidate("satellite", 1236, 65, satTrail.SatelliteTrail(r=1580.0, theta=0.286, width= 7.94)),    
         Candidate("empty",     1236, 50, None),
     ]
     
@@ -128,25 +133,28 @@ class EventList(list):
     def recall(self):
         posIn = self.positiveInputs
         if posIn == 0:
-            print "%s: No positive inputs.  Recall is undefined." % (color("WARNING", "yellow"))
+            #print "%s: No positive inputs.  Recall is undefined." % (color("WARNING", "yellow"))
             posIn = -1
         return self.truePositives/posIn
     @property
     def precision(self):
         posDet = self.positiveDetections
         if posDet == 0:
-            print "%s: No positive detections.  Precision is undefined." % (color("WARNING", "yellow"))
+            #print "%s: No positive detections.  Precision is undefined." % (color("WARNING", "yellow"))
             posDet = -1
         return self.truePositives/posDet
     @property
     def f1(self):
-        return 2.0*(self.recall*self.precision)/(self.recall + self.precision)
+        denom = self.recall + self.precision
+        if len(self) == 0 or denom == 0.0:
+            return 0.0
+        return 2.0*(self.recall*self.precision)/denom
         
 
 
 
         
-def main(root, threads):
+def main(root, threads, kind=None):
 
     butler       = dafPersist.Butler(root)
     rMax, thetaMax = 20.0, 0.15
@@ -155,14 +163,25 @@ def main(root, threads):
 
     mp = mapr.MapFunc(threads, process)
 
-    events = []
+    ###################################################################
+    # Create an eventList for all kinds of candiate Trail
+    eventLists = {}
+    nMasked = {}
+    for k in Candidate.validKinds:
+        eventLists[k] = EventList()
+        nMasked[k] = 0
+        
+    ###################################################################
+    # Add jobs to the map
     for candidate in knownCandidates:
-        dataId       = {'visit': candidate.visit, 'ccd': candidate.ccd}
-        dataRef      = hscButler.getDataRef(butler, dataId)
-        mp.add(dataRef, candidate)
+        if kind is None or candidate.kind == kind:
+            dataId       = {'visit': candidate.visit, 'ccd': candidate.ccd}
+            dataRef      = hscButler.getDataRef(butler, dataId)
+            mp.add(dataRef, candidate)
     results = mp.run()
 
-    eventList = EventList()
+    ####################################################################
+    # Tally the results and see how we did
     
     for result in results:
         candidate, foundTrails = result
@@ -174,7 +193,10 @@ def main(root, threads):
         result = ""
         claimed = [False]*nTrail
         for iTrail,fTrail in enumerate(foundTrails):
-            if fTrail.isNear(t, rMax, thetaMax):
+            
+            nMasked[candidate.kind] += fTrail.nMaskedPixels
+                
+            if t  and fTrail.isNear(t, rMax, thetaMax):
                 result += "\n  %s: %s" % (color("TRUE-POS", "green"), fTrail)
                 claimed[iTrail] = True
                 eList.append(Event(True, True))
@@ -204,12 +226,20 @@ def main(root, threads):
         msg += result
         allMessages += msg+"\n"
         print "\n"+msg+"\n"
-        eventList += eList
+        eventLists[candidate.kind] += eList
         
     print color("=== Summary ===", "magenta")
     print allMessages
-    print "Recall,precision,f1:", eventList.recall, eventList.precision, eventList.f1
-    
+    for kind, eventList in eventLists.items():
+        print color("=== %s ===" % (kind), "magenta")
+        if len(eventList) == 0:
+            print "No events."
+            continue
+        nPos = eventList.positiveDetections or 1
+        print "Recall,precision,f1:  %4.2f %4.2f  %4.2f"%(eventList.recall, eventList.precision, eventList.f1)
+        print "Masked pixels: %10d" % (nMasked[kind]), \
+            " (all: n = %d, %.2f%%)" % (len(eventList),100.0*nMasked[kind]/(len(eventList)*2048*4096)), \
+            " (det: n = %d, %.2f%%)" % (eventList.positiveDetections,  100.0*nMasked[kind]/(nPos*2048*4096))
 
 
     
@@ -217,5 +247,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("root")
     parser.add_argument("-j", "--threads", type=int, default=1, help="Number of threads to use")
+    parser.add_argument("-k", "--kind", choices=Candidate.validKinds, help="Specify kind to run.")
     args = parser.parse_args()
-    main(args.root, args.threads)
+    main(args.root, args.threads, kind=args.kind)

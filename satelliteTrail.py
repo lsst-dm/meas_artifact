@@ -54,7 +54,8 @@ class SatelliteTrailList(list):
         return s
 
     def __str__(self):
-        msg = "SatelliteTrailList(nPixels=%d, binMax=%d, psfSigma=%.2f)" % (self.nPixels, self.binMax, self.psfSigma)
+        msg = "SatelliteTrailList(nPixels=%d, binMax=%d, psfSigma=%.2f)" % \
+              (self.nPixels, self.binMax, self.psfSigma)
         return msg
         
         
@@ -114,6 +115,8 @@ class SatelliteTrail(object):
 
         self.binMax   = binMax
         self.resid    = resid
+
+        self.nMaskedPixels  = 0
         
     @classmethod
     def fromHoughSolution(cls, solution, bins):
@@ -152,6 +155,7 @@ class SatelliteTrail(object):
         # OR it in to the existing plane, return the number of pixels we set
         msk     |= tmp
         nPixels  = (tmp.getArray() > 0).sum()
+        self.nMaskedPixels += nPixels
         return nPixels
 
         
@@ -286,8 +290,11 @@ class SatelliteTrail(object):
 
         
     def __str__(self):
-        rep = "SatelliteTrail(r=%.1f,theta=%.3f,width=%.2f,flux=%.2f,binMax=%d,resid=(%.2f,%.2f))" % \
-              (self.r, self.theta, self.width, self.flux, self.binMax, self.resid.med, self.resid.iqr)
+        med, iqr = -1.0, -1.0
+        if self.resid is not None:
+            med,iqr = self.resid
+        rep = "SatelliteTrail(r=%.1f,theta=%.3f,width=%.2f,flux=%.2f,binMax=%r,resid=(%.2f,%.2f))" % \
+              (self.r, self.theta, self.width, self.flux, self.binMax, med, iqr)
         return rep
         
     def __repr__(self):

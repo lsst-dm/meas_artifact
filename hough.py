@@ -503,25 +503,35 @@ class HoughTransform(object):
             _x, _y = x[idx[i]], y[idx[i]]
             rnew, tnew = rNew[idx[i]], thetaNew[idx[i]]
             residual = _x*np.cos(thetas[i]) + _y*np.sin(thetas[i]) - rs[i]
-            if False:
-                #fig, ax = plt.subplots(nrows=2, ncols=3)
-                #ax[0,0].hist(theta, bins=500)
-                plt.hist(residual, bins=50)
-                plt.savefig("resid.png")
-                
+
             med = np.percentile(residual, 50.0)
             q1  = np.percentile(residual, 25.0)
             q3  = np.percentile(residual, 75.0)
             iqr = q3 - q1
             n   = idx[i].sum()
-            if iqr < self.maxResid:
+
+            # see if there's a significant 2nd-order term in a polynomial fit.
+            order2limit = 1.0e-3
+            poly = np.polyfit(np.arange(n), residual, 2)
+            if False:
+                fig, ax = plt.subplots(nrows=1, ncols=1)
+                xTmp = np.arange(n)
+                ax.plot(xTmp, residual, 'r.')
+                ax.plot(xTmp, np.poly1d(poly)(xTmp), 'b-')
+                fig.savefig("poly.png")
+
+            isReallyActuallyLinear = (iqr < self.maxResid) & (np.abs(poly[0]) < order2limit)
+            
+            if isReallyActuallyLinear:
+                
                 residStat = Residual(med, q3 - q1)
-                solution = HoughSolution(rs[i], thetas[i], _x, _y, rnew, tnew, n, residStat)
+                solution  = HoughSolution(rs[i], thetas[i], _x, _y, rnew, tnew, n, residStat)
                 solutions.append(solution)
+
             else:
                 print "WARNING: Rejecting solution: r=%.1f,theta=%.3f  " \
-                    "(IQR/sqrt(n)=%.2f/%.2f=%.3f [limit=%.2f])" % \
-                    (rs[i], thetas[i], iqr, np.sqrt(n), iqr/np.sqrt(n), self.maxResid)
-                
+                    "(IQR=%.2f [limit=%.2f]  2nd-order coeff = %.2g [limit=%.2g])" % \
+                    (rs[i], thetas[i], iqr, self.maxResid, poly[0], order2limit)
+
         return solutions
         
