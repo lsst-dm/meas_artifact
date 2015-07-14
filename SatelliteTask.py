@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import os, math, collections
+import os, math, collections, time
 import lsst.afw.cameraGeom as afwCg
 import lsst.pipe.base as pipeBase
 import lsst.pex.config as pexConfig
@@ -53,6 +53,7 @@ class SatelliteTask(pipeBase.CmdLineTask):
             except:
                 pass
 
+        t0 = time.time()
 
         # run for regular satellites
         trailsSat = self.runSatellite(exposure, bins=4)
@@ -89,7 +90,7 @@ class SatelliteTask(pipeBase.CmdLineTask):
 
             exposure.writeFits(os.path.join(path,"exp%04d-%03d.fits"%(v,c)))
         
-        return trails
+        return trails, time.time() - t0
         
     @pipeBase.timeMethod
     def runSatellite(self, exposure, bins=None, broadTrail=False):
