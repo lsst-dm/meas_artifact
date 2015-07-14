@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import copy
 import time
 import collections
 import numpy as np
@@ -112,6 +113,7 @@ def thetaAlignment(theta, x, y, limit=3, tolerance=0.19):
     aligned   = aligned1 & aligned2
 
     nNearNeighbours = np.zeros(n)
+    newThetas = copy.copy(theta)
     
     # Using variable names  pCloseNeighbour = e^(2*nCand*closeNeighbourTolerance/tolerance)
     pZeroCloseNeighbour     = 0.95
@@ -125,12 +127,16 @@ def thetaAlignment(theta, x, y, limit=3, tolerance=0.19):
     w, = np.where(nCand > cut)
     for i in w:
         pixelTheta = np.arctan(dydx[i,aligned[i,:]])
-        sort       = np.sort(pixelTheta)
-        diff       = np.diff(sort)
-
-        # how many collisions do we actually have?
-        nNearNeighbours[i]      = (diff < closeNeighbourTolerance[i]).sum()
+        idx        = np.argsort(pixelTheta)
+        diff       = np.diff(pixelTheta[idx])
+        didx       = (diff < closeNeighbourTolerance[i])
         
+        # how many collisions do we actually have?
+        nNearNeighbours[i]      = didx.sum()
+
+        if nNearNeighbours[i] >= limit:
+            newThetas[i] = pixelTheta[idx[didx]].mean()
+            
     isCandidate = nNearNeighbours >= limit
 
     if False:
@@ -147,7 +153,7 @@ def thetaAlignment(theta, x, y, limit=3, tolerance=0.19):
         ax[1,2].set_xlim([0.0, 0.01])
         fig.savefig("hist.png")
 
-    return isCandidate
+    return isCandidate, newThetas
 
     
 def improveCluster(theta, x, y):

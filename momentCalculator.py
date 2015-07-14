@@ -263,20 +263,22 @@ if __name__ == '__main__':
 
     cal = np.zeros((kwid,kwid))
     cal[kwid/2,kwid/2] += 1
-    cmm = MomentManager(cal, kernelWidth=kwid, kernelSigma=ksig)
+    cmm = MomentManager(cal, kernelWidth=kwid, kernelSigma=ksig, isCalibration=True)
 
-    limits = { k:1.0 for k in MomentManager.keys }
-    limits['sumI'] = -1.0
-    limits['theta'] = None
+    sumI = MomentLimit('sumI', 1.0, 'center')
     
-    norm = PixelSelector(mm, cmm, limits)
-    print norm.ellip[n/2,n/2]
+    norm = PixelSelector(mm, cmm)
+    norm.append(sumI)
+    
+    print mm.ellip[n/2,n/2]
     good = norm.getPixels()
     print good.sum()
 
-    pval = PValuePixelSelector(mm, cmm, limits)
-    print pval.ellip[n/2,n/2]
-    good = pval.getPixels(thresh=1.0e-10)
+    pval = PValuePixelSelector(mm, cmm)
+    pval.append(sumI)
+    
+    print mm.ellip[n/2,n/2]
+    good = pval.getPixels(maxPixels=1000)
     print good.sum()
     
     

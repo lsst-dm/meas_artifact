@@ -224,7 +224,7 @@ class SatelliteTrail(object):
 
         # only bother updating the pixels within 5-sigma of the line
         w = (offset < width/2)
-        img[w] = profile(offset[w])
+        img[w] += profile(offset[w])
         return img
 
 

@@ -36,11 +36,12 @@ class SatelliteTask(pipeBase.CmdLineTask):
         import lsstDebug
         dbg = lsstDebug.Info(__name__).dbg
 
-        self.log.info("lsstDebug.Info(%s).debug = %s" % (str(__name__), str(dbg)))
-        self.log.info("Detecting satellite trails in %s" % (str(dataRef.dataId)))
+        v,c = dataRef.dataId['visit'], dataRef.dataId['ccd']
+        
+        #self.log.info("lsstDebug.Info(%s).debug = %s" % (str(__name__), str(dbg)))
+        self.log.info("Detecting satellite trails in visit=%d, ccd=%d)" % (v,c))
         
         exposure = dataRef.get('calexp', immediate=True)
-        v,c = dataRef.dataId['visit'], dataRef.dataId['ccd']
 
         if dbg:
             basedir = os.environ.get('SATELLITE_DATA')
@@ -110,7 +111,7 @@ class SatelliteTask(pipeBase.CmdLineTask):
             luminosityLimit = 0.05   # low cut on pixel flux
             luminosityMax   = 4.0e2 # max luminsity for pixel flux
             maskNPsfSigma   = 7.0
-            centerLimit     = 0.6  # about 1 pixel
+            centerLimit     = 0.5  # about 1 pixel
             eRange          = 0.02  # about +/- 0.1
             houghBins       = 256   # number of r,theta bins (i.e. 256x256)
             kernelSigma     = 9   # pixels
@@ -131,7 +132,8 @@ class SatelliteTask(pipeBase.CmdLineTask):
             luminosityLimit=luminosityLimit,
             luminosityMax=luminosityMax,
             skewLimit=skewLimit,
-            bLimit=bLimit
+            bLimit=bLimit,
+            log=self.log
         )
 
         trails = self.finder.getTrails(exposure, widths)

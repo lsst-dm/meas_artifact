@@ -257,7 +257,10 @@ class SatelliteFinder(object):
         bestWidth = bestCal[0]
 
         nBeforeAlignment = isCandidate.sum()
-        thetaMatch = hough.thetaAlignment(mm.theta[isCandidate],xx[isCandidate],yy[isCandidate], limit=8)
+        thetaMatch, newTheta = hough.thetaAlignment(mm.theta[isCandidate],xx[isCandidate],yy[isCandidate],
+                                                    limit=8)
+
+        mm.theta[isCandidate] = newTheta
         isCandidate[isCandidate] = thetaMatch
         nAfterAlignment = isCandidate.sum()
         self.log.logdebug("theta-alignment Bef/aft: %d / %d" % (nBeforeAlignment, nAfterAlignment))
@@ -267,7 +270,7 @@ class SatelliteFinder(object):
         #################################################
         rMax           = sum([q**2 for q in img.shape])**0.5
         houghTransform = hough.HoughTransform(self.houghBins, self.houghThresh,
-                                              rMax=rMax, maxPoints=1000, nIter=1, maxResid=4.0)
+                                              rMax=rMax, maxPoints=1000, nIter=0, maxResid=4.0)
         solutions      = houghTransform(mm.theta[isCandidate], xx[isCandidate], yy[isCandidate])
 
         #################################################
