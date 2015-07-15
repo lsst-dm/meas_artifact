@@ -27,6 +27,25 @@ class SatelliteTrailList(list):
         self.binMax = binMax
         self.psfSigma = psfSigma
 
+        
+    def cleanDuplicates(self, drMax, dThetaMax):
+        """Go through this list and remove duplicates.  Return a new SatelliteTrailList."""
+        
+        # clean duplicates from each list
+        newTrailList = SatelliteTrailList(self.nPixels, self.binMax, self.psfSigma)
+        skip = []
+        for i,t in enumerate(self):
+            if i in skip:
+                continue
+            best = t
+            for i2, t2 in enumerate(self[i:]):
+                if t.isNear(t2, drMax, dThetaMax):
+                    best = t.chooseBest(best, t2)
+                    skip.append(i2)
+            newTrailList.append(best)
+        return newTrailList
+
+        
     def merge(self, trailList, drMax=50.0, dThetaMax=0.15):
         """Merge trails from trailList to this SatelliteTrailList.  Returns a new SatelliteTrailList.
 
@@ -35,27 +54,30 @@ class SatelliteTrailList(list):
         @param dthetaMax     The max separation in theta for identifying duplicates
         """
         
-        s = SatelliteTrailList(self.nPixels, max(trailList.binMax, self.binMax), self.psfSigma)
+        newList = SatelliteTrailList(self.nPixels, max(trailList.binMax, self.binMax), self.psfSigma)
+
+        tList1 = trailList.cleanDuplicates(drMax, dThetaMax)
+        tList2 = self.cleanDuplicates(drMax, dThetaMax)
 
         # get everything from list 1, and check for duplicates
-        for t in trailList:
-            best  = t
-            for t2 in self:
-                if t.isNear(t2, drMax, dThetaMax):
-                    best = t.chooseBest(t, t2)
-            s.append(best)
+        for t1 in tList1:
+            best  = t1
+            for t2 in tList2:
+                if t1.isNear(t2, drMax, dThetaMax):
+                    best = t1.chooseBest(t1, t2)
+            newList.append(best)
 
         # get everything from list 2, and throw out duplicates (we already chose the best one)
-        for t in self:
-            haveIt = [t.isNear(t2, drMax, dThetaMax) for t2 in s]
+        for t2 in tList2:
+            haveIt = [t2.isNear(tNew, drMax, dThetaMax) for tNew in newList]
             if not any(haveIt):
-                s.append(t)
+                newList.append(t2)
 
-        return s
+        return newList
 
     def __str__(self):
-        msg = "SatelliteTrailList(nPixels=%d, binMax=%d, psfSigma=%.2f)" % \
-              (self.nPixels, self.binMax, self.psfSigma)
+        msg = "SatelliteTrailList(nPixels=%d, binMax=%d, psfSigma=%.2f) [%d trails]" % \
+              (self.nPixels, self.binMax, self.psfSigma, len(self))
         return msg
         
         
