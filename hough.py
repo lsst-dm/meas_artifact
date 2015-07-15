@@ -135,7 +135,9 @@ def thetaAlignment(theta, x, y, limit=3, tolerance=0.19):
         nNearNeighbours[i]      = didx.sum()
 
         if nNearNeighbours[i] >= limit:
-            newThetas[i] = pixelTheta[idx[didx]].mean()
+            pixTheta = pixelTheta[idx[didx]]  #they're sorted
+            idxMedian = len(pixTheta)//2
+            newThetas[i] = pixTheta[idxMedian]
             
     isCandidate = nNearNeighbours >= limit
 
@@ -517,7 +519,7 @@ class HoughTransform(object):
             n   = idx[i].sum()
 
             # see if there's a significant 2nd-order term in a polynomial fit.
-            order2limit = 1.0e-3
+            order2limit = 1.5e-3
             poly = np.polyfit(np.arange(n), residual, 2)
             if False:
                 fig, ax = plt.subplots(nrows=1, ncols=1)

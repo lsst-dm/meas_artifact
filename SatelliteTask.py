@@ -20,10 +20,11 @@ import numpy as np
 import satellite as satell
 import satelliteDebug as satDebug
 
-try:
-    import debug
-except:
-    pass
+if True:
+    try:
+        import debug
+    except:
+        pass
 
 class SatelliteTask(pipeBase.CmdLineTask):
     _DefaultName = 'satellite'
@@ -69,7 +70,10 @@ class SatelliteTask(pipeBase.CmdLineTask):
             filename = os.path.join(path,"acdebug-%05d-%03d.png" % (v, c))
             satDebug.debugPlot(self.finder, filename)
 
-        trails = trailsSat.merge(trailsAc)
+        print trailsSat
+        print trailsAc
+            
+        trails = trailsSat.merge(trailsAc, drMax=90.0, dThetaMax=0.15)
 
         listMsg = "(%s,%s) Detected %d trail(s).  %s" % (v, c, len(trails), trails)
         self.log.info(listMsg)
@@ -99,15 +103,16 @@ class SatelliteTask(pipeBase.CmdLineTask):
             luminosityLimit = 0.06 # low cut on pixel flux
             luminosityMax   = 50.0
             maskNPsfSigma   = 3.0*bins
-            centerLimit     = 1.0   # about 1 pixel
-            eRange          = 0.04  # about +/- 0.1
-            houghBins       = 256   # number of r,theta bins (i.e. 256x256)
-            kernelSigma     = 21    # pixels
-            kernelWidth     = 41   # pixels
-            widths          = [40.0, 90.0]  #width of an out of focus aircraft (unbinned)
-            houghThresh     = 40    # counts in a r,theta bins
+            centerLimit     = 1.0           # about 1 pixel
+            eRange          = 0.04          # about +/- 0.1
+            houghBins       = 256           # number of r,theta bins (i.e. 256x256)
+            kernelSigma     = 21            # pixels
+            kernelWidth     = 41           # pixels
+            widths          = [40.0, 80.0, 120]  # width of an out of focus aircraft (unbinned)
+            houghThresh     = 80            # counts in a r,theta bins
             skewLimit       = 120.0
             bLimit          = 1.0
+            maxTrailWidth   = 35.0
         else:
             luminosityLimit = 0.05   # low cut on pixel flux
             luminosityMax   = 4.0e2 # max luminsity for pixel flux
@@ -118,9 +123,10 @@ class SatelliteTask(pipeBase.CmdLineTask):
             kernelSigma     = 9   # pixels
             kernelWidth     = 17   # pixels
             widths          = [1.0, 10.0]
-            houghThresh     = 40    # counts in a r,theta bins
+            houghThresh     = 80    # counts in a r,theta bins
             skewLimit       = 20.0
             bLimit          = 0.6
+            maxTrailWidth   = 30.0
 
         self.finder = satell.SatelliteFinder(
             kernelSigma=kernelSigma,
@@ -134,7 +140,9 @@ class SatelliteTask(pipeBase.CmdLineTask):
             luminosityMax=luminosityMax,
             skewLimit=skewLimit,
             bLimit=bLimit,
+            maxTrailWidth=maxTrailWidth,
             log=self.log
+            
         )
 
         trails = self.finder.getTrails(exposure, widths)

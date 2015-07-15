@@ -46,7 +46,7 @@ class SatelliteTrailList(list):
         return newTrailList
 
         
-    def merge(self, trailList, drMax=50.0, dThetaMax=0.15):
+    def merge(self, trailList, drMax=90.0, dThetaMax=0.15):
         """Merge trails from trailList to this SatelliteTrailList.  Returns a new SatelliteTrailList.
 
         @param trailList     The trailList to merge in

@@ -32,6 +32,7 @@ class SatelliteFinder(object):
                  luminosityMax   = 10.0,
                  skewLimit       = 40.0,
                  bLimit          = 0.5,
+                 maxTrailWidth   = 35.0,  # > 30 is rare (even for aircraft)
                  log             = None,
                  verbose         = False,
              ):
@@ -53,6 +54,8 @@ class SatelliteFinder(object):
         self.skewLimit         = skewLimit
         self.bLimit            = bLimit
 
+        self.maxTrailWidth     = maxTrailWidth
+        
         if log is None:
             logLevel = pexLog.Log.INFO
             if verbose:
@@ -258,7 +261,7 @@ class SatelliteFinder(object):
 
         nBeforeAlignment = isCandidate.sum()
         thetaMatch, newTheta = hough.thetaAlignment(mm.theta[isCandidate],xx[isCandidate],yy[isCandidate],
-                                                    limit=8)
+                                                    limit=4)
 
         mm.theta[isCandidate] = newTheta
         isCandidate[isCandidate] = thetaMatch
@@ -280,7 +283,9 @@ class SatelliteFinder(object):
         for s in solutions:
             trail = satTrail.SatelliteTrail.fromHoughSolution(s, self.bins)
             trail.measure(exp, bins=self.bins)
-            trails.append(trail)
+            # last chance to drop it
+            if trail.width < self.maxTrailWidth:
+                trails.append(trail)
 
         self._mm           = mm
         self._mmCals       = mmCals

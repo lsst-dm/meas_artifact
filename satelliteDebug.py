@@ -183,7 +183,7 @@ def bvskewPlot(finder, ax, mm, cmm, trails):
         x, y = trail.trace(nx, ny, offset=0, bins=finder.bins)
         x = x.astype(int)
         y = y.astype(int)
-        marker = '.', '+'
+        marker = '.', '+', 'o'
         for j in range(len(cmm)):
             ax.plot(mm.skew[y,x], mm.b[y,x] - cmm[j].b, colors[i%4]+marker[j], ms=4.0)
     ax.set_xlabel("Skew", size='small')
