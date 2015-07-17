@@ -320,13 +320,13 @@ class SatelliteTrail(object):
         return rep
         
     def __repr__(self):
-        rep = "SatelliteTrail(r=%r,theta=%r,width=%r,flux=%r,center=%r,fWing=%r,binMax=%r,resid=(%r))" % \
-              (self.r, self.theta, self.width, self.flux, self.center, self.fWing, self.binMax, self.resid)
+        rep = "SatelliteTrail(r=%r,theta=%r,width=%r,flux=%r,center=%r,binMax=%r,resid=(%r))" % \
+              (self.r, self.theta, self.width, self.flux, self.center, self.binMax, self.resid)
         return rep
 
     def __eq__(self, trail):
         isEq = (self.r == trail.r) and (self.theta == trail.theta) and \
-               (self.width == trail.width) and (self.flux == trail.flux) and (self.fWing == trail.fWing)
+               (self.width == trail.width) and (self.flux == trail.flux)
         return isEq
         
     def isNear(self, trail, drMax, dThetaMax):

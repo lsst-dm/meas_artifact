@@ -366,6 +366,138 @@ knownCandidates = [
     Candidate("scattered",1194,100   ,satTrail.SatelliteTrail(r=1934.4,theta=1.588,width=23.03  )),
 
     # 1204 r   1 f      101,15,8,3,2
+    Candidate("satellite", 1204,2   ,satTrail.SatelliteTrail(r=2640.9,theta=0.538,width=10.55 )),  
+    Candidate("satellite", 1204,3   ,satTrail.SatelliteTrail(r=0.0, theta=0.0, width=0.0 )),       # there but never successfully measured
+    Candidate("satellite", 1204,8   ,satTrail.SatelliteTrail(r=0.0, theta=0.0, width=0.0 )),       # there but never successfully measured
+    Candidate("satellite", 1204,14  ,satTrail.SatelliteTrail(r=0.0, theta=0.0, width=0.0 )),       # there but never successfully measured
+    Candidate("satellite", 1204,101 ,satTrail.SatelliteTrail(r=0.0, theta=0.0, width=0.0 )),       # there but never successfully measured
+    Candidate("moustache",1204,21    ,satTrail.SatelliteTrail(r=3233.7,theta=0.961,width=12.87  )),
+    Candidate("moustache",1204,21    ,satTrail.SatelliteTrail(r=3989.1,theta=1.100,width=13.18  )),
+    Candidate("moustache",1204,37    ,satTrail.SatelliteTrail(r=1250.9,theta=1.099,width=13.92  )),
+    Candidate("moustache",1204,83    ,satTrail.SatelliteTrail(r=2323.6,theta=2.365,width=13.11  )),
+    Candidate("moustache",1204,89    ,satTrail.SatelliteTrail(r=1995.0,theta=2.131,width=13.21  )),
+    Candidate("moustache",1204,94    ,satTrail.SatelliteTrail(r=482.4,theta=2.560,width=13.06   )),
+    Candidate("moustache",1204,94    ,satTrail.SatelliteTrail(r=1592.4,theta=2.424,width=13.05  )),
+    Candidate("moustache",1204,94    ,satTrail.SatelliteTrail(r=1643.6,theta=2.403,width=12.97  )),
+    Candidate("moustache",1204,94    ,satTrail.SatelliteTrail(r=1695.4,theta=2.381,width=12.51  )),
+    Candidate("moustache",1204,95    ,satTrail.SatelliteTrail(r=250.3,theta=5.817,width=13.60   )),
+    Candidate("moustache",1204,95    ,satTrail.SatelliteTrail(r=586.9,theta=5.483,width=11.98   )),
+    Candidate("moustache",1204,99    ,satTrail.SatelliteTrail(r=357.3,theta=2.523,width=13.24   )),
+    Candidate("moustache",1204,101   ,satTrail.SatelliteTrail(r=1039.4,theta=1.248,width=14.23  )),
+    Candidate("moustache",1204,103   ,satTrail.SatelliteTrail(r=1827.5,theta=5.486,width=15.99  )),
+
+    # 1206
+    Candidate("scattered",1206, 8    ,satTrail.SatelliteTrail(r=561.1,theta=1.571,width=18.70   )),
+    Candidate("scattered",1206,46    ,satTrail.SatelliteTrail(r=1511.7,theta=1.548,width=20.26  )),
+    Candidate("moustache",1206,54    ,satTrail.SatelliteTrail(r=1808.3,theta=1.561,width=18.60  )),
+    Candidate("moustache",1206,69    ,satTrail.SatelliteTrail(r=687.6,theta=1.749,width=18.32   )),
+    Candidate("moustache",1206,69    ,satTrail.SatelliteTrail(r=2718.8,theta=1.574,width=16.97  )),
+    Candidate("moustache",1206,70    ,satTrail.SatelliteTrail(r=2754.8,theta=1.016,width=23.87  )),
+    Candidate("scattered",1206,76    ,satTrail.SatelliteTrail(r=770.0,theta=2.364,width=18.96   )),
+    Candidate("moustache",1206,89    ,satTrail.SatelliteTrail(r=350.8,theta=5.688,width=20.04   )),
+    Candidate("moustache",1206,89    ,satTrail.SatelliteTrail(r=539.0,theta=2.361,width=19.33   )),
+    Candidate("moustache",1206,96    ,satTrail.SatelliteTrail(r=1384.9,theta=0.650,width=20.36  )),
+    Candidate("moustache",1206,96    ,satTrail.SatelliteTrail(r=1866.0,theta=0.485,width=21.49  )),
+    Candidate("moustache",1206,101    ,satTrail.SatelliteTrail(r=1111.8,theta=1.261,width=18.41  )),
+    Candidate("moustache",1206,101    ,satTrail.SatelliteTrail(r=1552.7,theta=0.809,width=18.19  )),
+    Candidate("moustache",1206,102    ,satTrail.SatelliteTrail(r=2277.3,theta=1.244,width=24.08  )),
+
+    # 1208
+    Candidate("scattered",1208,20    ,satTrail.SatelliteTrail(r=4168.0,theta=1.572,width=12.82  )),
+    Candidate("moustache",1208,21    ,satTrail.SatelliteTrail(r=3263.3,theta=0.793,width=11.39  )),
+    Candidate("moustache",1208,21    ,satTrail.SatelliteTrail(r=3985.6,theta=1.111,width=11.29  )),
+    Candidate("scattered",1208,30    ,satTrail.SatelliteTrail(r=2086.9,theta=1.565,width=12.16  )),
+    
+    # 1210
+    Candidate("scattered",1210, 8    ,satTrail.SatelliteTrail(r=2601.3,theta=1.581,width=17.97  )),
+    Candidate("moustache",1210,38    ,satTrail.SatelliteTrail(r=1792.2,theta=1.543,width=19.63  )),
+    Candidate("moustache",1210,38    ,satTrail.SatelliteTrail(r=1824.5,theta=1.513,width=19.37  )),
+    Candidate("moustache",1210,46    ,satTrail.SatelliteTrail(r=1733.5,theta=1.648,width=18.45  )),
+    Candidate("scattered",1210,67    ,satTrail.SatelliteTrail(r=662.9,theta=2.362,width=16.91   )),
+    Candidate("scattered",1210,78    ,satTrail.SatelliteTrail(r=1663.7,theta=0.464,width=15.78  )),
+    Candidate("moustache",1210,97    ,satTrail.SatelliteTrail(r=185.1,theta=0.049,width=17.13   )),
+
+    # 1216 r   1 f          92s,86,80,73s
+    Candidate("satellite", 1216,73  ,satTrail.SatelliteTrail(r=0.0, theta=0.0, width=0.0 )),       # there but never successfully measured
+    Candidate("satellite", 1216,80  ,satTrail.SatelliteTrail(r=0.0, theta=0.0, width=0.0 )),       # there but never successfully measured
+    Candidate("satellite", 1216,86  ,satTrail.SatelliteTrail(r=0.0, theta=0.0, width=0.0 )),       # there but never successfully measured
+    Candidate("satellite", 1216,92  ,satTrail.SatelliteTrail(r=0.0, theta=0.0, width=0.0 )),       # there but never successfully measured
+
+    
+    #1236 i   1 b          83s,75,74,66,65,64,56,55
+    Candidate("moustache",1236,38    ,satTrail.SatelliteTrail(r=1784.6,theta=1.540,width=17.04  )),
+    Candidate("moustache",1236,38    ,satTrail.SatelliteTrail(r=2724.3,theta=1.612,width=17.80  )),
+    Candidate("moustache",1236,46    ,satTrail.SatelliteTrail(r=1687.4,theta=1.636,width=18.16  )),
+    Candidate("satellite",1236,55    ,satTrail.SatelliteTrail(r=2009.1,theta=0.277,width=8.88   )),
+    Candidate("satellite",1236,56    ,satTrail.SatelliteTrail(r=783.6,theta=0.280,width=7.19    )),
+    Candidate("satellite",1236,64    ,satTrail.SatelliteTrail(r=2836.1,theta=0.285,width=7.07   )),
+    Candidate("satellite",1236,65    ,satTrail.SatelliteTrail(r=1581.4,theta=0.288,width=9.94   )),
+    Candidate("satellite",1236,66    ,satTrail.SatelliteTrail(r=380.2,theta=0.286,width=6.77    )),
+    Candidate("scattered",1236,67    ,satTrail.SatelliteTrail(r=660.2,theta=2.361,width=17.54   )),
+    Candidate("satellite",1236,74    ,satTrail.SatelliteTrail(r=2418.3,theta=0.290,width=7.24   )),
+    Candidate("satellite",1236,75    ,satTrail.SatelliteTrail(r=1134.5,theta=0.294,width=8.13   )),
+    Candidate("satellite",1236,83    ,satTrail.SatelliteTrail(r=1860.6,theta=0.312,width=11.14  )),
+
+    # 1238 i   
+    Candidate("satellite",1238,38    ,satTrail.SatelliteTrail(r=361.0,theta=0.272,width=7.17  )),
+    Candidate("satellite",1238,46    ,satTrail.SatelliteTrail(r=0.0,theta=0.272,width=7.17  )),   # very short not detected
+    # very faint aircraft running through ccd=15 and others in the column
+    
+
+    # 1240 i   2 a,f        96,91,85,86,80,73,74,66,58,59,51,43,44,36,28,29,101  103,77,69c
+    Candidate("moustache",1240,15    ,satTrail.SatelliteTrail(r=2751.3,theta=1.097,width=18.40  )),
+    Candidate("aircraft",1240,28    ,satTrail.SatelliteTrail(r=2557.6,theta=2.354,width=17.74  )),
+    Candidate("aircraft",1240,29    ,satTrail.SatelliteTrail(r=588.8,theta=5.523,width=19.06   )),
+    Candidate("moustache",1240,29    ,satTrail.SatelliteTrail(r=745.4,theta=1.283,width=18.16   )),
+    Candidate("aircraft",1240,36    ,satTrail.SatelliteTrail(r=892.0,theta=2.388,width=18.71   )),
+    Candidate("aircraft",1240,43    ,satTrail.SatelliteTrail(r=2463.3,theta=2.369,width=18.82 )),
+    Candidate("aircraft",1240,44    ,satTrail.SatelliteTrail(r=655.8,theta=5.524,width=19.05   )),
+    Candidate("aircraft",1240,51    ,satTrail.SatelliteTrail(r=885.6,theta=2.378,width=19.41   )),
+    Candidate("aircraft",1240,58    ,satTrail.SatelliteTrail(r=0.8,theta=5.512,width=18.24   )), # as yet undetected
+    Candidate("aircraft",1240,59    ,satTrail.SatelliteTrail(r=640.8,theta=5.512,width=18.24   )),
+    Candidate("aircraft",1240,66    ,satTrail.SatelliteTrail(r=918.2,theta=2.372,width=20.90   )),
+    Candidate("aircraft",1240,73    ,satTrail.SatelliteTrail(r=1.7,theta=5.523,width=20.20   )),  # as yet undetected
+    Candidate("aircraft",1240,74    ,satTrail.SatelliteTrail(r=631.7,theta=5.523,width=20.20   )),
+    Candidate("aircraft",1240,80    ,satTrail.SatelliteTrail(r=826.0,theta=2.367,width=20.47   )),
+    Candidate("scattered",1240,80    ,satTrail.SatelliteTrail(r=2499.8,theta=1.572,width=19.87  )),
+    Candidate("aircraft",1240,85    ,satTrail.SatelliteTrail(r=0.8,theta=5.513,width=21.61   )),   # as yet undetected
+    Candidate("aircraft",1240,86    ,satTrail.SatelliteTrail(r=706.8,theta=5.513,width=21.61   )),
+    Candidate("moustache",1240,89    ,satTrail.SatelliteTrail(r=2263.5,theta=2.138,width=20.15  )),
+    Candidate("aircraft",1240,91    ,satTrail.SatelliteTrail(r=932.2,theta=2.362,width=21.81   )),
+    Candidate("aircraft",1240,96    ,satTrail.SatelliteTrail(r=566.6,theta=5.498,width=21.53   )),
+    Candidate("aircraft",1240,100   ,satTrail.SatelliteTrail(r=613.3,theta=1.974,width=20.22   )),
+    Candidate("aircraft",1240,103   ,satTrail.SatelliteTrail(r=1683.9,theta=5.502,width=21.69  )),
+
+    # 1244 i   1 b          3,2,1,0
+    Candidate("satellite",1244,0     ,satTrail.SatelliteTrail(r=1064.2,theta=0.033,width=12.54  )),
+    Candidate("satellite",1244,1     ,satTrail.SatelliteTrail(r=928.2,theta=0.015,width=9.70    )),
+    Candidate("satellite",1244,2     ,satTrail.SatelliteTrail(r=859.0,theta=6.275,width=12.82   )),
+    Candidate("satellite",1244,3     ,satTrail.SatelliteTrail(r=885.1,theta=6.259,width=10.82   )),
+    Candidate("moustache",1244,84    ,satTrail.SatelliteTrail(r=1082.2,theta=1.042,width=16.93  )),
+    
+    
+    # 1246 i   2 b,b        29,28,27,26  97,96
+    Candidate("satellite",1246,26    ,satTrail.SatelliteTrail(r=963.6,theta=0.010,width=13.50   )),
+    Candidate("satellite",1246,27    ,satTrail.SatelliteTrail(r=923.3,theta=6.277,width=10.20   )),
+    Candidate("satellite",1246,28    ,satTrail.SatelliteTrail(r=931.2,theta=6.269,width=10.96   )),
+    Candidate("satellite",1246,29    ,satTrail.SatelliteTrail(r=991.6,theta=6.264,width=6.84    )),
+    Candidate("moustache",1246,38    ,satTrail.SatelliteTrail(r=2242.3,theta=1.514,width=18.26  )),
+    Candidate("satellite",1246,96    ,satTrail.SatelliteTrail(r=1067.0,theta=0.140,width=12.45  )),
+    Candidate("satellite",1246,97    ,satTrail.SatelliteTrail(r=433.9,theta=0.153,width=8.41    )),
+
+    #1248 i   5 b,b,b,f,F  18s,17,16,100  89  29s 48s,49,57,58,59,67,68,69c,77  50,49,48,56,55,62,42,43,44c,36,37
+    Candidate("moustache",1248,15    ,satTrail.SatelliteTrail(r=2118.1,theta=0.954,width=17.05  )),
+    Candidate("satellite",1248,16    ,satTrail.SatelliteTrail(r=260.3,theta=0.029,width=9.18    )),
+    Candidate("satellite",1248,17    ,satTrail.SatelliteTrail(r=142.5,theta=0.021,width=8.90    )),
+    Candidate("satellite",1248,18    ,satTrail.SatelliteTrail(r=52.6,theta=0.013,width=9.26     )),
+    Candidate("moustache",1248,21    ,satTrail.SatelliteTrail(r=3317.7,theta=0.795,width=17.77  )),
+    Candidate("moustache",1248,21    ,satTrail.SatelliteTrail(r=4036.8,theta=1.117,width=17.29  )),
+    Candidate("satellite",1248,29    ,satTrail.SatelliteTrail(r=1284.0,theta=0.232,width=7.90   )),
+    Candidate("aircraft", 1248,43    ,satTrail.SatelliteTrail(r=605.5,theta=6.013,width=16.36   )),
+    Candidate("aircraft", 1248,49    ,satTrail.SatelliteTrail(r=356.3,theta=6.021,width=16.14   )),
+    Candidate("satellite",1248,58    ,satTrail.SatelliteTrail(r=1546.3,theta=0.260,width=13.09  )),
+    Candidate("satellite",1248,89    ,satTrail.SatelliteTrail(r=331.5,theta=0.048,width=10.81   )),
+    Candidate("satellite",1248,100   ,satTrail.SatelliteTrail(r=317.1,theta=0.039,width=7.56    )),
 
     
     # Candidate("satellite",    ,satTrail.  )),
@@ -382,38 +514,8 @@ knownCandidates = [
     # Candidate("satellite",    ,satTrail.  )),
     # Candidate("satellite",    ,satTrail.  )),
     # Candidate("satellite",    ,satTrail.  )),
-
-
-    # Candidate("satellite",    ,satTrail.  )),
-    # Candidate("satellite",    ,satTrail.  )),
-    # Candidate("satellite",    ,satTrail.  )),
-    # Candidate("satellite",    ,satTrail.  )),
-    # Candidate("satellite",    ,satTrail.  )),
-    # Candidate("satellite",    ,satTrail.  )),
-    # Candidate("satellite",    ,satTrail.  )),
-    # Candidate("satellite",    ,satTrail.  )),
-    # Candidate("satellite",    ,satTrail.  )),
-    # Candidate("satellite",    ,satTrail.  )),
-    # Candidate("satellite",    ,satTrail.  )),
-    # Candidate("satellite",    ,satTrail.  )),
-    # Candidate("satellite",    ,satTrail.  )),
-    # Candidate("satellite",    ,satTrail.  )),
     
-
-    # 1236
-    Candidate("satellite", 1236, 65, satTrail.SatelliteTrail(r=1580.0, theta=0.286, width= 7.94)),
-
-
-    # 1240
-    Candidate("aircraft",  1240, 51, satTrail.SatelliteTrail(r= 885.4, theta=2.379, width=19.34)),
-
-
-    # 1248
-    Candidate("aircraft",  1248, 43, satTrail.SatelliteTrail(r= 606.7, theta=6.013, width=15.81)),
-                   
-
-
-#    Candidate("empty",  ,  , satTrail.SatelliteTrail()),
+    #    Candidate("empty",  ,  , satTrail.SatelliteTrail()),
     # empty ... take one from each visit ... pick CCDs near the center
     Candidate("empty", 242,  18, None),
     Candidate("empty", 244,  19, None),
@@ -552,7 +654,7 @@ class EventList(list):
 def main(root, threads, output, input=None, kind=None, visit=None):
 
     butler       = dafPersist.Butler(root)
-    rMax, thetaMax = 20.0, 0.15
+    rMax, thetaMax = 50.0, 0.15
         
     allMessages = ""
 
@@ -603,7 +705,6 @@ def main(root, threads, output, input=None, kind=None, visit=None):
         dataHash, foundTrails, runtime = result
         runtimes.append(runtime)
 
-        
         for candidate in candidateLookup[dataHash]:
         
             nTrail = len(foundTrails)
@@ -634,26 +735,34 @@ def main(root, threads, output, input=None, kind=None, visit=None):
             if nUnclaimed > 0:
                 nIgnored = 0
                 resultTmp = ""
-                
+
                 for iClaim,claim in enumerate(claimed):
                     if not claim:
                         isIgnored = t and (candidate.kind in Candidate.ignoredKinds) and (foundTrails[iClaim].isNear(t, rMax, thetaMax))
+                        isNegative = t and (candidate.kind in Candidate.negativeKinds) and (foundTrails[iClaim].isNear(t, rMax, thetaMax))
                         isOtherCandidate = False
                         for cand in candidateLookup[dataHash]:
                             if cand == candidate:
                                 continue
                             if foundTrails[iClaim].isNear(cand.trail, rMax,thetaMax):
                                 isOtherCandidate=True
-                                
-                        print candidate.ccd, 'not claim', isIgnored, isOtherCandidate
-                        if isIgnored or isOtherCandidate:
+                        if isNegative:
+                            tag = "Known-bad"
+                        elif isIgnored:
+                            tag = "Ignored"
+                            nIgnored += 1
+                            resultMsg += "\n  %s: %s (%s)" % (color("IGNORED-POS", "yellow"), fTrail, candidate.kind)
+                            continue
+                        elif isOtherCandidate:
                             nIgnored += 1
                             continue
-                        resultTmp  += "  --> Unclaimed: %s\n" % (color(str(foundTrails[iClaim]), 'yellow'))
+                        else:
+                            tag = "Unclaimed"
+                        resultTmp  += "  --> %s: %s\n" % (tag, color(str(foundTrails[iClaim]), 'yellow'))
                         eList.append(Event(False, True))
                 if nUnclaimed > nIgnored:
-                    resultMsg += "\n  %s: %d Unclaimed trails (total=%d).\n" % \
-                              (color("FALSE-POS", "red"), nUnclaimed, nTrail)
+                    resultMsg += "\n  %s: %d Unclaimed trails (total=%d) (%s).\n" % \
+                              (color("FALSE-POS", "red"), nUnclaimed, nTrail, candidate.kind)
                     resultMsg += resultTmp
 
                 
