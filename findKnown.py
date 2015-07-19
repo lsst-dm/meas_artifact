@@ -574,11 +574,15 @@ knownCandidates = [
     
 ]
 
-if False:
+if True:
     knownCandidates = [
+        Candidate("satellite",  242, 95, satTrail.SatelliteTrail(r=1497.8, theta=1.245, width=21.12)),
+        Candidate("satellite",   270, 78, satTrail.SatelliteTrail(r=1195.6,theta=5.871,width=14.58)),
         Candidate("aircraft",  1166, 65, satTrail.SatelliteTrail(r= 791.9, theta=6.058, width=22.55)),
+        Candidate("satellite",1168,47    ,satTrail.SatelliteTrail(r=2492.4,theta=1.431,width=13.12  )),
+        Candidate("meteor",    1184, 78    ,satTrail.SatelliteTrail(r=2221.4,theta=0.845,width=18.69  )),
         Candidate("satellite", 1236, 65, satTrail.SatelliteTrail(r=1580.0, theta=0.286, width= 7.94)),    
-        Candidate("empty",     1236, 50, None),
+        #Candidate("empty",     1236, 50, None),
     ]
     
 if False:

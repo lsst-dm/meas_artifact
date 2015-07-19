@@ -226,20 +226,24 @@ class PValuePixelSelector(PixelSelector):
             n += 1
             val = self._test(limit)
             neg2logp += val
-
         logp = -0.5*neg2logp
 
+        thresh1 = self.thresh or -0.5*n
+        ret = logp > thresh1
+        
+        #print "Thresh", thresh1, ret.size, ret.sum()
         if False:
             fig = figure.Figure()
             can = FigCanvas(fig)
             ax = fig.add_subplot(111)
-            qq = logp.ravel()
-            ax.hist(qq, bins=200, range=(-2*0.5*n, 0), edgecolor='none')
+            #ax.hist(qq, bins=200, range=(-2*0.5*n, 0), edgecolor='none')
+            dat = self.momentManager.sumI
+            ax.plot(dat, logp, 'k.')
+            ax.plot(dat[ret], logp[ret], 'r.')
+            ax.set_xlim([0, 10.0])
             fig.savefig('phist.png')
             self.done.append(limit.name)
 
-        thresh1 = self.thresh or -0.5*n
-        ret = logp > thresh1
         if maxPixels:
             nth = 1.0*maxPixels/logp.size
             if ret.sum() > maxPixels:

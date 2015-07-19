@@ -199,11 +199,11 @@ class SatelliteFinder(object):
             mmCals.append(mmCal)
 
             maxFactors   = 10.0, 20.0, 500.0
-            luminFactors = 1.0,  10.0,   2.0
+            luminFactors = self.luminosityLimit*rms,  10.0,  20.0
             scaleFactors = 1.0,   2.0,   3.0
             
-            sumI  = momCalc.MomentLimit('sumI',        self.luminosityLimit*rms, 'lower')
-            lumX  = momCalc.MomentLimit('sumI',        self.luminosityLimit*rms, 'upper')
+            sumI  = momCalc.MomentLimit('sumI',        self.luminosityLimit*rms, 'lower')  #dummy value
+            lumX  = momCalc.MomentLimit('sumI',        self.luminosityLimit*rms, 'upper')  #dummy value
             cent  = momCalc.MomentLimit('center',      2.0*self.centerLimit,     'center')
             centP = momCalc.MomentLimit('center_perp', self.centerLimit,         'center')
             skew  = momCalc.MomentLimit('skew',        2.0*self.skewLimit,       'center')
@@ -212,14 +212,14 @@ class SatelliteFinder(object):
             b     = momCalc.MomentLimit('b',           self.bLimit,              'center')
 
             selector = Selector(mm, mmCal)
-            for limit in sumI,  cent, centP, skew, skewP, ellip, b:
+            for limit in ellip, sumI, cent, centP, skew, skewP, b: #, lumX:
                 selector.append(limit)
 
             isCand = np.zeros(img.shape, dtype=bool)
             pixelSums = []
             for maxFact, luminFact, scaleFact in zip(maxFactors, luminFactors, scaleFactors):
-                sumI.norm  *= luminFact
-                lumX.norm   = maxFact*self.luminosityLimit*rms
+                sumI.norm   = luminFact
+                lumX.norm   = maxFact
                 cent.norm  /= scaleFact
                 centP.norm /= scaleFact
                 skew.norm  /= scaleFact
@@ -235,9 +235,10 @@ class SatelliteFinder(object):
             if True:
                 selector = Selector(mm_faint, mmCal)
                 sumI    = momCalc.MomentLimit('sumI',        3.0*rms,                  'lower')
+                lumX    = momCalc.MomentLimit('sumI',        5.0*rms,                  'upper')
                 cent    = momCalc.MomentLimit('center',      2.0*self.centerLimit,     'center')
                 skew    = momCalc.MomentLimit('skew',        2.0*self.skewLimit,       'center')
-                ellipLo = momCalc.MomentLimit('ellip',       0.05,                     'lower')
+                ellipLo = momCalc.MomentLimit('ellip',       0.10,                     'lower')
                 ellipHi = momCalc.MomentLimit('ellip',       0.90,                     'upper')
                 for limit in sumI, cent, skew, ellipHi, ellipLo:
                     selector.append(limit)
@@ -245,7 +246,9 @@ class SatelliteFinder(object):
                 faintPixels  = selector.getPixels(maxPixels=maxPixels) & (msk & (MASK | DET)==0)
                 isCand |= faintPixels
                 pixelSums.append(faintPixels.sum())
-
+            else:
+                pixelSums.append(0)
+                
             isCandidate |= isCand
             
             msg = "Candidates: nPix/med/bri = %d/ %d/ %d   faint: %d  totals: %d/ %d" % (
@@ -261,7 +264,7 @@ class SatelliteFinder(object):
 
         nBeforeAlignment = isCandidate.sum()
         thetaMatch, newTheta = hough.thetaAlignment(mm.theta[isCandidate],xx[isCandidate],yy[isCandidate],
-                                                    limit=4)
+                                                    limit=5)
 
         mm.theta[isCandidate] = newTheta
         isCandidate[isCandidate] = thetaMatch
@@ -273,7 +276,7 @@ class SatelliteFinder(object):
         #################################################
         rMax           = sum([q**2 for q in img.shape])**0.5
         houghTransform = hough.HoughTransform(self.houghBins, self.houghThresh,
-                                              rMax=rMax, maxPoints=1000, nIter=0, maxResid=4.0)
+                                              rMax=rMax, maxPoints=1000, nIter=0, maxResid=4.5)
         solutions      = houghTransform(mm.theta[isCandidate], xx[isCandidate], yy[isCandidate])
 
         #################################################

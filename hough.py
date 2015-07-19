@@ -130,7 +130,7 @@ def thetaAlignment(theta, x, y, limit=3, tolerance=0.19):
         idx        = np.argsort(pixelTheta)
         diff       = np.diff(pixelTheta[idx])
         didx       = (diff < closeNeighbourTolerance[i])
-        
+
         # how many collisions do we actually have?
         nNearNeighbours[i]      = didx.sum()
 
