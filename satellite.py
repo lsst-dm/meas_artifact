@@ -66,20 +66,25 @@ class SatelliteFinder(object):
         self.debugInfo = {}
 
 
-    def _makeCalibrationImage(self, psfSigma, width):
+    def _makeCalibrationImage(self, psfSigma, width, kernelWidth=None, kernelSigma=None):
         """Make a fake satellite trail with the PSF to calibrate moments we measure.
 
         @param psfSigma       Gaussian sigma for a double-Gaussian PSF model (in pixels)
         @param width          Width of the trail in pixels (0.0 for PSF alone, but wider for aircraft trails)
-
+        @param kernelWidth
+        @param kernelSigma
+        
         @return calImg        An afwImage containing a fake satellite/aircraft trail
         """
 
+        kernelWidth = kernelWidth or self.kernelWidth
+        kernelSigma = kernelSigma or self.kernelSigma
+        
         # tricky.  We have to make a fake trail so it's just like one in the real image
 
         # To get the binning right, we start with an image 'bins'-times too big
-        cx, cy   = (self.bins*self.kernelWidth)//2 - 0.5, 0
-        calImg   = afwImage.ImageF(self.bins*self.kernelWidth, self.bins*self.kernelWidth)
+        cx, cy   = (self.bins*kernelWidth)//2 - 0.5, 0
+        calImg   = afwImage.ImageF(self.bins*kernelWidth, self.bins*kernelWidth)
         calArr   = calImg.getArray()
 
         # Make a trail with the requested (unbinned) width
@@ -156,7 +161,7 @@ class SatelliteFinder(object):
 
         # subtract a small scale background when we search for PSFs
         if np.abs(widths[0]) < 1.1:
-            back       = satUtil.medianRing(img_faint, 20.0, 2.0*self.sigmaSmooth)
+            back       = satUtil.medianRing(img_faint, self.kernelWidth, 2.0*self.sigmaSmooth)
             img       -= back
             img_faint -= back
         
@@ -166,105 +171,120 @@ class SatelliteFinder(object):
 
         
         rms = img_faint[(msk_faint & (MASK | DET) == 0)].std()
-        
-        #################################################
-        # Calibration images
-        #################################################
-        calImages = []
-        for width in widths:
-            calImages.append(self._makeCalibrationImage(psfSigma, width))
 
-        
-        ################################################
-        #
-        # Moments
-        #
-        #################################################
-        xx, yy = np.meshgrid(np.arange(img.shape[1], dtype=int), np.arange(img.shape[0], dtype=int))
-        
-        mm       = momCalc.MomentManager(img, kernelWidth=self.kernelWidth, kernelSigma=self.kernelSigma)
-        mm_faint = momCalc.MomentManager(img_faint, kernelWidth=self.kernelWidth, kernelSigma=self.kernelSigma)
+        isCandidate = np.ones(img.shape, dtype=bool)
 
-        isCandidate = np.zeros(img.shape, dtype=bool)
-                
-        mmCals = []
-        nHits = []
-        
-        #Selector = momCalc.PixelSelector
-        Selector = momCalc.PValuePixelSelector
-        maxPixels = 1000
-        for i, calImg in enumerate(calImages):
-            mmCal = momCalc.MomentManager(calImg, kernelWidth=self.kernelWidth, kernelSigma=self.kernelSigma, 
-                                          isCalibration=True)
-            mmCals.append(mmCal)
+        # Different sized kernels should give the same results for a real trail
+        # but would be less likely to for noise.
+        # Unfortunately, this is costly, and the effect is small.
+        for kernelFactor in (1,):
+            kernelWidth = kernelFactor*self.kernelWidth
+            kernelSigma = kernelFactor*self.kernelSigma
 
-            maxFactors   = 10.0, 20.0, 500.0
-            luminFactors = self.luminosityLimit*rms,  10.0,  20.0
-            scaleFactors = 1.0,   2.0,   3.0
+
+            isKernelCandidate = np.zeros(img.shape, dtype=bool)
+        
             
-            sumI  = momCalc.MomentLimit('sumI',        self.luminosityLimit*rms, 'lower')  #dummy value
-            lumX  = momCalc.MomentLimit('sumI',        self.luminosityLimit*rms, 'upper')  #dummy value
-            cent  = momCalc.MomentLimit('center',      2.0*self.centerLimit,     'center')
-            centP = momCalc.MomentLimit('center_perp', self.centerLimit,         'center')
-            skew  = momCalc.MomentLimit('skew',        2.0*self.skewLimit,       'center')
-            skewP = momCalc.MomentLimit('skew_perp',   self.skewLimit,           'center')
-            ellip = momCalc.MomentLimit('ellip',       self.eRange,              'center')
-            b     = momCalc.MomentLimit('b',           self.bLimit,              'center')
+            #################################################
+            # Calibration images
+            #################################################
+            calImages = []
+            for width in widths:
+                calImages.append(self._makeCalibrationImage(psfSigma, width,
+                                                            kernelWidth=kernelWidth, kernelSigma=kernelSigma))
 
-            selector = Selector(mm, mmCal)
-            for limit in ellip, sumI, cent, centP, skew, skewP, b: #, lumX:
-                selector.append(limit)
 
-            isCand = np.zeros(img.shape, dtype=bool)
-            pixelSums = []
-            for maxFact, luminFact, scaleFact in zip(maxFactors, luminFactors, scaleFactors):
-                sumI.norm   = luminFact
-                lumX.norm   = maxFact
-                cent.norm  /= scaleFact
-                centP.norm /= scaleFact
-                skew.norm  /= scaleFact
-                skewP.norm /= scaleFact
-                ellip.norm *= scaleFact
-                b.norm     *= scaleFact
-                
-                pixels      = selector.getPixels(maxPixels=maxPixels)
-                isCand |= pixels
-                pixelSums.append(pixels.sum())
+            ################################################
+            #
+            # Moments
+            #
+            #################################################
+            xx, yy = np.meshgrid(np.arange(img.shape[1], dtype=int), np.arange(img.shape[0], dtype=int))
 
-                
-            if True:
-                selector = Selector(mm_faint, mmCal)
-                sumI    = momCalc.MomentLimit('sumI',        3.0*rms,                  'lower')
-                lumX    = momCalc.MomentLimit('sumI',        5.0*rms,                  'upper')
-                cent    = momCalc.MomentLimit('center',      2.0*self.centerLimit,     'center')
-                skew    = momCalc.MomentLimit('skew',        2.0*self.skewLimit,       'center')
-                ellipLo = momCalc.MomentLimit('ellip',       0.10,                     'lower')
-                ellipHi = momCalc.MomentLimit('ellip',       0.90,                     'upper')
-                for limit in sumI, cent, skew, ellipHi, ellipLo:
+            mm       = momCalc.MomentManager(img, kernelWidth=self.kernelWidth, kernelSigma=self.kernelSigma)
+            mm_faint = momCalc.MomentManager(img_faint, kernelWidth=self.kernelWidth, kernelSigma=self.kernelSigma)
+
+            mmCals = []
+            nHits = []
+
+            #Selector = momCalc.PixelSelector
+            Selector = momCalc.PValuePixelSelector
+            maxPixels = 1000
+            for i, calImg in enumerate(calImages):
+                mmCal = momCalc.MomentManager(calImg, kernelWidth=self.kernelWidth, kernelSigma=self.kernelSigma, 
+                                              isCalibration=True)
+                mmCals.append(mmCal)
+
+                maxFactors   = 10.0, 20.0, 500.0
+                luminFactors = self.luminosityLimit*rms,  10.0,  20.0
+                scaleFactors = 1.0,   2.0,   3.0
+
+                sumI  = momCalc.MomentLimit('sumI',        self.luminosityLimit*rms, 'lower')  #dummy value
+                lumX  = momCalc.MomentLimit('sumI',        self.luminosityLimit*rms, 'upper')  #dummy value
+                cent  = momCalc.MomentLimit('center',      2.0*self.centerLimit,     'center')
+                centP = momCalc.MomentLimit('center_perp', self.centerLimit,         'center')
+                skew  = momCalc.MomentLimit('skew',        2.0*self.skewLimit,       'center')
+                skewP = momCalc.MomentLimit('skew_perp',   self.skewLimit,           'center')
+                ellip = momCalc.MomentLimit('ellip',       self.eRange,              'center')
+                b     = momCalc.MomentLimit('b',           self.bLimit,              'center')
+
+                selector = Selector(mm, mmCal)
+                for limit in ellip, sumI, cent, centP, skew, skewP, b: #, lumX:
                     selector.append(limit)
-                    
-                faintPixels  = selector.getPixels(maxPixels=maxPixels) & (msk & (MASK | DET)==0)
-                isCand |= faintPixels
-                pixelSums.append(faintPixels.sum())
-            else:
-                pixelSums.append(0)
+
+                isCand = np.zeros(img.shape, dtype=bool)
+                pixelSums = []
+                for maxFact, luminFact, scaleFact in zip(maxFactors, luminFactors, scaleFactors):
+                    sumI.norm   = luminFact
+                    lumX.norm   = maxFact
+                    cent.norm  /= scaleFact
+                    centP.norm /= scaleFact
+                    skew.norm  /= scaleFact
+                    skewP.norm /= scaleFact
+                    ellip.norm *= scaleFact
+                    b.norm     *= scaleFact
+
+                    pixels      = selector.getPixels(maxPixels=maxPixels)
+                    isCand |= pixels
+                    pixelSums.append(pixels.sum())
+
+
+                if True:
+                    selector = Selector(mm_faint, mmCal)
+                    sumI    = momCalc.MomentLimit('sumI',        3.0*rms,                  'lower')
+                    lumX    = momCalc.MomentLimit('sumI',        5.0*rms,                  'upper')
+                    cent    = momCalc.MomentLimit('center',      2.0*self.centerLimit,     'center')
+                    skew    = momCalc.MomentLimit('skew',        2.0*self.skewLimit,       'center')
+                    ellipLo = momCalc.MomentLimit('ellip',       0.10,                     'lower')
+                    ellipHi = momCalc.MomentLimit('ellip',       0.90,                     'upper')
+                    for limit in sumI, cent, skew, ellipHi, ellipLo:
+                        selector.append(limit)
+
+                    faintPixels  = selector.getPixels(maxPixels=maxPixels) & (msk & (MASK | DET)==0)
+                    isCand |= faintPixels
+                    pixelSums.append(faintPixels.sum())
+                else:
+                    pixelSums.append(0)
+
+                isKernelCandidate |= isCand
                 
-            isCandidate |= isCand
-            
+            isCandidate &= isKernelCandidate
+
             msg = "Candidates: nPix/med/bri = %d/ %d/ %d   faint: %d  totals: %d/ %d" % (
                 pixelSums[0], pixelSums[1], pixelSums[2], pixelSums[3],
                 isCand.sum(), isCandidate.sum()
             )
             self.log.logdebug(msg)
-                
+
             nHits.append((widths[i], isCand.sum()))
         
         bestCal = sorted(nHits, key=lambda x: x[1], reverse=True)[0]
         bestWidth = bestCal[0]
 
         nBeforeAlignment = isCandidate.sum()
+        maxSeparation = min([x/2 for x in img.shape])
         thetaMatch, newTheta = hough.thetaAlignment(mm.theta[isCandidate],xx[isCandidate],yy[isCandidate],
-                                                    limit=5)
+                                                    limit=4, maxSeparation=maxSeparation)
 
         mm.theta[isCandidate] = newTheta
         isCandidate[isCandidate] = thetaMatch
@@ -288,8 +308,11 @@ class SatelliteFinder(object):
             trail.measure(exp, bins=self.bins)
             # last chance to drop it
             if trail.width < self.maxTrailWidth:
+                self.log.info(str(trail))
                 trails.append(trail)
-
+            else:
+                self.log.info("Dropping (maxWidth>%.1f): %s" %(self.maxTrailWidth, trail))
+                
         self._mm           = mm
         self._mmCals       = mmCals
         self._isCandidate  = isCandidate

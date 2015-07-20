@@ -68,7 +68,7 @@ def twoPiOverlap(theta_in, arrays=None, overlapRange=0.2):
 
 
 
-def thetaAlignment(theta, x, y, limit=3, tolerance=0.19):
+def thetaAlignment(theta, x, y, limit=3, tolerance=0.19, maxSeparation=None):
     """A helper function to cull the candidate points.
 
     @param theta      ndarray of thetas
@@ -103,15 +103,22 @@ def thetaAlignment(theta, x, y, limit=3, tolerance=0.19):
     
     n = len(theta)
 
-    dydx      = np.subtract.outer(y, y)/(np.subtract.outer(x, x) + 0.01)
+    dx        = np.subtract.outer(x, x)
+    dy        = np.subtract.outer(y, y)
+    dydx      = dy/(dx + 0.01)
     # we could call arctan(dydx) here but it's very expensive.
     # We faster if we instead convert our tolerance to test dydx directly.
     tanTheta  = np.tan(theta)
     dTanTheta = tolerance*(1.0 + tanTheta**2)
     aligned1  = np.abs((dydx - tanTheta)/dTanTheta) < 1.0
     aligned2  = np.abs((dydx.transpose() - tanTheta).transpose()/dTanTheta) < 1.0
-    aligned   = aligned1 & aligned2
-
+    if maxSeparation:
+        dist      = dx**2 + dy**2
+        closish   = dist < maxSeparation**2
+        aligned   = aligned1 & aligned2 & closish
+    else:
+        aligned   = aligned1 & aligned2
+        
     nNearNeighbours = np.zeros(n)
     newThetas = copy.copy(theta)
     
@@ -121,6 +128,7 @@ def thetaAlignment(theta, x, y, limit=3, tolerance=0.19):
     phi                     = -0.5*np.log(pZeroCloseNeighbour)
 
     nCand = aligned.sum(axis=1)
+    nCand[nCand == 0] = 1
     closeNeighbourTolerance = phi*tolerance/nCand
 
     cut = max(limit, 2)

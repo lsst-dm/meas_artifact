@@ -228,7 +228,12 @@ class PValuePixelSelector(PixelSelector):
             neg2logp += val
         logp = -0.5*neg2logp
 
-        thresh1 = self.thresh or -0.5*n
+        # logp = -z**2/2 is contributed by each parameter considered
+        # So to keep n-sigma points use:
+        # 1-sigma:    0.5   # 67% of real candidates accepted
+        # 0.7-sigma:  0.25  # 52% accepted
+        # 0.5-sigma:  0.125 # 38% accepted
+        thresh1 = self.thresh or -0.125*n #-0.5*n
         ret = logp > thresh1
         
         #print "Thresh", thresh1, ret.size, ret.sum()

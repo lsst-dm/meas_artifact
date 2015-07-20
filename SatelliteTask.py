@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import os, math, collections, time
+import sys, os, math, collections, time
 import lsst.afw.cameraGeom as afwCg
 import lsst.pipe.base as pipeBase
 import lsst.pex.config as pexConfig
@@ -56,17 +56,27 @@ class SatelliteTask(pipeBase.CmdLineTask):
 
         t0 = time.time()
 
+        coord1, coord2 = False, False 
+        
         # run for regular satellites
         trailsSat = self.runSatellite(exposure, bins=4)
         if dbg:
             self.log.info("DEBUGGING: Now plotting SATELLITE detections.")
+            if coord1:
+                filename = os.path.join(path,"coord-%05d-%03d.png" % (v,c))
+                satDebug.coordPlot(exposure, self.finder, filename)
+                sys.exit()
             filename = os.path.join(path,"satdebug-%05d-%03d.png" % (v, c))
             satDebug.debugPlot(self.finder, filename)
-
+            
         # run for broad linear (aircraft?) features by binning
         trailsAc = self.runSatellite(exposure, bins=4, broadTrail=True)
         if dbg:
             self.log.info("DEBUGGING: Now plotting AIRCRAFT detections.")
+            if coord2:
+                filename = os.path.join(path,"coord-%05d-%03d.png" % (v,c))
+                satDebug.coordPlot(exposure, self.finder, filename)
+                sys.exit()
             filename = os.path.join(path,"acdebug-%05d-%03d.png" % (v, c))
             satDebug.debugPlot(self.finder, filename)
 
@@ -108,8 +118,8 @@ class SatelliteTask(pipeBase.CmdLineTask):
             houghBins       = 256           # number of r,theta bins (i.e. 256x256)
             kernelSigma     = 21            # pixels
             kernelWidth     = 41           # pixels
-            widths          = [40.0, 80.0, 120]  # width of an out of focus aircraft (unbinned)
-            houghThresh     = 80            # counts in a r,theta bins
+            widths          = [40.0, 70.0, 100]  # width of an out of focus aircraft (unbinned)
+            houghThresh     = 40            # counts in a r,theta bins
             skewLimit       = 120.0
             bLimit          = 1.0
             maxTrailWidth   = 35.0
@@ -117,15 +127,15 @@ class SatelliteTask(pipeBase.CmdLineTask):
             luminosityLimit = 0.05   # low cut on pixel flux
             luminosityMax   = 4.0e2 # max luminsity for pixel flux
             maskNPsfSigma   = 7.0
-            centerLimit     = 0.5  # about 1 pixel
-            eRange          = 0.02  # about +/- 0.1
+            centerLimit     = 0.8  # about 1 pixel
+            eRange          = 0.04  # about +/- 0.1
             houghBins       = 256   # number of r,theta bins (i.e. 256x256)
             kernelSigma     = 9   # pixels
             kernelWidth     = 17   # pixels
             widths          = [1.0, 10.0]
-            houghThresh     = 80    # counts in a r,theta bins
+            houghThresh     = 40    # counts in a r,theta bins
             skewLimit       = 20.0
-            bLimit          = 0.6
+            bLimit          = 0.8
             maxTrailWidth   = 30.0
 
         self.finder = satell.SatelliteFinder(

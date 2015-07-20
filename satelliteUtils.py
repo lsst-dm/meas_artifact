@@ -61,7 +61,7 @@ def smooth(img, sigma):
 
 def medianRing(img, radius, width):
 
-    k = 2.0*int(radius + width) + 1
+    k = 2*int(radius + width) + 1
     ring = np.zeros((k,k), dtype=bool)
     a = np.arange(k) - k//2
     x, y = np.meshgrid(a, a)

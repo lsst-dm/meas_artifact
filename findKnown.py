@@ -49,6 +49,8 @@ class Candidate(object):
         self.trail = trail
 
     def __eq__(self, other):
+        if (self.trail is None) or (other.trail is None):
+            return False
         return (np.abs(self.trail.r - other.trail.r) < 0.01) and \
             (np.abs(self.trail.theta - other.trail.theta) < 0.01)
 
@@ -574,23 +576,22 @@ knownCandidates = [
     
 ]
 
-if True:
-    knownCandidates = [
-        Candidate("satellite",  242, 95, satTrail.SatelliteTrail(r=1497.8, theta=1.245, width=21.12)),
-        Candidate("satellite",   270, 78, satTrail.SatelliteTrail(r=1195.6,theta=5.871,width=14.58)),
-        Candidate("aircraft",  1166, 65, satTrail.SatelliteTrail(r= 791.9, theta=6.058, width=22.55)),
-        Candidate("satellite",1168,47    ,satTrail.SatelliteTrail(r=2492.4,theta=1.431,width=13.12  )),
-        Candidate("meteor",    1184, 78    ,satTrail.SatelliteTrail(r=2221.4,theta=0.845,width=18.69  )),
-        Candidate("satellite", 1236, 65, satTrail.SatelliteTrail(r=1580.0, theta=0.286, width= 7.94)),    
-        #Candidate("empty",     1236, 50, None),
-    ]
+shortCandidates = [
+    Candidate("satellite",  242, 95, satTrail.SatelliteTrail(r=1497.8, theta=1.245, width=21.12)),
+    Candidate("satellite",   270, 78, satTrail.SatelliteTrail(r=1195.6,theta=5.871,width=14.58)),
+    Candidate("aircraft",  1166, 65, satTrail.SatelliteTrail(r= 791.9, theta=6.058, width=22.55)),
+    Candidate("satellite",1168,47    ,satTrail.SatelliteTrail(r=2492.4,theta=1.431,width=13.12  )),
+    Candidate("meteor",    1184, 78    ,satTrail.SatelliteTrail(r=2221.4,theta=0.845,width=18.69  )),
+    Candidate("satellite", 1236, 65, satTrail.SatelliteTrail(r=1580.0, theta=0.286, width= 7.94)),    
+    #Candidate("empty",     1236, 50, None),
+]
+
+
+candidateSets = {
+    'all'   : knownCandidates,
+    'short' : shortCandidates,
+}
     
-if False:
-    knownCandidates = [
-        Candidate("empty", 1236, 50, None),
-    ]
-
-
 
 def hashDataId(dataId):
     return "%04d-%03d" % (int(dataId['visit']), int(dataId['ccd']))
@@ -655,8 +656,11 @@ class EventList(list):
 
 
         
-def main(root, threads, output, input=None, kind=None, visit=None):
+def main(root, threads, output, input=None, kind=None, visit=None, candidateSet=None):
 
+    if not candidateSet:
+        candidateSet = knownCandidates
+        
     butler       = dafPersist.Butler(root)
     rMax, thetaMax = 50.0, 0.15
         
@@ -673,7 +677,7 @@ def main(root, threads, output, input=None, kind=None, visit=None):
     nMasked['all'] = 0
 
     candidateLookup = collections.defaultdict(list)
-    for candidate in knownCandidates:
+    for candidate in candidateSet:
         did = {'visit': candidate.visit, 'ccd':candidate.ccd }
         candidateLookup[hashDataId(did)].append( candidate )
 
@@ -683,9 +687,9 @@ def main(root, threads, output, input=None, kind=None, visit=None):
     if input is None:
         mp = mapr.MapFunc(threads, process)
         alreadyProcessing = set()
-        for candidate in knownCandidates:
-            rightKind  = kind  is None or candidate.kind == kind
-            rightVisit = visit is None or candidate.visit == visit
+        for candidate in candidateSet:
+            rightKind  = kind  is None or (candidate.kind in kind)
+            rightVisit = visit is None or (candidate.visit in visit)
             if rightKind and rightVisit and (candidate.visit,candidate.ccd) not in alreadyProcessing:
                 dataId       = {'visit': candidate.visit, 'ccd': candidate.ccd}
                 dataRef      = hscButler.getDataRef(butler, dataId)
@@ -748,7 +752,7 @@ def main(root, threads, output, input=None, kind=None, visit=None):
                         for cand in candidateLookup[dataHash]:
                             if cand == candidate:
                                 continue
-                            if foundTrails[iClaim].isNear(cand.trail, rMax,thetaMax):
+                            if cand.trail and foundTrails[iClaim].isNear(cand.trail, rMax,thetaMax):
                                 isOtherCandidate=True
                         if isNegative:
                             tag = "Known-bad"
@@ -807,11 +811,12 @@ def main(root, threads, output, input=None, kind=None, visit=None):
             print "No events."
             continue
         nPos = eventList.positiveDetections or 1
+        print "TP=%d, TN=%d, FP=%d, FN=%d" % (eventList.truePositives, eventList.trueNegatives,
+                                              eventList.falsePositives, eventList.falseNegatives)
         print "Recall,precision,f1:  %4.2f %4.2f  %4.2f"%(eventList.recall, eventList.precision, eventList.f1)
         print "Masked pixels: %10d" % (nMasked[kind]), \
             " (all: n = %d, %.2f%%)" % (len(eventList),100.0*nMasked[kind]/(len(eventList)*2048*4096)), \
             " (det: n = %d, %.2f%%)" % (eventList.positiveDetections,100.0*nMasked[kind]/(nPos*2048*4096))
-        print "\n"
 
     rt = np.array(runtimes)
     print "Runtimes:   mean=%.2f  med=%.2f  std=%.2f  min=%.2f  max=%.2f\n" % \
@@ -821,14 +826,21 @@ def main(root, threads, output, input=None, kind=None, visit=None):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("root")
+    parser.add_argument("-c", "--candidates", choices=("all", "short"), default='all',
+                        help="Candidate set to use.")
     parser.add_argument("-j", "--threads", type=int, default=1, help="Number of threads to use")
-    parser.add_argument("-k", "--kind", choices=Candidate.validKinds, help="Specify kind to run.")
-    parser.add_argument("-v", "--visit", type=int, default=None, help="Specify visit to run")
+    parser.add_argument("-k", "--kind", default=None, help="Specify kind to run.")
+    parser.add_argument("-v", "--visit", default=None, help="Specify visit to run")
     parser.add_argument("-o", "--output", default="known.pickle")
     parser.add_argument("-i", "--input", default=None)
     args = parser.parse_args()
-    
+
+    if args.kind:
+        args.kind = args.kind.split("^")
+    if args.visit:
+        args.visit = [int(x) for x in args.visit.split("^")]
     if args.output == 'None':
         args.output = None
         
-    main(args.root, args.threads, args.output, args.input, kind=args.kind, visit=args.visit)
+    main(args.root, args.threads, args.output, args.input, kind=args.kind, visit=args.visit,
+         candidateSet=candidateSets[args.candidates])

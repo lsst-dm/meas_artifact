@@ -1,6 +1,6 @@
 
 import datetime
-
+import re
 import numpy as np
 
 import matplotlib.pyplot as plt
@@ -18,7 +18,65 @@ dr = 100
 dt = 0.2
 py, px = 2, 4
 
-        
+
+def coordPlot(exposure, finder, pngfile):
+
+    mm = finder._mm
+    cmm = finder._mmCals
+    img = exposure.getMaskedImage().getImage().getArray()
+    bins = 1.0*img.shape[1]/mm.img.shape[1]
+    xx, yy = np.meshgrid(np.arange(mm.img.shape[1], dtype=int), np.arange(mm.img.shape[0], dtype=int))
+    x = (bins*xx[finder._isCandidate]).astype(int)
+    y = (bins*yy[finder._isCandidate]).astype(int)
+
+    cimg = np.zeros(img.shape)
+    cimg[y,x] = 1.0
+
+
+    def small(ax):
+        for t in ax.get_xticklabels() + ax.get_yticklabels():
+            t.set_size("small")
+            
+    fig = figure.Figure(figsize=(8.0,4.0))
+    fig.subplots_adjust(bottom=0.15)
+    can = FigCanvas(fig)
+    
+    ax = fig.add_subplot(1, 3, 1)
+    ax.imshow(np.arcsinh(img), origin='lower', cmap='gray')
+    ax.set_xlim([0, img.shape[1]])
+    ax.set_ylim([0, img.shape[0]])
+    small(ax)
+    
+    ax = fig.add_subplot(1, 3, 3)
+    stride = 1
+    #ax.plot(mm.theta[::stride], mm.ellip[::stride], '.k', ms=0.2, alpha=0.2)
+    ax.scatter(mm.theta[::stride], mm.ellip[::stride],
+               c=np.clip(mm.center[::stride], 0.0, 4.0*finder.centerLimit),
+               s=0.2, alpha=0.2, edgecolor='none')
+    if len(cmm) == 2:
+        i = 0
+    else:
+        i = 2
+    ax.hlines([cmm[i].ellip], -np.pi/2.0, np.pi/2.0, color='k', linestyle='-')
+    ax.set_xlim([-np.pi/2.0, np.pi/2.0])
+    ax.set_ylim([0.0, 1.0])
+    ax.set_xlabel("$\\theta$")
+    ax.set_ylabel("$e=1-B/A$")
+    ax.yaxis.set_label_position("right")
+    ax.yaxis.tick_right()
+    small(ax)
+    
+    ax = fig.add_subplot(1, 3, 2)
+    ax.imshow(cimg, origin='lower', cmap='gray_r')
+    ax.plot(x, y, 'k.', ms=1.0)
+    ax.set_xlim([0, img.shape[1]])
+    ax.set_ylim([0, img.shape[0]])
+    small(ax)
+    
+    fig.savefig(pngfile)
+    fig.savefig(re.sub("png", "eps", pngfile))
+    
+
 def debugPlot(finder, pngfile):
 
     mm     = finder._mm

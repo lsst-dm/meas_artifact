@@ -86,10 +86,8 @@ class ConstantProfile(object):
         self.value = value
         self.width = width
     def __call__(self, offset):
-        w  = (offset < self.width/2)
-        out = np.zeros(offset.shape, dtype=type(self.value))
-        out[w] = self.value
-        return out
+        w  = (offset < self.width/2.0).astype(type(self.value))
+        return self.value*w
         
 class DoubleGaussianProfile(object):
     def __init__(self, flux, sigma, fWing=0.1):
@@ -97,13 +95,17 @@ class DoubleGaussianProfile(object):
         self.sigma = sigma
         self.fWing = fWing
         self.fCore = 1.0 - fWing
+        self.A1  = 1.0/(2.0*np.pi*self.sigma**2)
+        self.A2  = 1.0/(2.0*np.pi*(2.0*self.sigma)**2)
+        self.coef1 = self.flux*self.fCore*self.A1
+        self.coef2 = self.flux*self.fWing*self.A2
+        self.twoSigma2Core = 2.0*self.sigma**2
+        self.twoSigma2Wing = 2.0*(2.0*self.sigma)**2
         
     def __call__(self, offset):
-        A1  = 1.0/(2.0*np.pi*self.sigma**2)
-        g1  = np.exp(-offset**2/(2.0*self.sigma**2))
-        A2  = 1.0/(2.0*np.pi*(2.0*self.sigma)**2)
-        g2  = np.exp(-offset**2/(2.0*(2.0*self.sigma)**2))
-        out = self.flux*(self.fCore*A1*g1 + self.fWing*A2*g2)
+        g1  = np.exp(-offset**2/self.twoSigma2Core)
+        g2  = np.exp(-offset**2/self.twoSigma2Wing)
+        out = self.coef1*g1 + self.coef2*g2
         return out
 
         
@@ -237,15 +239,16 @@ class SatelliteTrail(object):
         #############################
         # plant the trail
         #############################
-        xx, yy = np.meshgrid(np.arange(nx), np.arange(ny))
+        xpart, ypart = np.arange(nx)*self.vx, np.arange(ny)*self.vy
+        dot = np.add.outer(ypart, xpart)
 
         # plant the trail using the distance from our line
         # as the parameter in a 1D DoubleGaussian
-        dot    = xx*self.vx + yy*self.vy
         offset = np.abs(dot - self.r)
 
         # only bother updating the pixels within 5-sigma of the line
-        w = (offset < width/2)
+        w = (offset < width/2.0)
+        #img += profile(offset)
         img[w] += profile(offset[w])
         return img
 
