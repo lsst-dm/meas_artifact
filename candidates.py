@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import numpy as np
 import satelliteTrail as satTrail
 
 class Candidate(object):
@@ -60,6 +61,7 @@ knownCandidates = [
     Candidate("satellite",  248, 46, satTrail.SatelliteTrail(r=1885.1,theta=6.274,width=28.09)),
 
     # 258
+    Candidate("diffraction", 258, 76, satTrail.SatelliteTrail(r=2478.1,theta=1.572,width=32.32)),
     Candidate("satellite",  258, 98, satTrail.SatelliteTrail(r=197.5,  theta=6.199, width=23.45)),
     Candidate("satellite",  258, 99, satTrail.SatelliteTrail(r=574.0,  theta=6.219, width=18.70)),
 
@@ -69,6 +71,7 @@ knownCandidates = [
     Candidate("satellite",  260, 27, satTrail.SatelliteTrail(r=2508.0,theta=0.295,width=22.08)),
     Candidate("satellite",  260, 28, satTrail.SatelliteTrail(r=1205.4,theta=0.286,width=14.95)),
     Candidate("satellite",  260, 37, satTrail.SatelliteTrail(r=1988.3,theta=0.275,width=15.49)),
+    Candidate("diffraction", 260, 48,satTrail.SatelliteTrail(r=813.1,theta=1.576,width=27.98)),
     Candidate("satellite",  260, 96, satTrail.SatelliteTrail(r=42.4,theta=3.021,width=16.26)),
     Candidate("scattered",  260, 98, None),
 
@@ -162,6 +165,7 @@ knownCandidates = [
     Candidate("satellite",   272, 88, satTrail.SatelliteTrail(r=2125.4,theta=0.302,width=30.69)),
     Candidate("satellite",   272, 89, satTrail.SatelliteTrail(r=792.1,theta=0.310,width=18.53 )),
     Candidate("satellite",   272, 95, satTrail.SatelliteTrail(r=0.0,theta=0.0,width=0.0)),          # short stub ... never detected
+    Candidate("moustache",   272, 97, satTrail.SatelliteTrail(r=114.5,theta=6.271,width=29.32)),
     
 
     # 1166
@@ -192,6 +196,7 @@ knownCandidates = [
     Candidate("satellite",1168,10    ,satTrail.SatelliteTrail(r=1071.5,theta=1.397,width=12.40  )),
     Candidate("moustache",1168,15    ,satTrail.SatelliteTrail(r=2349.1,theta=1.128,width=21.86  )),
     Candidate("satellite",1168,16    ,satTrail.SatelliteTrail(r=1208.0,theta=1.405,width=12.08  )),
+    Candidate("moustache",1168,21   ,satTrail.SatelliteTrail(r=3318.6,theta=1.037,width=21.07 )),
     Candidate("satellite",1168,23    ,satTrail.SatelliteTrail(r=1547.3,theta=1.410,width=12.80  )),
     Candidate("moustache",1168,29    ,satTrail.SatelliteTrail(r=1682.6,theta=0.783,width=26.18  )),
     Candidate("satellite",1168,29    ,satTrail.SatelliteTrail(r=1962.1,theta=0.981,width=22.84  )),
@@ -220,9 +225,17 @@ knownCandidates = [
     Candidate("scattered",1170,89    ,satTrail.SatelliteTrail(r=2685.0,theta=1.582,width=24.57  )),
     Candidate("satellite",1170,90    ,satTrail.SatelliteTrail(r=1127.1,theta=0.252,width=11.36  )),
     Candidate("moustache",1170,96    ,satTrail.SatelliteTrail(r=1339.3,theta=0.646,width=21.22  )),
+    Candidate("satellite",1170, 96   ,satTrail.SatelliteTrail(r=2049.3,theta=0.261,width=17.14)),
     Candidate("moustache",1170,101   ,satTrail.SatelliteTrail(r=1210.8,theta=1.261,width=23.42  )),
 
+    # 1176
+    Candidate("moustache",1176, 15   ,satTrail.SatelliteTrail(r=2318.4,theta=1.028,width=22.92)),
 
+    # 1178
+    Candidate("moustache",1178, 15,  satTrail.SatelliteTrail(r=2778.3,theta=1.085,width=21.77)),
+    Candidate("moustache",1178, 29,  satTrail.SatelliteTrail(r=790.7,theta=1.283,width=23.01)),
+
+                                                   
     # 1180 z
     Candidate("satellite",1180,1     ,satTrail.SatelliteTrail(r=2535.3,theta=1.035,width=12.46  )),
     Candidate("satellite",1180,6     ,satTrail.SatelliteTrail(r=3616.0,theta=1.033,width=10.09  )),
@@ -245,6 +258,9 @@ knownCandidates = [
     Candidate("moustache",1180,89    ,satTrail.SatelliteTrail(r=2891.2,theta=1.998,width=22.50  )),
     Candidate("moustache",1180,96    ,satTrail.SatelliteTrail(r=1761.1,theta=0.634,width=20.08  )),
 
+    # 1182
+    Candidate("moustache",1182, 98   ,satTrail.SatelliteTrail(r=528.9,theta=6.086,width=19.83)),
+    
     # 1184 z   1 f          96,91,85c,84,78,71,70,62,54
     Candidate("scattered", 1184, 38    ,satTrail.SatelliteTrail(r=1937.9,theta=1.560,width=21.05  )),
     Candidate("meteor",    1184, 54    ,satTrail.SatelliteTrail(r=1281.3,theta=0.819,width=16.11  )),  # trail varies in brightness.  wider than PSF
@@ -256,7 +272,7 @@ knownCandidates = [
     Candidate("meteor",    1184, 85    ,satTrail.SatelliteTrail(r=0.0,theta=0.861,width=0.0  )),  # tiny corner
     Candidate("meteor",    1184, 91    ,satTrail.SatelliteTrail(r=1593.2,theta=0.870,width=20.60  )),
     Candidate("meteor",    1184, 96    ,satTrail.SatelliteTrail(r=2954.7,theta=0.882,width=12.61  )),
-
+    Candidate("moustache", 1184, 97,   satTrail.SatelliteTrail(r=115.0,theta=6.216,width=22.07)),
 
 
     # 1186 z   1 p,d        95,94s     # extremely faint dashes ... will never detect  95,89,83,76,75,67,59,51,42,34,26,19,12,6,1
@@ -389,11 +405,14 @@ knownCandidates = [
     Candidate("moustache",1210,97    ,satTrail.SatelliteTrail(r=185.1,theta=0.049,width=17.13   )),
 
     # 1216 r   1 f          92s,86,80,73s
+    Candidate("moustache",1216, 45  ,satTrail.SatelliteTrail(r=1860.3,theta=1.634,width=11.47)),
     Candidate("satellite", 1216,73  ,satTrail.SatelliteTrail(r=0.0, theta=0.0, width=0.0 )),       # there but never successfully measured
     Candidate("satellite", 1216,80  ,satTrail.SatelliteTrail(r=0.0, theta=0.0, width=0.0 )),       # there but never successfully measured
     Candidate("satellite", 1216,86  ,satTrail.SatelliteTrail(r=0.0, theta=0.0, width=0.0 )),       # there but never successfully measured
     Candidate("satellite", 1216,92  ,satTrail.SatelliteTrail(r=0.0, theta=0.0, width=0.0 )),       # there but never successfully measured
 
+    # 1220
+    Candidate("moustache", 1220, 10, satTrail.SatelliteTrail(r=977.7,theta=5.690,width=11.96)),
     
     #1236 i   1 b          83s,75,74,66,65,64,56,55
     Candidate("moustache",1236,38    ,satTrail.SatelliteTrail(r=1784.6,theta=1.540,width=17.04  )),
@@ -411,7 +430,7 @@ knownCandidates = [
 
     # 1238 i   
     Candidate("satellite",1238,38    ,satTrail.SatelliteTrail(r=361.0,theta=0.272,width=7.17  )),
-    Candidate("satellite",1238,46    ,satTrail.SatelliteTrail(r=0.0,theta=0.272,width=7.17  )),   # very short not detected
+    Candidate("satellite",1238,46    ,satTrail.SatelliteTrail(r=2395.6,theta=0.264,width=10.00)),  # very short
     # very faint aircraft running through ccd=15 and others in the column
     
 
@@ -470,6 +489,14 @@ knownCandidates = [
     Candidate("satellite",1248,89    ,satTrail.SatelliteTrail(r=331.5,theta=0.048,width=10.81   )),
     Candidate("satellite",1248,100   ,satTrail.SatelliteTrail(r=317.1,theta=0.039,width=7.56    )),
 
+
+    Candidate("satellite",1890, 82,  satTrail.SatelliteTrail(r=2856.4,theta=0.306,width=18.95)),
+    Candidate("satellite",1890, 83,  satTrail.SatelliteTrail(r=1504.8,theta=0.310,width=21.85)),
+    Candidate("satellite",1890, 103, satTrail.SatelliteTrail(r=2183.3,theta=0.321,width=19.20)),
+
+
+
+    
     
     # Candidate("satellite",    ,satTrail.  )),
     # Candidate("satellite",    ,satTrail.  )),

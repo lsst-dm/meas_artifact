@@ -110,7 +110,7 @@ def main(root, threads, output, input=None, kind=None, visit=None, candidateSet=
         candidateSet = candi.knownCandidates
         
     butler       = dafPersist.Butler(root)
-    rMax, thetaMax = 50.0, 0.15
+    rMax, thetaMax = 100.0, 0.15
         
     allMessages = ""
 
@@ -153,7 +153,9 @@ def main(root, threads, output, input=None, kind=None, visit=None, candidateSet=
         with open(output, 'w') as fp:
             pickle.dump(results, fp)
 
-            
+
+    falsePos, falseNeg = [], []
+    
     ####################################################################
     # Tally the results and see how we did
     runtimes = []
@@ -161,15 +163,35 @@ def main(root, threads, output, input=None, kind=None, visit=None, candidateSet=
         dataHash, foundTrails, runtime = result
         runtimes.append(runtime)
 
-        for candidate in candidateLookup[dataHash]:
+        # if there's no candidate for this data
+        candidates = candidateLookup[dataHash]
+        if len(candidates) == 0:
+
+            resultMsg = ""
+            # if we found something it's a false positive
+            if len(foundTrails) > 0:
+                for iTrail, fTrail in enumerate(foundTrails):                
+                    resultMsg  += "\n  %s: %s (%s)" % (color("FALSE-POS", "red"), fTrail, "no-candidate")
+                    eventLists['empty'].append(Event(False, True))
+                    eventLists['all'].append(Event(False, True))
+                    falsePos.append((dataHash, fTrail))
+                    
+            # otherwise, it's a true negative
+            else:
+                resultMsg  += "\n  %s: %s (%s)" % (color("TRUE-NEG", "green"), "No Trail", "no-candidate")
+                eventLists['empty'].append(Event(False, False))
+                eventLists['all'].append(Event(False, False))
+            allMessages += resultMsg
+                
         
+        for candidate in candidateLookup[dataHash]:
+
             nTrail = len(foundTrails)
-
+            
             eList = EventList()
-
+        
             t = candidate.trail
             resultMsg = ""
-
             #########################################
             # True positives - does result match candidate
             #########################################
@@ -220,6 +242,8 @@ def main(root, threads, output, input=None, kind=None, visit=None, candidateSet=
                             tag = "Unclaimed"
                         resultTmp  += "  --> %s: %s\n" % (tag, color(str(foundTrails[iClaim]), 'yellow'))
                         eList.append(Event(False, True))
+                        falsePos.append((dataHash, foundTrails[iClaim]))
+                        
                 if nUnclaimed > nIgnored:
                     resultMsg += "\n  %s: %d Unclaimed trails (total=%d) (%s).\n" % \
                               (color("FALSE-POS", "red"), nUnclaimed, nTrail, candidate.kind)
@@ -240,7 +264,7 @@ def main(root, threads, output, input=None, kind=None, visit=None, candidateSet=
                 else:
                     resultMsg += "\n  %s: %s (%s)" % (color("FALSE-NEG", "red"), t, candidate.kind)
                     eList.append(Event(True, False))
-
+                    falseNeg.append((dataHash, t, candidate.kind))
 
                     
             did = "(%d, %d)" % (candidate.visit, candidate.ccd)
@@ -274,7 +298,14 @@ def main(root, threads, output, input=None, kind=None, visit=None, candidateSet=
     rt = np.array(runtimes)
     print "Runtimes:   mean=%.2f  med=%.2f  std=%.2f  min=%.2f  max=%.2f\n" % \
         (rt.mean(), np.median(rt), rt.std(), rt.min(), rt.max())
-        
+
+    with open("falsePositive.txt", 'w') as fp:
+        for d, f in falsePos:
+            fp.write("%s %s\n" % (str(d), str(f)))
+    with open("falseNegatives.txt", 'w') as fp:
+        for d, f, k in falseNeg:
+            fp.write("%s %s %s\n" % (str(d), k, str(f)))
+                     
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

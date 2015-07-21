@@ -53,11 +53,10 @@ class SatelliteTask(pipeBase.CmdLineTask):
         if basedir:
             basedir = os.path.join(os.environ.get("PWD"), "data")
         path = os.path.join(basedir, "%04d" %(v))
-        if dbg:
-            try:
-                os.mkdir(path)
-            except:
-                pass
+        try:
+            os.mkdir(path)
+        except:
+            pass
 
         t0 = time.time()
 
@@ -89,6 +88,12 @@ class SatelliteTask(pipeBase.CmdLineTask):
         print trailsAc
             
         trails = trailsSat.merge(trailsAc, drMax=90.0, dThetaMax=0.15)
+        
+        if True:
+            picfile = os.path.join(path, "trails%05d-%03d.pickle" % (v,c))
+            with open(picfile, 'w') as fp:
+                bundle = ((v,c), trails, time.time() - t0)
+                pickle.dump(bundle, fp)
 
         listMsg = "(%s,%s) Detected %d trail(s).  %s" % (v, c, len(trails), trails)
         self.log.info(listMsg)
@@ -99,12 +104,6 @@ class SatelliteTask(pipeBase.CmdLineTask):
             msg = "(%s,%s) Trail %d/%d %s:  maskPix: %d" % (v, c, i+1, len(trails), trail, maskedPixels)
             self.log.info(msg)
             trailMsgs.append(msg)
-
-            if True:
-                picfile = os.path.join(path, "trails%05d-%03d.pickle" % (v,c))
-                with open(picfile, 'w') as fp:
-                    bundle = ((v,c), trails, time.time() - t0)
-                    pickle.dump(bundle, fp)
             
         if dbg:
             logfile = os.path.join(path, "log%05d-%03d.txt" % (v,c))
@@ -125,14 +124,14 @@ class SatelliteTask(pipeBase.CmdLineTask):
             luminosityMax   = 50.0
             maskNPsfSigma   = 3.0*bins
             centerLimit     = 1.0           # about 1 pixel
-            eRange          = 0.04          # about +/- 0.1
+            eRange          = 0.06          # about +/- 0.1
             houghBins       = 256           # number of r,theta bins (i.e. 256x256)
             kernelSigma     = 21            # pixels
             kernelWidth     = 41           # pixels
             widths          = [40.0, 70.0, 100]  # width of an out of focus aircraft (unbinned)
             houghThresh     = 40            # counts in a r,theta bins
             skewLimit       = 120.0
-            bLimit          = 1.0
+            bLimit          = 1.5
             maxTrailWidth   = 35.0
         else:
             luminosityLimit = 0.05   # low cut on pixel flux

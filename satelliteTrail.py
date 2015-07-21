@@ -352,10 +352,27 @@ class SatelliteTrail(object):
 
         It's quite possible that the same trail will be detected in a searches for satellites and
         aircraft.  The parameters won't be identical, but they'll be close.
-        """
-        isNear = (np.abs(self.r - trail.r) < drMax) and (np.abs(self.theta - trail.theta) < dThetaMax)
-        return isNear
 
+        Use dot product to handle the wrap at 2*pi
+        """
+        r1, r2 = self.r,     trail.r
+        t1, t2 = self.theta, trail.theta
+        rTest = np.abs(r2 - r1) < drMax
+        tTest = np.abs(t2 - t1) < dThetaMax
+
+        # if there's no wrap problem, just use the direct test
+        if rTest and tTest:
+            return True
+
+        # maybe we wrapped
+        c1, c2 = np.cos(t1), np.cos(t2)
+        s1, s2 = np.sin(t1), np.sin(t2)
+        dot    = np.clip(c1*c2 + s1*s2, -1.0, 1.0)
+        acos   = np.arccos(dot)
+        tTest = (np.abs(acos) < dThetaMax)
+        return rTest and tTest
+
+        
     @staticmethod
     def chooseBest(trail1, trail2):
         """A single place to choose the best trail, if two solutions exist.
