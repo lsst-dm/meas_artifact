@@ -186,7 +186,7 @@ class PValuePixelSelector(PixelSelector):
             val         = getattr(self.momentManager,    limit.name)
             expectation = getattr(self.calMomentManager, limit.name)
             delta       = val - expectation
-            neg         = delta < 0.0
+            neg         = delta <= 0.0
             delta2      = delta**2
             self.cache[limit.name] = (delta, delta2, neg)
             
@@ -205,15 +205,12 @@ class PValuePixelSelector(PixelSelector):
         elif limit.limitType == 'center':
             neg2logp = zz
 
-        # This is the opposite of 'lower'.  I use the same function, but shift it by 2
+        # This is the opposite of 'lower'.
         # it keeps the values below z~1 and suppresses those above z=2
         elif limit.limitType == 'upper':
-            x = delta/limit.norm
-            z = x - 2.0
-            zz = z**2 + 0.0001
-            pos = x > 2.0
-            neg2logp = 1.0/zz
-            neg2logp[pos] = 1.0/0.0001
+            neg2logp = zz
+            neg2logp[neg] = 0.0001
+
         else:
             raise ValueError("Unknown limit type.")
 
@@ -243,9 +240,10 @@ class PValuePixelSelector(PixelSelector):
             ax = fig.add_subplot(111)
             #ax.hist(qq, bins=200, range=(-2*0.5*n, 0), edgecolor='none')
             dat = self.momentManager.sumI
-            ax.plot(dat, logp, 'k.')
-            ax.plot(dat[ret], logp[ret], 'r.')
-            ax.set_xlim([0, 10.0])
+            ax.plot(dat, np.exp(logp), 'k.')
+            ax.plot(dat[ret], np.exp(logp[ret]), 'r.')
+            ax.set_xlim([0, 500.0])
+            #ax.set_ylim([0, 1.0])
             fig.savefig('phist.png')
             self.done.append(limit.name)
 

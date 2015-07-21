@@ -197,6 +197,21 @@ class SatelliteTrail(object):
         w =  (x > 0) & (x < nx) & (y > 0) & (y < ny)
         return x[w], y[w]
 
+    def length(self, nx, ny):
+        """Compute the length of the trail in an nx*ny image.
+
+        @param nx      Image x dimension
+        @param ny      Image y dimension
+        """
+
+        # we could do this faster, but this won't likely ever be a bottleneck for speed.
+        # just get the trace and compute with the first and last point.
+        x, y = self.trace(nx, ny)
+        dx = x[-1] - x[0]
+        dy = y[-1] - y[0]
+        length = np.sqrt(dx**2 + dy**2)
+        return length
+        
 
     def residual(self, x, y, bins=1):
         """Get residuals of this fit compared to given x,y coords.

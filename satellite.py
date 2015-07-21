@@ -215,8 +215,8 @@ class SatelliteFinder(object):
                                               isCalibration=True)
                 mmCals.append(mmCal)
 
-                maxFactors   = 10.0, 20.0, 500.0
-                luminFactors = self.luminosityLimit*rms,  10.0,  20.0
+                maxFactors   = 12.0, 24.0, 500.0
+                luminFactors = self.luminosityLimit,  10.0,  20.0
                 scaleFactors = 1.0,   2.0,   3.0
 
                 sumI  = momCalc.MomentLimit('sumI',        self.luminosityLimit*rms, 'lower')  #dummy value
@@ -228,15 +228,16 @@ class SatelliteFinder(object):
                 ellip = momCalc.MomentLimit('ellip',       self.eRange,              'center')
                 b     = momCalc.MomentLimit('b',           self.bLimit,              'center')
 
+                # NOTE: lumX upper limit currently ignored.
                 selector = Selector(mm, mmCal)
-                for limit in ellip, sumI, cent, centP, skew, skewP, b: #, lumX:
+                for limit in sumI, ellip, cent, centP, skew, skewP, b:
                     selector.append(limit)
 
                 isCand = np.zeros(img.shape, dtype=bool)
                 pixelSums = []
                 for maxFact, luminFact, scaleFact in zip(maxFactors, luminFactors, scaleFactors):
-                    sumI.norm   = luminFact
-                    lumX.norm   = maxFact
+                    sumI.norm   = luminFact*rms
+                    lumX.norm   = maxFact*rms
                     cent.norm  /= scaleFact
                     centP.norm /= scaleFact
                     skew.norm  /= scaleFact
@@ -247,7 +248,6 @@ class SatelliteFinder(object):
                     pixels      = selector.getPixels(maxPixels=maxPixels)
                     isCand |= pixels
                     pixelSums.append(pixels.sum())
-
 
                 if True:
                     selector = Selector(mm_faint, mmCal)

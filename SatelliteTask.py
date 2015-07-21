@@ -1,6 +1,11 @@
 #!/usr/bin/env python
 
-import sys, os, math, collections, time
+import sys, os
+import math
+import collections
+import time
+import cPickle as pickle
+
 import lsst.afw.cameraGeom as afwCg
 import lsst.pipe.base as pipeBase
 import lsst.pex.config as pexConfig
@@ -44,11 +49,11 @@ class SatelliteTask(pipeBase.CmdLineTask):
         
         exposure = dataRef.get('calexp', immediate=True)
 
+        basedir = os.environ.get('SATELLITE_DATA')
+        if basedir:
+            basedir = os.path.join(os.environ.get("PWD"), "data")
+        path = os.path.join(basedir, "%04d" %(v))
         if dbg:
-            basedir = os.environ.get('SATELLITE_DATA')
-            if basedir:
-                basedir = os.path.join(os.environ.get("PWD"), "data")
-            path = os.path.join(basedir, "%04d" %(v))
             try:
                 os.mkdir(path)
             except:
@@ -94,7 +99,13 @@ class SatelliteTask(pipeBase.CmdLineTask):
             msg = "(%s,%s) Trail %d/%d %s:  maskPix: %d" % (v, c, i+1, len(trails), trail, maskedPixels)
             self.log.info(msg)
             trailMsgs.append(msg)
-        
+
+            if True:
+                picfile = os.path.join(path, "trails%05d-%03d.pickle" % (v,c))
+                with open(picfile, 'w') as fp:
+                    bundle = ((v,c), trails, time.time() - t0)
+                    pickle.dump(bundle, fp)
+            
         if dbg:
             logfile = os.path.join(path, "log%05d-%03d.txt" % (v,c))
             with open(logfile, 'w') as log:
