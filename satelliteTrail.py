@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import numpy          as np
-
+import matplotlib.pyplot as plt
 import lsst.afw.image as afwImage
 
 import satelliteUtils as satUtil
@@ -207,9 +207,11 @@ class SatelliteTrail(object):
         # we could do this faster, but this won't likely ever be a bottleneck for speed.
         # just get the trace and compute with the first and last point.
         x, y = self.trace(nx, ny)
-        dx = x[-1] - x[0]
-        dy = y[-1] - y[0]
-        length = np.sqrt(dx**2 + dy**2)
+        length = 0
+        if len(x):
+            dx = x[-1] - x[0]
+            dy = y[-1] - y[0]
+            length = np.sqrt(dx**2 + dy**2)
         return length
         
 
@@ -315,15 +317,21 @@ class SatelliteTrail(object):
         # plant the trail using the distance from our line
         # as the parameter in a 1D DoubleGaussian
         dot    = xx*self.vx + yy*self.vy
-        offset = np.abs(dot - self.r/bins)
+        offset = dot - self.r/bins
 
         hwidth = aperture/2.0
 
         # only bother updating the pixels within 5-sigma of the line
-        w = (offset < hwidth) & (np.isfinite(img))
+        w = (np.abs(offset) < hwidth) & (np.isfinite(img))
         self.flux     = img[w].sum()
         self.center   = bins*(img[w]*offset[w]).sum()/self.flux
-        sigma         = bins*np.sqrt((img[w]*offset[w]**2).sum()/self.flux)
+        sigma         = np.sqrt((img[w]*offset[w]**2).sum()/self.flux)
+
+        # iterate once to suppress noise
+        off2 = offset[w]**2
+        weight = np.exp(-0.5*off2/sigma**2)/(2.0*np.pi*np.sqrt(sigma))
+        sigma         = bins*np.sqrt((weight*img[w]*off2).sum()/self.flux)
+            
         self.width    = 2.0*sigma
 
         return self.flux
@@ -333,8 +341,8 @@ class SatelliteTrail(object):
         med, iqr = -1.0, -1.0
         if self.resid is not None:
             med,iqr = self.resid
-        rep = "SatelliteTrail(r=%.1f,theta=%.3f,width=%.2f,flux=%.2f,binMax=%r,resid=(%.2f,%.2f))" % \
-              (self.r, self.theta, self.width, self.flux, self.binMax, med, iqr)
+        rep = "SatelliteTrail(r=%.1f,theta=%.3f,width=%.2f,flux=%.2f,binMax=%r,resid=(%.2f,%.2f)[%dpix])" % \
+              (self.r, self.theta, self.width, self.flux, self.binMax, med, iqr, self.length(2048,4096))
         return rep
         
     def __repr__(self):

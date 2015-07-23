@@ -68,7 +68,7 @@ def twoPiOverlap(theta_in, arrays=None, overlapRange=0.2):
 
 
 
-def thetaAlignment(theta, x, y, limit=3, tolerance=0.19, maxSeparation=None):
+def thetaAlignment(theta, x, y, limit=3, tolerance=0.21, maxSeparation=None):
     """A helper function to cull the candidate points.
 
     @param theta      ndarray of thetas
@@ -106,12 +106,9 @@ def thetaAlignment(theta, x, y, limit=3, tolerance=0.19, maxSeparation=None):
     dx        = np.subtract.outer(x, x)
     dy        = np.subtract.outer(y, y)
     dydx      = dy/(dx + 0.01)
-    # we could call arctan(dydx) here but it's very expensive.
-    # We faster if we instead convert our tolerance to test dydx directly.
-    tanTheta  = np.tan(theta)
-    dTanTheta = tolerance*(1.0 + tanTheta**2)
-    aligned1  = np.abs((dydx - tanTheta)/dTanTheta) < 1.0
-    aligned2  = np.abs((dydx.transpose() - tanTheta).transpose()/dTanTheta) < 1.0
+    thetaXY = np.arctan(dydx)
+    aligned1 = np.abs(thetaXY - theta) < tolerance
+    aligned2 = np.abs(thetaXY.transpose() - theta).transpose() < tolerance
     if maxSeparation:
         dist      = dx**2 + dy**2
         closish   = dist < maxSeparation**2
@@ -123,7 +120,7 @@ def thetaAlignment(theta, x, y, limit=3, tolerance=0.19, maxSeparation=None):
     newThetas = copy.copy(theta)
     
     # Using variable names  pCloseNeighbour = e^(2*nCand*closeNeighbourTolerance/tolerance)
-    pZeroCloseNeighbour     = 0.95
+    pZeroCloseNeighbour     = 0.67
     # compute the closeNeighbourTolerance for which we expect 1 collision
     phi                     = -0.5*np.log(pZeroCloseNeighbour)
 
@@ -134,10 +131,10 @@ def thetaAlignment(theta, x, y, limit=3, tolerance=0.19, maxSeparation=None):
     cut = max(limit, 2)
     w, = np.where(nCand > cut)
     for i in w:
-        pixelTheta = np.arctan(dydx[i,aligned[i,:]])
+        pixelTheta = thetaXY[i,aligned[i,:]]
         idx        = np.argsort(pixelTheta)
         diff       = np.diff(pixelTheta[idx])
-        didx       = (diff < closeNeighbourTolerance[i])
+        didx       = (diff < closeNeighbourTolerance[i]) & (diff > 1.0e-8)
 
         # how many collisions do we actually have?
         nNearNeighbours[i]      = didx.sum()
@@ -152,15 +149,25 @@ def thetaAlignment(theta, x, y, limit=3, tolerance=0.19, maxSeparation=None):
     if False:
         nAligned    = (aligned1 & aligned2).sum(axis=1)
         isAligned   = nAligned >= limit
-        
-        fig, ax = plt.subplots(nrows=2, ncols=3)
-        ax[0,0].hist(theta, bins=500)
-        ax[0,1].hist(np.arctan(dydx).ravel(), bins=500)
-        ax[1,0].hist(nAligned, bins=40)
-        ax[1,1].hist(theta[isAligned], bins=50, edgecolor='none')
-        ax[1,1].hist(theta[isCandidate], bins=50, edgecolor='none', facecolor='r')
-        ax[1,2].hist(diffs, bins=200)
-        ax[1,2].set_xlim([0.0, 0.01])
+
+        print "calc"
+        metric = np.arctan(dydx)
+        dt1 = metric - theta
+        dt2 = (metric.transpose() - theta).transpose()
+        var = dt1**2 + dt2**2
+        p = np.exp(-var/(2.0*0.15**2))
+        w = dist*p
+        w = w/w.max()
+        vals, edges = np.histogram(metric, bins=80, range=(-np.pi/2.0, np.pi/2.0), weights=w)
+        print "plot"
+        fig, ax = plt.subplots(nrows=1, ncols=1)
+        ax.semilogy(edges[:-1], vals)
+        #ax[0,1].hist(np.arctan(dydx).ravel(), bins=500)
+        #ax[1,0].hist(nAligned, bins=40)
+        #ax[1,1].hist(theta[isAligned], bins=50, edgecolor='none')
+        #ax[1,1].hist(theta[isCandidate], bins=50, edgecolor='none', facecolor='r')
+        #ax[1,2].hist(diffs, bins=200)
+        #ax[1,2].set_xlim([0.0, 0.01])
         fig.savefig("hist.png")
 
     return isCandidate, newThetas
@@ -366,7 +373,7 @@ def hesseBin(r0, theta0, bins=200, rMax=4096, thresh=40):
         grow = np.sqrt(rgrow**2 + tgrow**2)
 
         if rgrow > 3.0 and tgrow > 3.0:
-            print "Warning: Discarding locus at %.1f,%.3f due to poor convergence (%.2f/%.2f, %.2f/%2.f)." % \
+            print "Warning: Suspect locus at %.1f,%.3f due to poor convergence (%.2f/%.2f, %.2f/%2.f)." % \
                 (rTmp, tTmp, drTmp, rgrow, dtTmp, tgrow)
             #continue
 
@@ -527,7 +534,7 @@ class HoughTransform(object):
             n   = idx[i].sum()
 
             # see if there's a significant 2nd-order term in a polynomial fit.
-            order2limit = 1.5e-3
+            order2limit = 0.1 #1.5e-3
             poly = np.polyfit(np.arange(n), residual, 2)
             if False:
                 fig, ax = plt.subplots(nrows=1, ncols=1)

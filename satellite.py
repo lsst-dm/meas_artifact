@@ -40,8 +40,8 @@ class SatelliteFinder(object):
         
         self.kernelSigma       = kernelSigma        
         self.kernelWidth       = kernelWidth
-        self.kx                = np.arange(kernelWidth) - kernelWidth//2
-        self.ky                = np.arange(kernelWidth) - kernelWidth//2
+        #self.kx                = np.arange(kernelWidth) - kernelWidth//2
+        #self.ky                = np.arange(kernelWidth) - kernelWidth//2
         self.bins              = bins
         self.sigmaSmooth       = 1.0
 
@@ -161,9 +161,17 @@ class SatelliteFinder(object):
 
         # subtract a small scale background when we search for PSFs
         if np.abs(widths[0]) < 1.1:
+            self.sigmaSmooth = self.sigmaSmooth
             back       = satUtil.medianRing(img_faint, self.kernelWidth, 2.0*self.sigmaSmooth)
             img       -= back
             img_faint -= back
+            kernelGrow = 1.4
+        else:
+            self.sigmaSmooth = 2.0
+            kernelGrow = 1.4
+            #back       = satUtil.medianRing(img_faint, self.kernelWidth, 2.0*self.sigmaSmooth)
+            #img       -= back
+            #img_faint -= back
         
         #   - smooth 
         img       = satUtil.smooth(img,       self.sigmaSmooth)
@@ -177,11 +185,11 @@ class SatelliteFinder(object):
         # Different sized kernels should give the same results for a real trail
         # but would be less likely to for noise.
         # Unfortunately, this is costly, and the effect is small.
-        for kernelFactor in (1,):
-            kernelWidth = kernelFactor*self.kernelWidth
-            kernelSigma = kernelFactor*self.kernelSigma
+        for kernelFactor in (1.0, 1.4):
+            kernelWidth = 2*int((kernelFactor*self.kernelWidth)//2) + 1
+            kernelSigma = kernelFactor*self.kernelSigma 
 
-
+            #print "Kernels:", kernelWidth, kernelSigma
             isKernelCandidate = np.zeros(img.shape, dtype=bool)
         
             
@@ -201,17 +209,17 @@ class SatelliteFinder(object):
             #################################################
             xx, yy = np.meshgrid(np.arange(img.shape[1], dtype=int), np.arange(img.shape[0], dtype=int))
 
-            mm       = momCalc.MomentManager(img, kernelWidth=self.kernelWidth, kernelSigma=self.kernelSigma)
-            mm_faint = momCalc.MomentManager(img_faint, kernelWidth=self.kernelWidth, kernelSigma=self.kernelSigma)
+            mm       = momCalc.MomentManager(img, kernelWidth=kernelWidth, kernelSigma=kernelSigma)
+            mm_faint = momCalc.MomentManager(img_faint, kernelWidth=kernelWidth, kernelSigma=kernelSigma)
 
             mmCals = []
             nHits = []
 
             #Selector = momCalc.PixelSelector
             Selector = momCalc.PValuePixelSelector
-            maxPixels = 1000
+            maxPixels = 2000
             for i, calImg in enumerate(calImages):
-                mmCal = momCalc.MomentManager(calImg, kernelWidth=self.kernelWidth, kernelSigma=self.kernelSigma, 
+                mmCal = momCalc.MomentManager(calImg, kernelWidth=kernelWidth, kernelSigma=kernelSigma, 
                                               isCalibration=True)
                 mmCals.append(mmCal)
 
@@ -249,7 +257,7 @@ class SatelliteFinder(object):
                     isCand |= pixels
                     pixelSums.append(pixels.sum())
 
-                if True:
+                if False:
                     selector = Selector(mm_faint, mmCal)
                     sumI    = momCalc.MomentLimit('sumI',        3.0*rms,                  'lower')
                     lumX    = momCalc.MomentLimit('sumI',        5.0*rms,                  'upper')
@@ -265,16 +273,18 @@ class SatelliteFinder(object):
                     pixelSums.append(faintPixels.sum())
                 else:
                     pixelSums.append(0)
-
+                    
                 isKernelCandidate |= isCand
+
+                msg = "cand: nPix/med/bri = %d/ %d/ %d   faint: %d  tot: %d/ %d" % (
+                    pixelSums[0], pixelSums[1], pixelSums[2], pixelSums[3],
+                    isCand.sum(), isKernelCandidate.sum()
+                )
+                self.log.logdebug(msg)
+
                 
             isCandidate &= isKernelCandidate
-
-            msg = "Candidates: nPix/med/bri = %d/ %d/ %d   faint: %d  totals: %d/ %d" % (
-                pixelSums[0], pixelSums[1], pixelSums[2], pixelSums[3],
-                isCand.sum(), isCandidate.sum()
-            )
-            self.log.logdebug(msg)
+            self.log.logdebug("total: %d" % (isCandidate.sum()))
 
             nHits.append((widths[i], isCand.sum()))
         
@@ -283,11 +293,12 @@ class SatelliteFinder(object):
 
         nBeforeAlignment = isCandidate.sum()
         maxSeparation = min([x/2 for x in img.shape])
-        thetaMatch, newTheta = hough.thetaAlignment(mm.theta[isCandidate],xx[isCandidate],yy[isCandidate],
-                                                    limit=4, maxSeparation=maxSeparation)
+        if True:
+            thetaMatch, newTheta = hough.thetaAlignment(mm.theta[isCandidate],xx[isCandidate],yy[isCandidate],
+                                                        limit=4, maxSeparation=maxSeparation)
 
-        mm.theta[isCandidate] = newTheta
-        isCandidate[isCandidate] = thetaMatch
+            mm.theta[isCandidate] = newTheta
+            isCandidate[isCandidate] = thetaMatch
         nAfterAlignment = isCandidate.sum()
         self.log.logdebug("theta-alignment Bef/aft: %d / %d" % (nBeforeAlignment, nAfterAlignment))
 
@@ -296,7 +307,7 @@ class SatelliteFinder(object):
         #################################################
         rMax           = sum([q**2 for q in img.shape])**0.5
         houghTransform = hough.HoughTransform(self.houghBins, self.houghThresh,
-                                              rMax=rMax, maxPoints=1000, nIter=0, maxResid=4.5)
+                                              rMax=rMax, maxPoints=1000, nIter=1, maxResid=3.0)
         solutions      = houghTransform(mm.theta[isCandidate], xx[isCandidate], yy[isCandidate])
 
         #################################################

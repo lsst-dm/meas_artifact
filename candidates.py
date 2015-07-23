@@ -5,7 +5,7 @@ import satelliteTrail as satTrail
 class Candidate(object):
     
     positiveKinds = set(("satellite", "aircraft", "meteor", "diffraction"))
-    negativeKinds = set(("empty","scattered"))
+    negativeKinds = set(("empty","scattered","unknown","swallow"))
     ignoredKinds  = set(("moustache",))
     validKinds    = positiveKinds | negativeKinds | ignoredKinds
     
@@ -30,7 +30,7 @@ knownCandidates = [
 
 #    Candidate("satellite",  ,  , satTrail.SatelliteTrail()),
     
-    # 242 
+    # 242 y    2 f,s        95,89,83c,82c,75,67,59,51,43,35,27,26,19,13,7,2  15,38
     Candidate("satellite",  242,  2, satTrail.SatelliteTrail(r=2055.0,theta=1.290,width=23.25)),
     Candidate("moustache",  242,  4, satTrail.SatelliteTrail(r=1910.6,theta=2.360,width=36.08)),
     Candidate("satellite",  242,  7, satTrail.SatelliteTrail(r=2643.3,theta=1.286,width=23.21)),
@@ -48,7 +48,10 @@ knownCandidates = [
     Candidate("satellite",  242, 89, satTrail.SatelliteTrail(r=821.9,theta=1.252,width=16.19)),    
     Candidate("satellite",  242, 95, satTrail.SatelliteTrail(r=1497.8, theta=1.245, width=21.12)),
 
-    # 246
+    # 244 y      98,93,87,81,74,66,58,50,35,27,20,14
+    # There's an interesting 'dash' feature in these chips.  undetectable, but there
+    
+    # 246 y    1 f          48,49,50,51,52
     Candidate("satellite",  246, 48, satTrail.SatelliteTrail(r=1472.9,theta=6.274,width=29.55)),
     Candidate("satellite",  246, 49, satTrail.SatelliteTrail(r=1512.8,theta=6.272,width=21.52)),
     Candidate("satellite",  246, 50, satTrail.SatelliteTrail(r=1572.7,theta=6.277,width=24.05)),
@@ -56,16 +59,16 @@ knownCandidates = [
     Candidate("satellite",  246, 52, satTrail.SatelliteTrail(r=1650.5,theta=6.271,width=18.88)),
     Candidate("scattered",  246, 95, satTrail.SatelliteTrail(r=1174.9,theta=2.369,width=24.37)),
 
-    # 248
+    # 248 y    1 f,s        46 15,21
     Candidate("scattered",  248, 15, None),
     Candidate("satellite",  248, 46, satTrail.SatelliteTrail(r=1885.1,theta=6.274,width=28.09)),
 
-    # 258
+    # 258 y    1 b          98s,99
     Candidate("diffraction", 258, 76, satTrail.SatelliteTrail(r=2478.1,theta=1.572,width=32.32)),
     Candidate("satellite",  258, 98, satTrail.SatelliteTrail(r=197.5,  theta=6.199, width=23.45)),
     Candidate("satellite",  258, 99, satTrail.SatelliteTrail(r=574.0,  theta=6.219, width=18.70)),
 
-    # 260
+    # 260 y    3 b,f,s      96              37,28,27,20,19s  21,98
     Candidate("satellite",  260, 19, satTrail.SatelliteTrail(r=1900.7,theta=0.325,width=25.64)),
     Candidate("satellite",  260, 20, satTrail.SatelliteTrail(r=491.1,theta=0.301,width=15.42)),
     Candidate("satellite",  260, 27, satTrail.SatelliteTrail(r=2508.0,theta=0.295,width=22.08)),
@@ -76,11 +79,12 @@ knownCandidates = [
     Candidate("scattered",  260, 98, None),
 
 
-    # 262
+    # 262 y    3 f,f,a      18s,17,11,10,04  15  6,12
     Candidate("satellite",    262,  4, satTrail.SatelliteTrail(r=507.9,theta=0.333,width=16.49)),
     Candidate("aircraft",     262,  6, satTrail.SatelliteTrail(r=873.5,theta=0.465,width=38.73)),
     Candidate("satellite",    262, 10, satTrail.SatelliteTrail(r=2507.8,theta=0.333,width=14.67)),
     Candidate("satellite",    262, 11, satTrail.SatelliteTrail(r=1050.7,theta=0.324,width=17.89)),
+    Candidate("aircraft",     262, 12, satTrail.SatelliteTrail(r=0.0,theta=0.465,width=0.0)), #not det
     Candidate("satellite",    262, 15, satTrail.SatelliteTrail(r=548.0,theta=6.123,width=18.11)),
     Candidate("satellite",    262, 17, satTrail.SatelliteTrail(r=2991.2,theta=0.322,width=15.55)),
     Candidate("satellite",    262, 18, satTrail.SatelliteTrail(r=1583.3,theta=0.319,width=18.36)),    
@@ -90,9 +94,8 @@ knownCandidates = [
     Candidate("diffraction",  262, 75, satTrail.SatelliteTrail(r=3271.7,theta=1.573,width=31.88)),
     Candidate("diffraction",  262, 79, satTrail.SatelliteTrail(r=3999.6,theta=1.565,width=27.00)),
 
-    # 264
+    # 264 y    2 a,f,s      90,96,97  17,18,19,14,13  0,38,101
     Candidate("moustache",    264,  4, satTrail.SatelliteTrail(r=1903.6,theta=2.360,width=32.41)),
-    Candidate("satellite",    264, 11, satTrail.SatelliteTrail(r=0.0, theta=0.0, width=0.0)), #not det
     Candidate("satellite",    264, 13, satTrail.SatelliteTrail(r=0.0, theta=0.0, width=0.0)), #not det
     Candidate("satellite",    264, 14, satTrail.SatelliteTrail(r=0.0, theta=0.0, width=0.0)), #not det
     Candidate("satellite",    264, 15, satTrail.SatelliteTrail(r=0.0, theta=0.0, width=0.0)), #not det
@@ -102,25 +105,26 @@ knownCandidates = [
     Candidate("diffraction",  264, 56, satTrail.SatelliteTrail(r=1880.9,theta=1.580,width=31.61)),
     Candidate("diffraction",  264, 71, satTrail.SatelliteTrail(r=755.6,theta=1.572,width=31.87)),
     Candidate("diffraction",  264, 76, satTrail.SatelliteTrail(r=799.5,theta=1.579,width=30.69)),
-    Candidate("satellite",    264, 90, satTrail.SatelliteTrail(r=0.0, theta=0.0, width=0.0)), #not det
+    Candidate("aircraft",     264, 90, satTrail.SatelliteTrail(r=0.0, theta=0.0, width=0.0)), #not det
     Candidate("aircraft",     264, 96, satTrail.SatelliteTrail(r=1995.9,theta=0.369,width=37.42)),
-
-    # 266
+    Candidate("aircraft",     264, 97, satTrail.SatelliteTrail(r=0.0,theta=0.369,width=0.42)), # not det
+    
+    # 266 y    2 f,s        23s  37,29,89,21
     Candidate("satellite",    266, 23, satTrail.SatelliteTrail(r=0.0, theta=0.0, width=0.0)), #not det
     Candidate("moustache",    266, 89, satTrail.SatelliteTrail(r=2184.4,theta=2.134,width=31.40)),
     
 
-    # 268 y 
+    # 268 y    3 b,p,s      44,45,52,51,59,58,66,65s  49s,50,51,52,53  96,99
     Candidate("diffraction", 268,  38, satTrail.SatelliteTrail(r=1663.3,theta=1.564,width=31.29 )), 
     Candidate("satellite",   268,  44, satTrail.SatelliteTrail(r=1261.0,theta=2.748,width=18.18 )),
     Candidate("satellite",   268,  45, satTrail.SatelliteTrail(r=459.0,theta=5.891,width=13.96  )),
     Candidate("satellite",   268,  49, satTrail.SatelliteTrail(r=1357.3,theta=6.277,width=21.08 )),
     Candidate("satellite",   268,  50, satTrail.SatelliteTrail(r=1391.4,theta=6.278,width=18.76 )),
-    Candidate("satellite",   268,  51, satTrail.SatelliteTrail(r=1058.5,theta=2.741,width=12.97 )),  #DOUBLE TRAILS
-    Candidate("satellite",   268,  51, satTrail.SatelliteTrail(r=1417.6,theta=6.276,width=14.49 )),  # DOUBLE TRAILS
-    Candidate("satellite",   268,  52, satTrail.SatelliteTrail(r=689.7,theta=5.887,width=14.58  )),  #DOUBLE TRAILS
-    Candidate("satellite",   268,  52, satTrail.SatelliteTrail(r=1453.1,theta=6.277,width=22.96 )),  # DOUBLE TRAILS
-    Candidate("satellite",   268,  53, satTrail.SatelliteTrail(r=1488.8,theta=6.276,width=15.00   )),
+    Candidate("satellite",   268,  51, satTrail.SatelliteTrail(r=1058.5,theta=2.741,width=12.97 )),  #DOUBLE
+    Candidate("satellite",   268,  51, satTrail.SatelliteTrail(r=1417.6,theta=6.276,width=14.49 )),  # DOUBLE
+    Candidate("satellite",   268,  52, satTrail.SatelliteTrail(r=689.7,theta=5.887,width=14.58  )),  #DOUBLE
+    Candidate("satellite",   268,  52, satTrail.SatelliteTrail(r=1453.1,theta=6.277,width=22.96 )),  # DOUBLE
+    Candidate("satellite",   268,  53, satTrail.SatelliteTrail(r=1488.8,theta=6.276,width=15.00  )),
     Candidate("diffraction", 268,  56, satTrail.SatelliteTrail(r=3678.8,theta=1.575,width=29.23 )),
     Candidate("satellite",   268,  58, satTrail.SatelliteTrail(r=866.9,theta=2.737,width=15.86  )),
     Candidate("satellite",   268,  59, satTrail.SatelliteTrail(r=893.9,theta=5.882,width=13.43  )),
@@ -134,7 +138,7 @@ knownCandidates = [
     Candidate("scattered",   268, 103, satTrail.SatelliteTrail(r=59.7,theta=1.572,width=35.98  )),
     
 
-    # 270
+    # 270 y    4 b,p,f,s    102,78,71s  46  42s,41,33,32,31,23,22  21,98
     Candidate("diffraction", 270, 16, satTrail.SatelliteTrail(r=2900.5,theta=1.573,width=30.45)),
     Candidate("diffraction", 270, 19, satTrail.SatelliteTrail(r=1020.0,theta=1.576,width=38.60)),
     Candidate("moustache",   270, 21,  satTrail.SatelliteTrail(r=4308.9,theta=1.109,width=31.14)),
@@ -150,10 +154,10 @@ knownCandidates = [
     Candidate("satellite",   270,102, satTrail.SatelliteTrail(r=2234.0,theta=5.869,width=14.07)), 
 
 
-    # 272
+    # 272 y    3 p,v,s      95,89,88,82,81,80,73,72s  61,60,59s  97
     Candidate("satellite",   272, 59, satTrail.SatelliteTrail(r=1769.0,theta=0.017,width=29.88)),
     Candidate("satellite",   272, 60, satTrail.SatelliteTrail(r=1702.3,theta=6.279,width=14.66)),
-    Candidate("satellite",   272, 61, satTrail.SatelliteTrail(r=1702.3,theta=6.279,width=14.0)),   # not detected ... why?
+    Candidate("satellite",   272, 61, satTrail.SatelliteTrail(r=1702.3,theta=6.279,width=14.0)),   # not det
     Candidate("diffraction", 272, 67, satTrail.SatelliteTrail(r=1612.4,theta=1.573,width=30.89)),
     Candidate("diffraction", 272, 70, satTrail.SatelliteTrail(r=3305.4,theta=1.576,width=30.97)),
     Candidate("satellite",   272, 72, satTrail.SatelliteTrail(r=1808.8,theta=0.276,width=16.98)),
@@ -161,19 +165,21 @@ knownCandidates = [
     Candidate("diffraction", 272, 75, satTrail.SatelliteTrail(r=3445.2,theta=1.577,width=28.99)),
     Candidate("satellite",   272, 80, satTrail.SatelliteTrail(r=2626.5,theta=0.283,width=15.34)),
     Candidate("satellite",   272, 81, satTrail.SatelliteTrail(r=1436.5,theta=0.290,width=15.36)),
-    Candidate("satellite",   272, 82, satTrail.SatelliteTrail(r=20.,theta=0.290,width=15.)),        #tiny ... in the corner
+    Candidate("satellite",   272, 82, satTrail.SatelliteTrail(r=20.,theta=0.290,width=15.)),        # corner
     Candidate("satellite",   272, 88, satTrail.SatelliteTrail(r=2125.4,theta=0.302,width=30.69)),
     Candidate("satellite",   272, 89, satTrail.SatelliteTrail(r=792.1,theta=0.310,width=18.53 )),
-    Candidate("satellite",   272, 95, satTrail.SatelliteTrail(r=0.0,theta=0.0,width=0.0)),          # short stub ... never detected
+    Candidate("satellite",   272, 95, satTrail.SatelliteTrail(r=0.0,theta=0.0,width=0.0)),          # not det
     Candidate("moustache",   272, 97, satTrail.SatelliteTrail(r=114.5,theta=6.271,width=29.32)),
     
 
-    # 1166
+    # 1166 z   2 a,b,f      53,52,60,59,58,66,65,64,70,71,72  96s  18,17,11,10
     Candidate("satellite", 1166,10   ,satTrail.SatelliteTrail(r=2162.0,theta=0.304,width=15.94 )),
+    Candidate("moustache", 1166,10   ,satTrail.SatelliteTrail(r=387.8,theta=5.710,width=21.05 )),
     Candidate("satellite", 1166,11   ,satTrail.SatelliteTrail(r=824.8,theta=0.295, width=11.28 )),
     Candidate("satellite", 1166,17   ,satTrail.SatelliteTrail(r=2788.1,theta=0.294,width=14.48 )),
     Candidate("satellite", 1166,18   ,satTrail.SatelliteTrail(r=1490.3,theta=0.279,width=21.65 )),
     Candidate("moustache", 1166,21   ,satTrail.SatelliteTrail(r=2960.4,theta=0.798,width=23.31 )),
+    Candidate("moustache", 1166,21   ,satTrail.SatelliteTrail(r=3571.4,theta=0.888,width=21.38 )),    
     Candidate("aircraft",  1166,52   ,satTrail.SatelliteTrail(r=398.3,theta=2.935,width=23.83)),
     Candidate("aircraft",  1166,53   ,satTrail.SatelliteTrail(r=526.1,theta=6.068,width=23.05)),
     Candidate("scattered", 1166,56   ,satTrail.SatelliteTrail(r=368.1,theta=2.369, width=24.41 )), 
@@ -182,17 +188,17 @@ knownCandidates = [
     Candidate("aircraft",  1166,60   ,satTrail.SatelliteTrail(r=1641.3,theta=6.069,width=23.22)),
     Candidate("aircraft",  1166,64   ,satTrail.SatelliteTrail(r=227.1,theta=2.912, width=24.24 )),
     Candidate("aircraft",  1166,65   ,satTrail.SatelliteTrail(r=791.1,theta=6.058, width=22.63 )),
-    Candidate("aircraft",  1166,66   ,satTrail.SatelliteTrail(r=0.0, theta=0.0, width=0.0)),        # small corner
+    Candidate("aircraft",  1166,66   ,satTrail.SatelliteTrail(r=1752.1,theta=6.075,width=23.67)), # corner
     Candidate("aircraft",  1166,70   ,satTrail.SatelliteTrail(r=245.9,theta=2.904, width=25.30 )),
     Candidate("aircraft",  1166,71   ,satTrail.SatelliteTrail(r=795.8,theta=6.046, width=25.79 )),
-    Candidate("aircraft",  1166,72   ,satTrail.SatelliteTrail(r=0.0, theta=0.0, width=0.0)),        # small corner
+    Candidate("aircraft",  1166,72   ,satTrail.SatelliteTrail(r=0.0, theta=0.0, width=0.0)),    #  corner
     Candidate("moustache", 1166,77   ,satTrail.SatelliteTrail(r=468.5,theta=2.158, width=23.29 )),
     Candidate("satellite", 1166,96   ,satTrail.SatelliteTrail(r=1169.0,theta=6.153,width=17.02 )), 
     Candidate("satellite", 1166,101  ,satTrail.SatelliteTrail(r=542.8,theta=1.147, width=23.95 )),
               
 
-    # 1168 z 
-    Candidate("satellite",1168, 4    ,satTrail.SatelliteTrail(r=0.0, theta=0.0 ,width=0.0  )),          # extremely short stub
+    #1168 z   1 b          90,84,78,71,63,55,47,39,31,23,16,10,04
+    Candidate("satellite",1168, 4    ,satTrail.SatelliteTrail(r=0.0, theta=0.0 ,width=0.0  )),  # short stub
     Candidate("satellite",1168,10    ,satTrail.SatelliteTrail(r=1071.5,theta=1.397,width=12.40  )),
     Candidate("moustache",1168,15    ,satTrail.SatelliteTrail(r=2349.1,theta=1.128,width=21.86  )),
     Candidate("satellite",1168,16    ,satTrail.SatelliteTrail(r=1208.0,theta=1.405,width=12.08  )),
@@ -214,7 +220,7 @@ knownCandidates = [
     Candidate("moustache",1168,101   ,satTrail.SatelliteTrail(r=1136.2,theta=1.230,width=23.51  )),
 
     
-    # 1170 z
+    #1170 z   1 b          90,96
     Candidate("scattered",1170, 8    ,satTrail.SatelliteTrail(r=750.5,theta=1.581,width=23.11   )),
     Candidate("moustache",1170,29    ,satTrail.SatelliteTrail(r=2045.5,theta=0.988,width=23.36  )),
     Candidate("scattered",1170,30    ,satTrail.SatelliteTrail(r=577.7,theta=0.023,width=19.39   )),
@@ -236,23 +242,24 @@ knownCandidates = [
     Candidate("moustache",1178, 29,  satTrail.SatelliteTrail(r=790.7,theta=1.283,width=23.01)),
 
                                                    
-    # 1180 z
+    # 1180 z   1 f          68s,59,51,43,35,34,26,19,13,6,1
     Candidate("satellite",1180,1     ,satTrail.SatelliteTrail(r=2535.3,theta=1.035,width=12.46  )),
     Candidate("satellite",1180,6     ,satTrail.SatelliteTrail(r=3616.0,theta=1.033,width=10.09  )),
     Candidate("moustache",1180,10    ,satTrail.SatelliteTrail(r=193.2,theta=5.167,width=18.71   )),
     Candidate("satellite",1180,13    ,satTrail.SatelliteTrail(r=871.0,theta=1.029,width=10.99   )),
     Candidate("satellite",1180,19    ,satTrail.SatelliteTrail(r=1970.9,theta=1.023,width=12.81  )),
-    Candidate("satellite",1180,16    ,satTrail.SatelliteTrail(r=0.0,theta=0.0,width=0.0  )),          # very faint, but it's there
-    Candidate("satellite",1180,17    ,satTrail.SatelliteTrail(r=0.0,theta=0.0,width=0.0  )),          # very faint, but it's there
-    Candidate("satellite",1180,18    ,satTrail.SatelliteTrail(r=0.0,theta=0.0,width=0.0  )),          # very faint, but it's there
-    Candidate("satellite",1180,25    ,satTrail.SatelliteTrail(r=0.0,theta=0.0,width=0.0  )),          # very faint, but it's there
-    Candidate("satellite",1180,26    ,satTrail.SatelliteTrail(r=1619.7,theta=0.185,width=16.67 )),          # very faint, but it's there
+    Candidate("satellite",1180,16    ,satTrail.SatelliteTrail(r=0.0,theta=0.0,width=0.0  )),   #not det
+    Candidate("satellite",1180,17    ,satTrail.SatelliteTrail(r=0.0,theta=0.0,width=0.0  )),   #not det
+    Candidate("satellite",1180,18    ,satTrail.SatelliteTrail(r=0.0,theta=0.0,width=0.0  )),   #not det
+    Candidate("satellite",1180,25    ,satTrail.SatelliteTrail(r=0.0,theta=0.0,width=0.0  )),   #not det
+    Candidate("satellite",1180,26    ,satTrail.SatelliteTrail(r=1619.7,theta=0.185,width=16.67 )), # not det
     Candidate("satellite",1180,26    ,satTrail.SatelliteTrail(r=3073.0,theta=1.017,width=15.67  )),
     Candidate("scattered",1180,42    ,satTrail.SatelliteTrail(r=3401.9,theta=1.579,width=18.59  )),
     Candidate("satellite",1180,43    ,satTrail.SatelliteTrail(r=1494.7,theta=1.015,width=15.53  )),
     Candidate("satellite",1180,51    ,satTrail.SatelliteTrail(r=2617.8,theta=1.011,width=11.61  )),
     Candidate("satellite",1180,59    ,satTrail.SatelliteTrail(r=3745.1,theta=1.009,width=11.31  )),
     Candidate("scattered",1180,66    ,satTrail.SatelliteTrail(r=3439.1,theta=1.593,width=20.22  )),
+    Candidate("satellite", 1180, 68, satTrail.SatelliteTrail(r=1098.3, theta=1.004, width=13.3)),
     Candidate("scattered",1180,83    ,satTrail.SatelliteTrail(r=1572.5,theta=1.567,width=20.56  )),
     Candidate("moustache",1180,89    ,satTrail.SatelliteTrail(r=2844.6,theta=2.013,width=21.90  )),
     Candidate("moustache",1180,89    ,satTrail.SatelliteTrail(r=2891.2,theta=1.998,width=22.50  )),
@@ -283,7 +290,7 @@ knownCandidates = [
     Candidate("scattered", 1186,65   ,satTrail.SatelliteTrail(r=693.2,theta=1.583,width=16.67   )),
     Candidate("scattered", 1186,66   ,satTrail.SatelliteTrail(r=1154.1,theta=1.577,width=18.43  )),
     Candidate("scattered", 1186,82   ,satTrail.SatelliteTrail(r=3641.8,theta=1.568,width=16.16  )),
-    Candidate("satellite", 1186,94   ,satTrail.SatelliteTrail(r=0.0,theta=0.229,width=0.0    )),    # very short stub
+    Candidate("satellite", 1186, 94, satTrail.SatelliteTrail(r=1915.1, theta=0.220, width=14.6)), #short stub
     Candidate("satellite", 1186,95   ,satTrail.SatelliteTrail(r=938.9,theta=0.229,width=8.65    )),
     Candidate("moustache", 1186,100  ,satTrail.SatelliteTrail(r=104.8,theta=5.487,width=13.00   )),
 
@@ -306,13 +313,13 @@ knownCandidates = [
     Candidate("satellite", 1188,86   ,satTrail.SatelliteTrail(r=861.4,theta=0.193,width=8.71    )),
     Candidate("moustache", 1188,89   ,satTrail.SatelliteTrail(r=1734.0,theta=2.121,width=17.27  )),
     Candidate("satellite", 1188,93   ,satTrail.SatelliteTrail(r=2083.4,theta=0.205,width=8.46   )),
-    Candidate("satellite", 1188,94   ,satTrail.SatelliteTrail(r=0.0,theta=0.205,width=0.0   )),     # tiny stub
+    Candidate("satellite", 1188, 94, satTrail.SatelliteTrail(r=1162.6, theta=0.210, width=16.9)), # tiny stub
     Candidate("moustache", 1188,101  ,satTrail.SatelliteTrail(r=1018.4,theta=1.225,width=18.81  )),
     Candidate("satellite", 1188,102  ,satTrail.SatelliteTrail(r=2816.8,theta=0.155,width=7.19   )),
 
 
     # 1190  1190 z   1 b          49s,48,47,46
-    Candidate("scattered",1190, 7    ,satTrail.SatelliteTrail(r=1632.1,theta=1.570,width=18.32  )),  # 2 swallow tails
+    Candidate("swallow",1190, 7    ,satTrail.SatelliteTrail(r=1632.1,theta=1.570,width=18.32  )),  # 2 swallow tails
     Candidate("moustache",1190,10    ,satTrail.SatelliteTrail(r=717.0,theta=5.641,width=20.07   )),
     Candidate("moustache",1190,29    ,satTrail.SatelliteTrail(r=2026.7,theta=0.981,width=17.80  )),
     Candidate("satellite",1190,46    ,satTrail.SatelliteTrail(r=424.9,theta=6.274,width=10.57   )),
@@ -334,12 +341,12 @@ knownCandidates = [
     Candidate("satellite",1192,52    ,satTrail.SatelliteTrail(r=1096.9,theta=6.275,width=8.12,  )),
     Candidate("satellite",1192,53    ,satTrail.SatelliteTrail(r=1120.2,theta=6.272,width=11.43  )),
     Candidate("scattered",1192,70    ,satTrail.SatelliteTrail(r=3929.6,theta=1.580,width=15.06  )),
-    Candidate("scattered",1192,97    ,satTrail.SatelliteTrail(r=2356.5,theta=1.569,width=18.44  )),  #swallow tail ghost
+    Candidate("swallow",1192,97    ,satTrail.SatelliteTrail(r=2356.5,theta=1.569,width=18.44  )),  #swallow tail ghost
 
     
     # 1194 z   1 b          57,56,55,54
     Candidate("scattered",1194,34    ,satTrail.SatelliteTrail(r=2691.1,theta=1.583,width=19.31  )),
-    Candidate("scattered",1194,37    ,satTrail.SatelliteTrail(r=235.5,theta=2.680,width=16.93  )),  # swallowtail ghost
+    Candidate("swallow",1194,37    ,satTrail.SatelliteTrail(r=235.5,theta=2.680,width=16.93  )),  # swallowtail ghost
     Candidate("moustache",1194,38    ,satTrail.SatelliteTrail(r=2461.3,theta=1.571,width=19.20  )),
     Candidate("satellite",1194,54    ,satTrail.SatelliteTrail(r=1682.8,theta=6.271,width=7.70   )),
     Candidate("satellite",1194,55    ,satTrail.SatelliteTrail(r=1732.9,theta=6.274,width=7.54   )),
@@ -354,10 +361,10 @@ knownCandidates = [
 
     # 1204 r   1 f      101,15,8,3,2
     Candidate("satellite", 1204,2   ,satTrail.SatelliteTrail(r=2640.9,theta=0.538,width=10.55 )),  
-    Candidate("satellite", 1204,3   ,satTrail.SatelliteTrail(r=0.0, theta=0.0, width=0.0 )),       # there but never successfully measured
-    Candidate("satellite", 1204,8   ,satTrail.SatelliteTrail(r=0.0, theta=0.0, width=0.0 )),       # there but never successfully measured
-    Candidate("satellite", 1204,14  ,satTrail.SatelliteTrail(r=0.0, theta=0.0, width=0.0 )),       # there but never successfully measured
-    Candidate("satellite", 1204,101 ,satTrail.SatelliteTrail(r=0.0, theta=0.0, width=0.0 )),       # there but never successfully measured
+    Candidate("satellite", 1204,3   ,satTrail.SatelliteTrail(r=0.0, theta=0.0, width=0.0 )), #not det
+    Candidate("satellite", 1204,8   ,satTrail.SatelliteTrail(r=0.0, theta=0.0, width=0.0 )), #not det
+    Candidate("satellite", 1204,14  ,satTrail.SatelliteTrail(r=0.0, theta=0.0, width=0.0 )), #not det
+    Candidate("satellite", 1204,101 ,satTrail.SatelliteTrail(r=0.0, theta=0.0, width=0.0 )), #not det
     Candidate("moustache",1204,21    ,satTrail.SatelliteTrail(r=3233.7,theta=0.961,width=12.87  )),
     Candidate("moustache",1204,21    ,satTrail.SatelliteTrail(r=3989.1,theta=1.100,width=13.18  )),
     Candidate("moustache",1204,37    ,satTrail.SatelliteTrail(r=1250.9,theta=1.099,width=13.92  )),
@@ -483,13 +490,16 @@ knownCandidates = [
     Candidate("moustache",1248,21    ,satTrail.SatelliteTrail(r=3317.7,theta=0.795,width=17.77  )),
     Candidate("moustache",1248,21    ,satTrail.SatelliteTrail(r=4036.8,theta=1.117,width=17.29  )),
     Candidate("satellite",1248,29    ,satTrail.SatelliteTrail(r=1284.0,theta=0.232,width=7.90   )),
+    Candidate("aircraft", 1248, 36, satTrail.SatelliteTrail(r=241.0, theta=2.875, width=17.4)),
     Candidate("aircraft", 1248,43    ,satTrail.SatelliteTrail(r=605.5,theta=6.013,width=16.36   )),
     Candidate("aircraft", 1248,49    ,satTrail.SatelliteTrail(r=356.3,theta=6.021,width=16.14   )),
+    Candidate("aircraft", 1248, 55, satTrail.SatelliteTrail(r=35.2, theta=6.020, width=17.2)),
     Candidate("satellite",1248,58    ,satTrail.SatelliteTrail(r=1546.3,theta=0.260,width=13.09  )),
     Candidate("satellite",1248,89    ,satTrail.SatelliteTrail(r=331.5,theta=0.048,width=10.81   )),
     Candidate("satellite",1248,100   ,satTrail.SatelliteTrail(r=317.1,theta=0.039,width=7.56    )),
 
 
+    Candidate("satellite", 1890, 75, satTrail.SatelliteTrail(r=821.1, theta=0.302, width=31.9)),
     Candidate("satellite",1890, 82,  satTrail.SatelliteTrail(r=2856.4,theta=0.306,width=18.95)),
     Candidate("satellite",1890, 83,  satTrail.SatelliteTrail(r=1504.8,theta=0.310,width=21.85)),
     Candidate("satellite",1890, 103, satTrail.SatelliteTrail(r=2183.3,theta=0.321,width=19.20)),
@@ -569,6 +579,422 @@ knownCandidates = [
     Candidate("empty", 1886,  74, None),
     Candidate("empty", 1888,  80, None),
     Candidate("empty", 1890,  81, None),
+
+
+
+    # these were all detected in a mass run of cosmos.
+    # originally flagged as false positives.  I went through and ID'd what they are.
+    # The list is machine generated
+    Candidate("diffraction", 250, 75, satTrail.SatelliteTrail(r=3462.0, theta=1.575, width=32.5)),
+    Candidate("diffraction", 254, 76, satTrail.SatelliteTrail(r=627.3, theta=1.575, width=33.8)),
+    Candidate("diffraction", 254, 77, satTrail.SatelliteTrail(r=1987.0, theta=1.629, width=33.9)),
+    Candidate("diffraction", 256, 56, satTrail.SatelliteTrail(r=1730.7, theta=1.582, width=24.3)),
+    Candidate("diffraction", 256, 73, satTrail.SatelliteTrail(r=1594.7, theta=1.577, width=33.3)),
+    Candidate("diffraction", 256, 78, satTrail.SatelliteTrail(r=1499.7, theta=1.568, width=33.6)),
+    Candidate("diffraction", 258, 16, satTrail.SatelliteTrail(r=3547.4, theta=1.577, width=33.9)),
+    Candidate("diffraction", 258, 68, satTrail.SatelliteTrail(r=601.7, theta=1.572, width=31.9)),
+    Candidate("diffraction", 258, 71, satTrail.SatelliteTrail(r=2449.2, theta=1.573, width=35.0)),
+    Candidate("moustache", 258, 101, satTrail.SatelliteTrail(r=1207.5, theta=1.262, width=34.6)),
+    Candidate("diffraction", 260, 42, satTrail.SatelliteTrail(r=786.8, theta=0.799, width=28.7)),
+    Candidate("swallow", 260, 44, satTrail.SatelliteTrail(r=1984.3, theta=2.363, width=31.4)),
+    Candidate("diffraction", 260, 87, satTrail.SatelliteTrail(r=1775.2, theta=1.576, width=26.6)),
+    Candidate("diffraction", 262, 23, satTrail.SatelliteTrail(r=297.9, theta=2.371, width=33.7)),
+    Candidate("moustache", 264, 15, satTrail.SatelliteTrail(r=2100.5, theta=1.060, width=34.4)),
+    Candidate("diffraction", 264, 16, satTrail.SatelliteTrail(r=1882.0, theta=1.576, width=32.4)),
+    Candidate("moustache", 264, 21, satTrail.SatelliteTrail(r=3214.4, theta=0.820, width=31.6)),
+    Candidate("diffraction", 264, 74, satTrail.SatelliteTrail(r=2155.5, theta=1.596, width=23.0)),
+    Candidate("diffraction", 264, 79, satTrail.SatelliteTrail(r=2984.1, theta=1.580, width=34.5)),
+    Candidate("moustache", 266, 21, satTrail.SatelliteTrail(r=3407.9, theta=0.885, width=31.4)),
+    Candidate("moustache", 266, 29, satTrail.SatelliteTrail(r=554.7, theta=1.279, width=28.4)),
+    Candidate("moustache", 266, 37, satTrail.SatelliteTrail(r=1569.3, theta=1.103, width=31.5)),
+    Candidate("diffraction", 266, 38, satTrail.SatelliteTrail(r=678.1, theta=1.572, width=31.1)),
+    Candidate("diffraction", 266, 50, satTrail.SatelliteTrail(r=793.9, theta=2.364, width=29.2)),
+    Candidate("diffraction", 266, 55, satTrail.SatelliteTrail(r=3564.4, theta=1.571, width=29.0)),
+    Candidate("diffraction", 266, 66, satTrail.SatelliteTrail(r=2391.6, theta=1.588, width=28.3)),
+    Candidate("diffraction", 266, 80, satTrail.SatelliteTrail(r=2330.7, theta=1.581, width=28.8)),
+    Candidate("diffraction", 266, 83, satTrail.SatelliteTrail(r=2735.1, theta=0.791, width=31.9)),
+    Candidate("diffraction", 266, 93, satTrail.SatelliteTrail(r=3783.2, theta=1.573, width=27.6)),
+    Candidate("diffraction", 268, 16, satTrail.SatelliteTrail(r=3724.6, theta=1.575, width=30.9)),
+    Candidate("moustache", 268, 29, satTrail.SatelliteTrail(r=2294.2, theta=0.999, width=32.8)),
+    Candidate("swallow", 268, 43, satTrail.SatelliteTrail(r=1186.5, theta=2.360, width=32.6)),
+    Candidate("diffraction", 268, 68, satTrail.SatelliteTrail(r=772.7, theta=1.572, width=28.8)),
+    Candidate("moustache", 268, 99, satTrail.SatelliteTrail(r=130.3, theta=6.193, width=30.4)),
+    Candidate("moustache", 268, 101, satTrail.SatelliteTrail(r=1428.8, theta=1.276, width=34.6)),
+    Candidate("diffraction", 270, 42, satTrail.SatelliteTrail(r=968.0, theta=0.802, width=28.6)),
+    Candidate("swallow", 270, 44, satTrail.SatelliteTrail(r=1811.6, theta=2.368, width=34.2)),
+    Candidate("moustache", 270, 98, satTrail.SatelliteTrail(r=492.0, theta=6.139, width=31.3)),
+    Candidate("diffraction", 272, 8, satTrail.SatelliteTrail(r=1666.8, theta=1.587, width=29.3)),
+    Candidate("unknown", 272, 9, satTrail.SatelliteTrail(r=1798.5, theta=0.509, width=32.9)),
+    Candidate("moustache", 272, 38, satTrail.SatelliteTrail(r=1501.2, theta=0.048, width=29.0)),
+    Candidate("moustache", 1166, 2, satTrail.SatelliteTrail(r=1689.0, theta=0.114, width=22.1)),
+    Candidate("moustache", 1166, 15, satTrail.SatelliteTrail(r=1846.6, theta=1.017, width=22.8)),
+    Candidate("moustache", 1166, 15, satTrail.SatelliteTrail(r=2635.5, theta=1.086, width=24.4)),
+    Candidate("moustache", 1166, 28, satTrail.SatelliteTrail(r=3935.1, theta=1.244, width=26.9)),
+    Candidate("unknown", 1166, 40, satTrail.SatelliteTrail(r=2882.4, theta=1.250, width=21.8)),
+    Candidate("swallow", 1166, 44, satTrail.SatelliteTrail(r=65.6, theta=5.492, width=19.9)),
+    Candidate("diffraction", 1166, 45, satTrail.SatelliteTrail(r=478.6, theta=6.124, width=26.8)),
+    Candidate("moustache", 1166, 97, satTrail.SatelliteTrail(r=171.0, theta=6.172, width=23.9)),
+    Candidate("moustache", 1166, 98, satTrail.SatelliteTrail(r=576.6, theta=0.083, width=22.3)),
+    Candidate("moustache", 1168, 29, satTrail.SatelliteTrail(r=282.0, theta=1.339, width=22.2)),
+    Candidate("moustache", 1168, 37, satTrail.SatelliteTrail(r=1370.5, theta=1.074, width=20.3)),
+    Candidate("moustache", 1168, 89, satTrail.SatelliteTrail(r=2069.9, theta=2.132, width=25.2)),
+    Candidate("swallow", 1170, 2, satTrail.SatelliteTrail(r=1309.3, theta=1.636, width=22.4)),
+    Candidate("moustache", 1170, 5, satTrail.SatelliteTrail(r=343.9, theta=5.661, width=24.4)),
+    Candidate("diffraction", 1170, 38, satTrail.SatelliteTrail(r=2227.8, theta=0.574, width=22.2)),
+    Candidate("swallow", 1170, 43, satTrail.SatelliteTrail(r=2454.8, theta=0.466, width=23.1)),
+    Candidate("unknown", 1170, 59, satTrail.SatelliteTrail(r=2336.2, theta=1.927, width=15.8)),
+    Candidate("moustache", 1170, 69, satTrail.SatelliteTrail(r=836.6, theta=1.716, width=21.1)),
+    Candidate("diffraction", 1170, 76, satTrail.SatelliteTrail(r=799.0, theta=2.369, width=21.9)),
+    Candidate("diffraction", 1170, 76, satTrail.SatelliteTrail(r=2639.4, theta=0.726, width=22.2)),
+    Candidate("moustache", 1170, 99, satTrail.SatelliteTrail(r=51.1, theta=6.217, width=17.9)),
+    Candidate("moustache", 1172, 15, satTrail.SatelliteTrail(r=2175.6, theta=1.000, width=23.2)),
+    Candidate("moustache", 1172, 15, satTrail.SatelliteTrail(r=3247.9, theta=1.178, width=23.4)),
+    Candidate("moustache", 1172, 21, satTrail.SatelliteTrail(r=2939.3, theta=0.775, width=22.4)),
+    Candidate("moustache", 1172, 21, satTrail.SatelliteTrail(r=4080.8, theta=1.112, width=23.1)),
+    Candidate("moustache", 1172, 29, satTrail.SatelliteTrail(r=1549.5, theta=0.875, width=24.1)),
+    Candidate("moustache", 1174, 9, satTrail.SatelliteTrail(r=1579.1, theta=0.479, width=25.9)),
+    Candidate("unknown", 1174, 22, satTrail.SatelliteTrail(r=2103.1, theta=1.577, width=25.6)),
+    Candidate("swallow", 1174, 37, satTrail.SatelliteTrail(r=55.4, theta=5.517, width=25.1)),
+    Candidate("moustache", 1174, 38, satTrail.SatelliteTrail(r=1116.2, theta=6.047, width=20.6)),
+    Candidate("moustache", 1174, 38, satTrail.SatelliteTrail(r=1723.8, theta=0.384, width=21.8)),
+    Candidate("moustache", 1174, 46, satTrail.SatelliteTrail(r=1666.3, theta=1.687, width=21.3)),
+    Candidate("diffraction", 1174, 49, satTrail.SatelliteTrail(r=1568.4, theta=2.357, width=23.8)),
+    Candidate("moustache", 1176, 10, satTrail.SatelliteTrail(r=482.0, theta=5.765, width=23.7)),
+    Candidate("moustache", 1176, 15, satTrail.SatelliteTrail(r=3051.7, theta=1.040, width=24.4)),
+    Candidate("moustache", 1176, 21, satTrail.SatelliteTrail(r=3689.5, theta=1.224, width=26.5)),
+    Candidate("moustache", 1176, 21, satTrail.SatelliteTrail(r=3410.2, theta=0.801, width=22.2)),
+    Candidate("swallow", 1176, 22, satTrail.SatelliteTrail(r=3513.2, theta=0.791, width=24.0)),
+    Candidate("moustache", 1176, 28, satTrail.SatelliteTrail(r=4429.5, theta=1.147, width=22.6)),
+    Candidate("moustache", 1176, 29, satTrail.SatelliteTrail(r=424.0, theta=1.039, width=23.5)),
+    Candidate("moustache", 1176, 29, satTrail.SatelliteTrail(r=2152.6, theta=0.976, width=26.5)),
+    Candidate("diffraction", 1176, 30, satTrail.SatelliteTrail(r=132.9, theta=6.281, width=12.1)),
+    Candidate("swallow", 1176, 44, satTrail.SatelliteTrail(r=325.7, theta=5.495, width=23.5)),
+    Candidate("unknown", 1176, 78, satTrail.SatelliteTrail(r=85.2, theta=2.363, width=18.9)),
+    Candidate("unknown", 1176, 84, satTrail.SatelliteTrail(r=1441.5, theta=0.961, width=23.4)),
+    Candidate("moustache", 1176, 97, satTrail.SatelliteTrail(r=540.9, theta=6.229, width=23.0)),
+    Candidate("moustache", 1176, 101, satTrail.SatelliteTrail(r=985.6, theta=1.194, width=23.4)),
+    Candidate("moustache", 1178, 15, satTrail.SatelliteTrail(r=3698.3, theta=1.159, width=23.7)),
+    Candidate("moustache", 1178, 21, satTrail.SatelliteTrail(r=3730.4, theta=0.936, width=22.5)),
+    Candidate("swallow", 1178, 35, satTrail.SatelliteTrail(r=955.9, theta=2.689, width=23.0)),
+    Candidate("moustache", 1178, 37, satTrail.SatelliteTrail(r=1853.2, theta=1.064, width=26.3)),
+    Candidate("moustache", 1178, 69, satTrail.SatelliteTrail(r=251.1, theta=1.978, width=23.4)),
+    Candidate("diffraction", 1178, 78, satTrail.SatelliteTrail(r=2019.2, theta=6.281, width=12.7)),
+    Candidate("moustache", 1178, 89, satTrail.SatelliteTrail(r=2375.4, theta=2.114, width=25.2)),
+    Candidate("moustache", 1178, 100, satTrail.SatelliteTrail(r=631.7, theta=1.965, width=21.3)),
+    Candidate("moustache", 1180, 5, satTrail.SatelliteTrail(r=248.3, theta=5.642, width=17.5)),
+    Candidate("unknown", 1180, 35, satTrail.SatelliteTrail(r=376.7, theta=1.020, width=10.2)),
+    Candidate("moustache", 1180, 45, satTrail.SatelliteTrail(r=1945.6, theta=1.684, width=21.6)),
+    Candidate("moustache", 1180, 69, satTrail.SatelliteTrail(r=1251.1, theta=1.703, width=20.9)),
+    Candidate("moustache", 1180, 90, satTrail.SatelliteTrail(r=1577.2, theta=0.379, width=19.1)),
+    Candidate("moustache", 1180, 96, satTrail.SatelliteTrail(r=2402.3, theta=0.563, width=20.3)),
+    Candidate("moustache", 1180, 99, satTrail.SatelliteTrail(r=219.6, theta=6.189, width=19.7)),
+    Candidate("moustache", 1180, 100, satTrail.SatelliteTrail(r=190.4, theta=2.302, width=18.4)),
+    Candidate("moustache", 1182, 15, satTrail.SatelliteTrail(r=3689.1, theta=1.153, width=18.8)),
+    Candidate("moustache", 1182, 15, satTrail.SatelliteTrail(r=1887.8, theta=0.788, width=17.2)),
+    Candidate("moustache", 1182, 21, satTrail.SatelliteTrail(r=3814.4, theta=0.807, width=18.3)),
+    Candidate("moustache", 1182, 28, satTrail.SatelliteTrail(r=3838.0, theta=0.968, width=19.9)),
+    Candidate("swallow", 1182, 31, satTrail.SatelliteTrail(r=2132.4, theta=0.464, width=18.6)),
+    Candidate("swallow", 1182, 44, satTrail.SatelliteTrail(r=1477.5, theta=0.462, width=20.1)),
+    Candidate("moustache", 1182, 100, satTrail.SatelliteTrail(r=325.5, theta=1.865, width=19.4)),
+    Candidate("moustache", 1182, 101, satTrail.SatelliteTrail(r=659.5, theta=0.986, width=21.3)),
+    Candidate("moustache", 1184, 10, satTrail.SatelliteTrail(r=1001.9, theta=5.675, width=18.9)),
+    Candidate("moustache", 1184, 15, satTrail.SatelliteTrail(r=3320.8, theta=0.958, width=21.9)),
+    Candidate("swallow", 1184, 20, satTrail.SatelliteTrail(r=1753.8, theta=2.360, width=18.3)),
+    Candidate("moustache", 1184, 28, satTrail.SatelliteTrail(r=3773.0, theta=0.980, width=19.3)),
+    Candidate("diffraction", 1184, 67, satTrail.SatelliteTrail(r=1884.2, theta=0.872, width=18.8)),
+    Candidate("moustache", 1184, 97, satTrail.SatelliteTrail(r=465.9, theta=0.089, width=20.0)),
+    Candidate("moustache", 1184, 97, satTrail.SatelliteTrail(r=318.1, theta=0.030, width=21.4)),
+    Candidate("moustache", 1186, 4, satTrail.SatelliteTrail(r=1066.2, theta=2.526, width=15.9)),
+    Candidate("moustache", 1186, 15, satTrail.SatelliteTrail(r=2511.5, theta=1.020, width=16.2)),
+    Candidate("moustache", 1186, 21, satTrail.SatelliteTrail(r=3018.0, theta=0.805, width=16.7)),
+    Candidate("moustache", 1186, 21, satTrail.SatelliteTrail(r=3528.9, theta=0.851, width=16.2)),
+    Candidate("moustache", 1186, 22, satTrail.SatelliteTrail(r=2076.7, theta=1.986, width=16.3)),
+    Candidate("swallow", 1186, 44, satTrail.SatelliteTrail(r=321.6, theta=2.404, width=17.8)),
+    Candidate("moustache", 1186, 53, satTrail.SatelliteTrail(r=3033.2, theta=1.314, width=20.7)),
+    Candidate("swallow", 1186, 72, satTrail.SatelliteTrail(r=481.5, theta=2.365, width=16.2)),
+    Candidate("moustache", 1186, 97, satTrail.SatelliteTrail(r=586.9, theta=6.199, width=16.8)),
+    Candidate("unknown", 1188, 16, satTrail.SatelliteTrail(r=1016.6, theta=0.330, width=17.6)),
+    Candidate("moustache", 1188, 21, satTrail.SatelliteTrail(r=3081.8, theta=0.812, width=17.1)),
+    Candidate("moustache", 1188, 29, satTrail.SatelliteTrail(r=1844.6, theta=0.867, width=18.0)),
+    Candidate("swallow", 1188, 36, satTrail.SatelliteTrail(r=529.7, theta=5.846, width=15.6)),
+    Candidate("moustache", 1188, 37, satTrail.SatelliteTrail(r=1344.0, theta=1.053, width=14.8)),
+    Candidate("moustache", 1190, 4, satTrail.SatelliteTrail(r=1532.4, theta=2.619, width=16.1)),
+    Candidate("moustache", 1190, 5, satTrail.SatelliteTrail(r=595.3, theta=5.525, width=18.5)),
+    Candidate("diffraction", 1190, 38, satTrail.SatelliteTrail(r=2101.9, theta=0.134, width=20.5)),
+    Candidate("moustache", 1190, 69, satTrail.SatelliteTrail(r=533.1, theta=1.734, width=17.9)),
+    Candidate("unknown", 1190, 83, satTrail.SatelliteTrail(r=1817.7, theta=2.357, width=17.9)),
+    Candidate("moustache", 1190, 89, satTrail.SatelliteTrail(r=2198.2, theta=2.015, width=16.5)),
+    Candidate("moustache", 1190, 90, satTrail.SatelliteTrail(r=1535.8, theta=0.413, width=17.3)),
+    Candidate("moustache", 1190, 99, satTrail.SatelliteTrail(r=396.0, theta=6.251, width=17.1)),
+    Candidate("moustache", 1192, 5, satTrail.SatelliteTrail(r=657.4, theta=5.854, width=17.5)),
+    Candidate("swallow", 1192, 8, satTrail.SatelliteTrail(r=199.3, theta=2.365, width=17.4)),
+    Candidate("moustache", 1192, 21, satTrail.SatelliteTrail(r=3398.3, theta=0.773, width=12.7)),
+    Candidate("moustache", 1192, 21, satTrail.SatelliteTrail(r=4029.5, theta=1.123, width=16.1)),
+    Candidate("swallow", 1192, 31, satTrail.SatelliteTrail(r=2413.9, theta=0.469, width=15.7)),
+    Candidate("moustache", 1192, 98, satTrail.SatelliteTrail(r=787.3, theta=6.207, width=16.2)),
+    Candidate("moustache", 1194, 2, satTrail.SatelliteTrail(r=1348.7, theta=6.168, width=17.6)),
+    Candidate("moustache", 1194, 3, satTrail.SatelliteTrail(r=2808.9, theta=0.716, width=22.6)),
+    Candidate("moustache", 1194, 9, satTrail.SatelliteTrail(r=1761.5, theta=0.512, width=18.1)),
+    Candidate("swallow", 1194, 23, satTrail.SatelliteTrail(r=3382.0, theta=0.613, width=17.0)),
+    Candidate("swallow", 1194, 37, satTrail.SatelliteTrail(r=315.4, theta=2.604, width=18.4)),
+    Candidate("swallow", 1194, 37, satTrail.SatelliteTrail(r=682.3, theta=0.199, width=18.1)),
+    Candidate("moustache", 1194, 38, satTrail.SatelliteTrail(r=1553.2, theta=1.567, width=19.3)),
+    Candidate("moustache", 1194, 46, satTrail.SatelliteTrail(r=1381.8, theta=1.706, width=18.3)),
+    Candidate("moustache", 1194, 97, satTrail.SatelliteTrail(r=379.9, theta=0.017, width=17.8)),
+    Candidate("moustache", 1202, 4, satTrail.SatelliteTrail(r=1903.6, theta=2.364, width=17.1)),
+    Candidate("moustache", 1202, 10, satTrail.SatelliteTrail(r=300.8, theta=5.699, width=15.1)),
+    Candidate("moustache", 1202, 15, satTrail.SatelliteTrail(r=1760.2, theta=1.023, width=15.3)),
+    Candidate("moustache", 1202, 15, satTrail.SatelliteTrail(r=2490.7, theta=1.049, width=16.9)),
+    Candidate("moustache", 1202, 21, satTrail.SatelliteTrail(r=3432.3, theta=0.865, width=16.3)),
+    Candidate("moustache", 1202, 28, satTrail.SatelliteTrail(r=3872.8, theta=1.141, width=16.0)),
+    Candidate("moustache", 1202, 29, satTrail.SatelliteTrail(r=1590.0, theta=0.964, width=17.2)),
+    Candidate("moustache", 1202, 61, satTrail.SatelliteTrail(r=2197.8, theta=1.868, width=16.4)),
+    Candidate("moustache", 1202, 69, satTrail.SatelliteTrail(r=2060.5, theta=1.661, width=16.2)),
+    Candidate("diffraction", 1202, 71, satTrail.SatelliteTrail(r=59.7, theta=5.521, width=15.0)),
+    Candidate("moustache", 1202, 84, satTrail.SatelliteTrail(r=1006.3, theta=0.969, width=17.2)),
+    Candidate("moustache", 1202, 89, satTrail.SatelliteTrail(r=554.8, theta=2.109, width=15.9)),
+    Candidate("moustache", 1202, 97, satTrail.SatelliteTrail(r=220.6, theta=6.170, width=17.0)),
+    Candidate("moustache", 1202, 101, satTrail.SatelliteTrail(r=432.6, theta=1.167, width=17.7)),
+    Candidate("moustache", 1204, 4, satTrail.SatelliteTrail(r=1320.5, theta=2.212, width=13.9)),
+    Candidate("moustache", 1204, 29, satTrail.SatelliteTrail(r=1883.5, theta=0.998, width=13.9)),
+    Candidate("moustache", 1204, 37, satTrail.SatelliteTrail(r=1834.7, theta=1.093, width=13.2)),
+    Candidate("unknown", 1204, 38, satTrail.SatelliteTrail(r=266.5, theta=5.901, width=13.4)),
+    Candidate("moustache", 1204, 61, satTrail.SatelliteTrail(r=395.6, theta=1.969, width=13.2)),
+    Candidate("moustache", 1204, 69, satTrail.SatelliteTrail(r=130.6, theta=5.117, width=14.8)),
+    Candidate("moustache", 1204, 90, satTrail.SatelliteTrail(r=2509.7, theta=0.949, width=14.9)),
+    Candidate("moustache", 1204, 90, satTrail.SatelliteTrail(r=2640.4, theta=0.487, width=11.9)),
+    Candidate("moustache", 1204, 94, satTrail.SatelliteTrail(r=1312.0, theta=2.358, width=12.8)),
+    Candidate("moustache", 1204, 95, satTrail.SatelliteTrail(r=1415.9, theta=5.738, width=13.3)),
+    Candidate("moustache", 1204, 99, satTrail.SatelliteTrail(r=458.6, theta=2.476, width=13.6)),
+    Candidate("moustache", 1206, 3, satTrail.SatelliteTrail(r=2544.5, theta=0.663, width=18.2)),
+    Candidate("moustache", 1206, 5, satTrail.SatelliteTrail(r=262.9, theta=5.611, width=15.1)),
+    Candidate("diffraction", 1206, 10, satTrail.SatelliteTrail(r=290.4, theta=5.651, width=13.5)),
+    Candidate("diffraction", 1206, 10, satTrail.SatelliteTrail(r=1127.6, theta=2.416, width=18.0)),
+    Candidate("moustache", 1206, 15, satTrail.SatelliteTrail(r=2974.7, theta=0.818, width=19.3)),
+    Candidate("moustache", 1206, 15, satTrail.SatelliteTrail(r=3902.3, theta=1.019, width=17.9)),
+    Candidate("moustache", 1206, 29, satTrail.SatelliteTrail(r=2007.6, theta=1.050, width=18.2)),
+    Candidate("diffraction", 1206, 30, satTrail.SatelliteTrail(r=336.0, theta=6.268, width=9.3)),
+    Candidate("unknown", 1206, 38, satTrail.SatelliteTrail(r=1742.6, theta=0.193, width=18.4)),
+    Candidate("unknown", 1206, 62, satTrail.SatelliteTrail(r=1502.0, theta=1.797, width=21.5)),
+    Candidate("diffraction", 1206, 76, satTrail.SatelliteTrail(r=2584.5, theta=0.692, width=17.9)),
+    Candidate("moustache", 1206, 89, satTrail.SatelliteTrail(r=2362.8, theta=2.045, width=19.0)),
+    Candidate("moustache", 1206, 90, satTrail.SatelliteTrail(r=1244.6, theta=0.366, width=20.5)),
+    Candidate("moustache", 1206, 90, satTrail.SatelliteTrail(r=2408.7, theta=0.819, width=20.2)),
+    Candidate("moustache", 1206, 94, satTrail.SatelliteTrail(r=1601.1, theta=2.451, width=19.5)),
+    Candidate("moustache", 1206, 95, satTrail.SatelliteTrail(r=912.4, theta=5.686, width=20.3)),
+    Candidate("moustache", 1206, 98, satTrail.SatelliteTrail(r=1197.5, theta=0.014, width=19.1)),
+    Candidate("moustache", 1206, 99, satTrail.SatelliteTrail(r=116.1, theta=6.231, width=18.6)),
+    Candidate("moustache", 1206, 99, satTrail.SatelliteTrail(r=2171.1, theta=1.566, width=18.1)),
+    Candidate("moustache", 1206, 103, satTrail.SatelliteTrail(r=1990.6, theta=5.420, width=20.6)),
+    Candidate("unknown", 1208, 1, satTrail.SatelliteTrail(r=1505.8, theta=6.178, width=11.5)),
+    Candidate("moustache", 1208, 15, satTrail.SatelliteTrail(r=3188.2, theta=1.212, width=11.5)),
+    Candidate("diffraction", 1208, 16, satTrail.SatelliteTrail(r=1931.9, theta=0.568, width=12.2)),
+    Candidate("diffraction", 1208, 29, satTrail.SatelliteTrail(r=1420.2, theta=0.901, width=11.4)),
+    Candidate("diffraction", 1208, 47, satTrail.SatelliteTrail(r=1382.3, theta=0.792, width=11.6)),
+    Candidate("diffraction", 1208, 48, satTrail.SatelliteTrail(r=561.3, theta=2.365, width=11.3)),
+    Candidate("unknown", 1208, 67, satTrail.SatelliteTrail(r=1683.1, theta=6.254, width=11.3)),
+    Candidate("moustache", 1208, 84, satTrail.SatelliteTrail(r=606.3, theta=1.051, width=11.9)),
+    Candidate("moustache", 1208, 84, satTrail.SatelliteTrail(r=1799.5, theta=0.632, width=11.8)),
+    Candidate("moustache", 1208, 95, satTrail.SatelliteTrail(r=749.1, theta=5.799, width=11.8)),
+    Candidate("moustache", 1208, 98, satTrail.SatelliteTrail(r=700.0, theta=0.023, width=10.4)),
+    Candidate("moustache", 1208, 102, satTrail.SatelliteTrail(r=2880.9, theta=0.797, width=15.3)),
+    Candidate("moustache", 1210, 9, satTrail.SatelliteTrail(r=1511.1, theta=0.502, width=17.6)),
+    Candidate("moustache", 1210, 15, satTrail.SatelliteTrail(r=2767.0, theta=0.967, width=18.8)),
+    Candidate("diffraction", 1210, 68, satTrail.SatelliteTrail(r=1139.7, theta=0.805, width=18.0)),
+    Candidate("diffraction", 1210, 68, satTrail.SatelliteTrail(r=1521.7, theta=0.082, width=16.4)),
+    Candidate("moustache", 1210, 78, satTrail.SatelliteTrail(r=1087.8, theta=0.835, width=16.1)),
+    Candidate("moustache", 1210, 97, satTrail.SatelliteTrail(r=58.0, theta=6.254, width=18.1)),
+    Candidate("diffraction", 1210, 100, satTrail.SatelliteTrail(r=1368.8, theta=0.536, width=17.6)),
+    Candidate("moustache", 1212, 4, satTrail.SatelliteTrail(r=1936.4, theta=2.393, width=20.0)),
+    Candidate("moustache", 1212, 10, satTrail.SatelliteTrail(r=371.6, theta=5.736, width=19.4)),
+    Candidate("moustache", 1212, 15, satTrail.SatelliteTrail(r=2208.5, theta=0.994, width=19.1)),
+    Candidate("moustache", 1212, 15, satTrail.SatelliteTrail(r=2990.2, theta=1.077, width=19.7)),
+    Candidate("moustache", 1212, 21, satTrail.SatelliteTrail(r=3334.0, theta=0.805, width=18.2)),
+    Candidate("diffraction", 1212, 30, satTrail.SatelliteTrail(r=131.8, theta=6.281, width=10.1)),
+    Candidate("swallow", 1212, 44, satTrail.SatelliteTrail(r=1174.8, theta=5.919, width=17.6)),
+    Candidate("unknown", 1212, 55, satTrail.SatelliteTrail(r=3285.6, theta=0.802, width=19.9)),
+    Candidate("moustache", 1212, 61, satTrail.SatelliteTrail(r=2366.3, theta=1.935, width=18.1)),
+    Candidate("moustache", 1212, 69, satTrail.SatelliteTrail(r=2509.7, theta=1.613, width=18.8)),
+    Candidate("diffraction", 1212, 73, satTrail.SatelliteTrail(r=1512.1, theta=0.771, width=18.4)),
+    Candidate("moustache", 1212, 84, satTrail.SatelliteTrail(r=1482.2, theta=0.968, width=20.9)),
+    Candidate("moustache", 1212, 97, satTrail.SatelliteTrail(r=365.5, theta=6.162, width=19.6)),
+    Candidate("moustache", 1212, 100, satTrail.SatelliteTrail(r=441.2, theta=2.360, width=23.5)),
+    Candidate("moustache", 1212, 101, satTrail.SatelliteTrail(r=493.2, theta=0.799, width=19.2)),
+    Candidate("moustache", 1214, 15, satTrail.SatelliteTrail(r=2713.0, theta=1.116, width=13.0)),
+    Candidate("moustache", 1214, 15, satTrail.SatelliteTrail(r=3607.7, theta=1.170, width=14.1)),
+    Candidate("moustache", 1214, 21, satTrail.SatelliteTrail(r=3570.1, theta=0.895, width=13.0)),
+    Candidate("moustache", 1214, 21, satTrail.SatelliteTrail(r=4442.1, theta=1.060, width=13.1)),
+    Candidate("moustache", 1214, 22, satTrail.SatelliteTrail(r=865.4, theta=2.217, width=14.0)),
+    Candidate("moustache", 1214, 29, satTrail.SatelliteTrail(r=694.0, theta=1.279, width=12.8)),
+    Candidate("moustache", 1214, 37, satTrail.SatelliteTrail(r=1746.6, theta=1.073, width=12.6)),
+    Candidate("moustache", 1214, 37, satTrail.SatelliteTrail(r=2304.2, theta=1.097, width=12.3)),
+    Candidate("moustache", 1214, 61, satTrail.SatelliteTrail(r=716.3, theta=1.918, width=12.4)),
+    Candidate("moustache", 1214, 69, satTrail.SatelliteTrail(r=191.2, theta=1.953, width=12.2)),
+    Candidate("moustache", 1214, 83, satTrail.SatelliteTrail(r=2475.6, theta=2.355, width=13.6)),
+    Candidate("moustache", 1214, 89, satTrail.SatelliteTrail(r=2298.6, theta=2.103, width=12.5)),
+    Candidate("moustache", 1214, 94, satTrail.SatelliteTrail(r=1434.5, theta=2.360, width=13.4)),
+    Candidate("moustache", 1214, 94, satTrail.SatelliteTrail(r=1770.8, theta=2.399, width=13.0)),
+    Candidate("moustache", 1214, 95, satTrail.SatelliteTrail(r=292.7, theta=5.830, width=13.3)),
+    Candidate("moustache", 1214, 95, satTrail.SatelliteTrail(r=409.7, theta=5.461, width=11.0)),
+    Candidate("moustache", 1214, 99, satTrail.SatelliteTrail(r=561.0, theta=2.469, width=12.8)),
+    Candidate("moustache", 1214, 100, satTrail.SatelliteTrail(r=700.2, theta=1.952, width=13.8)),
+    Candidate("moustache", 1214, 101, satTrail.SatelliteTrail(r=597.7, theta=0.911, width=13.2)),
+    Candidate("moustache", 1214, 103, satTrail.SatelliteTrail(r=1715.4, theta=5.497, width=15.0)),
+    Candidate("moustache", 1216, 4, satTrail.SatelliteTrail(r=1776.3, theta=2.362, width=13.5)),
+    Candidate("moustache", 1216, 5, satTrail.SatelliteTrail(r=126.6, theta=5.571, width=13.1)),
+    Candidate("moustache", 1216, 10, satTrail.SatelliteTrail(r=142.4, theta=5.164, width=13.0)),
+    Candidate("diffraction", 1216, 16, satTrail.SatelliteTrail(r=3785.9, theta=0.838, width=14.1)),
+    Candidate("moustache", 1216, 46, satTrail.SatelliteTrail(r=2049.1, theta=1.273, width=13.3)),
+    Candidate("moustache", 1216, 54, satTrail.SatelliteTrail(r=2283.6, theta=1.451, width=12.6)),
+    Candidate("diffraction", 1216, 65, satTrail.SatelliteTrail(r=1124.6, theta=2.365, width=12.4)),
+    Candidate("moustache", 1216, 70, satTrail.SatelliteTrail(r=3230.6, theta=1.032, width=12.3)),
+    Candidate("moustache", 1216, 89, satTrail.SatelliteTrail(r=2792.7, theta=1.999, width=12.7)),
+    Candidate("moustache", 1216, 90, satTrail.SatelliteTrail(r=1671.9, theta=0.388, width=12.6)),
+    Candidate("moustache", 1216, 90, satTrail.SatelliteTrail(r=1992.6, theta=0.962, width=12.3)),
+    Candidate("moustache", 1216, 91, satTrail.SatelliteTrail(r=239.2, theta=0.300, width=12.6)),
+    Candidate("moustache", 1216, 94, satTrail.SatelliteTrail(r=1723.4, theta=2.442, width=11.5)),
+    Candidate("moustache", 1216, 96, satTrail.SatelliteTrail(r=2429.3, theta=0.543, width=11.9)),
+    Candidate("moustache", 1216, 98, satTrail.SatelliteTrail(r=1509.1, theta=0.061, width=12.0)),
+    Candidate("moustache", 1216, 99, satTrail.SatelliteTrail(r=296.3, theta=6.178, width=12.0)),
+    Candidate("moustache", 1216, 99, satTrail.SatelliteTrail(r=2555.5, theta=1.510, width=12.3)),
+    Candidate("moustache", 1216, 103, satTrail.SatelliteTrail(r=1358.6, theta=5.295, width=12.8)),
+    Candidate("moustache", 1218, 15, satTrail.SatelliteTrail(r=1919.6, theta=0.898, width=11.2)),
+    Candidate("moustache", 1218, 15, satTrail.SatelliteTrail(r=2565.5, theta=1.000, width=11.2)),
+    Candidate("moustache", 1218, 15, satTrail.SatelliteTrail(r=3625.3, theta=1.176, width=11.3)),
+    Candidate("unknown", 1218, 19, satTrail.SatelliteTrail(r=1824.9, theta=0.461, width=11.5)),
+    Candidate("moustache", 1218, 21, satTrail.SatelliteTrail(r=3715.5, theta=0.795, width=9.9)),
+    Candidate("moustache", 1218, 21, satTrail.SatelliteTrail(r=4458.6, theta=1.112, width=10.8)),
+    Candidate("swallow", 1218, 31, satTrail.SatelliteTrail(r=2128.4, theta=0.800, width=12.9)),
+    Candidate("diffraction", 1218, 45, satTrail.SatelliteTrail(r=228.5, theta=2.354, width=11.2)),
+    Candidate("moustache", 1218, 53, satTrail.SatelliteTrail(r=1772.3, theta=1.881, width=11.4)),
+    Candidate("diffraction", 1218, 58, satTrail.SatelliteTrail(r=513.2, theta=2.370, width=10.7)),
+    Candidate("unknown", 1218, 59, satTrail.SatelliteTrail(r=3381.9, theta=0.794, width=11.0)),
+    Candidate("moustache", 1218, 95, satTrail.SatelliteTrail(r=755.1, theta=5.801, width=11.3)),
+    Candidate("moustache", 1218, 98, satTrail.SatelliteTrail(r=837.4, theta=6.265, width=12.4)),
+    Candidate("moustache", 1220, 4, satTrail.SatelliteTrail(r=1198.7, theta=2.226, width=12.0)),
+    Candidate("moustache", 1220, 15, satTrail.SatelliteTrail(r=3261.4, theta=1.000, width=11.3)),
+    Candidate("moustache", 1220, 38, satTrail.SatelliteTrail(r=1619.9, theta=6.258, width=11.1)),
+    Candidate("moustache", 1220, 38, satTrail.SatelliteTrail(r=1822.5, theta=0.316, width=12.1)),
+    Candidate("moustache", 1220, 38, satTrail.SatelliteTrail(r=2266.0, theta=1.525, width=11.8)),
+    Candidate("moustache", 1220, 46, satTrail.SatelliteTrail(r=2116.8, theta=1.668, width=12.0)),
+    Candidate("moustache", 1220, 97, satTrail.SatelliteTrail(r=246.0, theta=6.246, width=11.7)),
+    Candidate("moustache", 1220, 97, satTrail.SatelliteTrail(r=538.2, theta=0.086, width=11.9)),
+    Candidate("unknown", 1220, 103, satTrail.SatelliteTrail(r=3834.5, theta=6.265, width=14.1)),
+    Candidate("moustache", 1222, 10, satTrail.SatelliteTrail(r=359.9, theta=5.723, width=12.7)),
+    Candidate("moustache", 1222, 15, satTrail.SatelliteTrail(r=1968.9, theta=0.993, width=11.1)),
+    Candidate("moustache", 1222, 21, satTrail.SatelliteTrail(r=3088.3, theta=0.790, width=13.2)),
+    Candidate("moustache", 1222, 83, satTrail.SatelliteTrail(r=1766.2, theta=2.238, width=11.9)),
+    Candidate("moustache", 1222, 84, satTrail.SatelliteTrail(r=1247.2, theta=1.014, width=11.5)),
+    Candidate("moustache", 1222, 97, satTrail.SatelliteTrail(r=340.1, theta=6.177, width=9.2)),
+    Candidate("moustache", 1222, 98, satTrail.SatelliteTrail(r=776.4, theta=0.085, width=11.4)),
+    Candidate("moustache", 1222, 101, satTrail.SatelliteTrail(r=638.6, theta=1.187, width=11.2)),
+    Candidate("moustache", 1228, 2, satTrail.SatelliteTrail(r=1666.0, theta=0.119, width=19.0)),
+    Candidate("moustache", 1228, 4, satTrail.SatelliteTrail(r=1878.7, theta=2.352, width=16.3)),
+    Candidate("moustache", 1228, 10, satTrail.SatelliteTrail(r=418.5, theta=5.718, width=18.5)),
+    Candidate("moustache", 1228, 21, satTrail.SatelliteTrail(r=3408.5, theta=0.835, width=19.6)),
+    Candidate("unknown", 1228, 30, satTrail.SatelliteTrail(r=1229.3, theta=1.574, width=16.6)),
+    Candidate("swallow", 1228, 44, satTrail.SatelliteTrail(r=1281.6, theta=5.947, width=17.6)),
+    Candidate("swallow", 1228, 72, satTrail.SatelliteTrail(r=41.9, theta=2.361, width=19.9)),
+    Candidate("moustache", 1228, 83, satTrail.SatelliteTrail(r=1372.9, theta=2.350, width=22.5)),
+    Candidate("moustache", 1228, 84, satTrail.SatelliteTrail(r=959.6, theta=0.967, width=18.9)),
+    Candidate("moustache", 1228, 97, satTrail.SatelliteTrail(r=183.5, theta=6.168, width=18.5)),
+    Candidate("moustache", 1228, 100, satTrail.SatelliteTrail(r=342.5, theta=2.300, width=17.8)),
+    Candidate("moustache", 1228, 101, satTrail.SatelliteTrail(r=472.9, theta=1.146, width=19.1)),
+    Candidate("moustache", 1228, 102, satTrail.SatelliteTrail(r=2844.7, theta=0.784, width=19.2)),
+    Candidate("moustache", 1230, 10, satTrail.SatelliteTrail(r=445.4, theta=2.366, width=17.5)),
+    Candidate("moustache", 1230, 21, satTrail.SatelliteTrail(r=3264.8, theta=1.048, width=19.2)),
+    Candidate("moustache", 1230, 29, satTrail.SatelliteTrail(r=1648.9, theta=0.779, width=17.9)),
+    Candidate("moustache", 1230, 29, satTrail.SatelliteTrail(r=1919.4, theta=1.005, width=19.6)),
+    Candidate("diffraction", 1230, 38, satTrail.SatelliteTrail(r=317.4, theta=0.049, width=16.7)),
+    Candidate("diffraction", 1230, 83, satTrail.SatelliteTrail(r=2501.4, theta=0.812, width=19.4)),
+    Candidate("moustache", 1230, 89, satTrail.SatelliteTrail(r=2024.8, theta=2.125, width=19.8)),
+    Candidate("moustache", 1230, 90, satTrail.SatelliteTrail(r=2463.6, theta=0.947, width=18.7)),
+    Candidate("moustache", 1230, 94, satTrail.SatelliteTrail(r=1624.1, theta=2.419, width=20.4)),
+    Candidate("moustache", 1230, 95, satTrail.SatelliteTrail(r=221.6, theta=5.822, width=18.9)),
+    Candidate("moustache", 1230, 99, satTrail.SatelliteTrail(r=447.5, theta=2.494, width=17.4)),
+    Candidate("moustache", 1230, 101, satTrail.SatelliteTrail(r=1055.7, theta=1.246, width=19.1)),
+    Candidate("moustache", 1230, 103, satTrail.SatelliteTrail(r=1878.3, theta=5.525, width=19.4)),
+    Candidate("moustache", 1232, 3, satTrail.SatelliteTrail(r=2526.1, theta=0.639, width=18.9)),
+    Candidate("moustache", 1232, 5, satTrail.SatelliteTrail(r=337.4, theta=5.643, width=17.8)),
+    Candidate("moustache", 1232, 10, satTrail.SatelliteTrail(r=319.9, theta=5.640, width=18.7)),
+    Candidate("unknown", 1232, 11, satTrail.SatelliteTrail(r=2985.2, theta=0.796, width=21.9)),
+    Candidate("diffraction", 1232, 68, satTrail.SatelliteTrail(r=1388.7, theta=0.877, width=17.9)),
+    Candidate("moustache", 1232, 69, satTrail.SatelliteTrail(r=698.2, theta=1.758, width=17.6)),
+    Candidate("moustache", 1232, 70, satTrail.SatelliteTrail(r=2714.6, theta=1.027, width=19.6)),
+    Candidate("diffraction", 1232, 76, satTrail.SatelliteTrail(r=781.9, theta=2.365, width=18.7)),
+    Candidate("moustache", 1232, 89, satTrail.SatelliteTrail(r=322.1, theta=5.686, width=18.7)),
+    Candidate("moustache", 1232, 89, satTrail.SatelliteTrail(r=453.0, theta=2.402, width=20.4)),
+    Candidate("moustache", 1232, 89, satTrail.SatelliteTrail(r=2433.8, theta=2.032, width=18.9)),
+    Candidate("moustache", 1232, 96, satTrail.SatelliteTrail(r=1336.0, theta=0.636, width=18.8)),
+    Candidate("moustache", 1232, 98, satTrail.SatelliteTrail(r=1204.5, theta=0.030, width=17.8)),
+    Candidate("moustache", 1232, 99, satTrail.SatelliteTrail(r=79.2, theta=6.211, width=19.2)),
+    Candidate("moustache", 1232, 101, satTrail.SatelliteTrail(r=1136.2, theta=1.268, width=17.7)),
+    Candidate("moustache", 1232, 101, satTrail.SatelliteTrail(r=1586.5, theta=0.788, width=17.2)),
+    Candidate("moustache", 1236, 9, satTrail.SatelliteTrail(r=1554.6, theta=0.510, width=16.3)),
+    Candidate("moustache", 1236, 15, satTrail.SatelliteTrail(r=2814.3, theta=0.983, width=15.7)),
+    Candidate("moustache", 1236, 38, satTrail.SatelliteTrail(r=1753.9, theta=0.332, width=17.4)),
+    Candidate("unknown", 1236, 78, satTrail.SatelliteTrail(r=1076.7, theta=0.811, width=17.6)),
+    Candidate("unknown", 1236, 84, satTrail.SatelliteTrail(r=2168.1, theta=1.039, width=17.2)),
+    Candidate("moustache", 1236, 97, satTrail.SatelliteTrail(r=35.2, theta=6.260, width=16.4)),
+    Candidate("moustache", 1236, 97, satTrail.SatelliteTrail(r=1391.3, theta=0.204, width=16.0)),
+    Candidate("moustache", 1238, 2, satTrail.SatelliteTrail(r=1719.1, theta=6.266, width=19.1)),
+    Candidate("moustache", 1238, 10, satTrail.SatelliteTrail(r=435.6, theta=5.741, width=17.1)),
+    Candidate("moustache", 1238, 15, satTrail.SatelliteTrail(r=2252.7, theta=0.985, width=16.7)),
+    Candidate("moustache", 1238, 15, satTrail.SatelliteTrail(r=3007.2, theta=1.043, width=16.4)),
+    Candidate("moustache", 1238, 21, satTrail.SatelliteTrail(r=3391.2, theta=0.804, width=14.9)),
+    Candidate("swallow", 1238, 22, satTrail.SatelliteTrail(r=3551.0, theta=0.794, width=18.6)),
+    Candidate("moustache", 1238, 28, satTrail.SatelliteTrail(r=4375.9, theta=1.191, width=15.9)),
+    Candidate("moustache", 1238, 29, satTrail.SatelliteTrail(r=2111.3, theta=0.945, width=16.6)),
+    Candidate("swallow", 1238, 72, satTrail.SatelliteTrail(r=196.4, theta=5.534, width=16.4)),
+    Candidate("moustache", 1238, 77, satTrail.SatelliteTrail(r=617.5, theta=2.182, width=17.0)),
+    Candidate("moustache", 1238, 84, satTrail.SatelliteTrail(r=1455.1, theta=0.955, width=17.9)),
+    Candidate("moustache", 1238, 97, satTrail.SatelliteTrail(r=343.4, theta=6.166, width=17.7)),
+    Candidate("moustache", 1238, 101, satTrail.SatelliteTrail(r=838.3, theta=1.248, width=16.3)),
+    Candidate("moustache", 1238, 103, satTrail.SatelliteTrail(r=1027.9, theta=5.118, width=17.9)),
+    Candidate("moustache", 1240, 21, satTrail.SatelliteTrail(r=3729.3, theta=0.955, width=18.0)),
+    Candidate("moustache", 1240, 22, satTrail.SatelliteTrail(r=864.3, theta=2.202, width=20.3)),
+    Candidate("moustache", 1240, 62, satTrail.SatelliteTrail(r=1248.6, theta=1.446, width=22.3)),
+    Candidate("moustache", 1240, 73, satTrail.SatelliteTrail(r=2354.3, theta=2.366, width=20.2)),
+    Candidate("moustache", 1240, 85, satTrail.SatelliteTrail(r=2450.6, theta=2.361, width=19.0)),
+    Candidate("moustache", 1240, 95, satTrail.SatelliteTrail(r=280.4, theta=5.873, width=20.6)),
+    Candidate("unknown", 1240, 99, satTrail.SatelliteTrail(r=1488.8, theta=2.362, width=19.9)),
+    Candidate("moustache", 1240, 101, satTrail.SatelliteTrail(r=643.8, theta=0.878, width=18.9)),
+    Candidate("moustache", 1242, 5, satTrail.SatelliteTrail(r=250.5, theta=5.642, width=22.6)),
+    Candidate("unknown", 1242, 8, satTrail.SatelliteTrail(r=1625.3, theta=6.092, width=17.0)),
+    Candidate("moustache", 1242, 10, satTrail.SatelliteTrail(r=173.2, theta=5.156, width=18.7)),
+    Candidate("moustache", 1242, 22, satTrail.SatelliteTrail(r=2629.5, theta=1.862, width=19.4)),
+    Candidate("swallow", 1242, 28, satTrail.SatelliteTrail(r=673.4, theta=2.689, width=18.5)),
+    Candidate("diffraction", 1242, 38, satTrail.SatelliteTrail(r=2617.5, theta=0.797, width=20.3)),
+    Candidate("unknown", 1242, 60, satTrail.SatelliteTrail(r=1833.7, theta=0.795, width=18.1)),
+    Candidate("moustache", 1242, 69, satTrail.SatelliteTrail(r=1082.4, theta=1.765, width=18.6)),
+    Candidate("swallow", 1242, 78, satTrail.SatelliteTrail(r=76.9, theta=5.478, width=18.7)),
+    Candidate("moustache", 1242, 89, satTrail.SatelliteTrail(r=196.8, theta=5.645, width=20.8)),
+    Candidate("moustache", 1242, 89, satTrail.SatelliteTrail(r=2852.7, theta=1.994, width=18.7)),
+    Candidate("moustache", 1242, 90, satTrail.SatelliteTrail(r=1628.5, theta=0.383, width=19.3)),
+    Candidate("moustache", 1242, 91, satTrail.SatelliteTrail(r=214.3, theta=0.299, width=19.4)),
+    Candidate("moustache", 1242, 99, satTrail.SatelliteTrail(r=261.7, theta=6.189, width=18.7)),
+    Candidate("moustache", 1242, 100, satTrail.SatelliteTrail(r=216.7, theta=2.276, width=18.7)),
+    Candidate("moustache", 1244, 15, satTrail.SatelliteTrail(r=2600.4, theta=0.977, width=16.2)),
+    Candidate("swallow", 1244, 31, satTrail.SatelliteTrail(r=2146.5, theta=0.803, width=16.9)),
+    Candidate("swallow", 1244, 44, satTrail.SatelliteTrail(r=1775.1, theta=2.361, width=18.8)),
+    Candidate("moustache", 1244, 98, satTrail.SatelliteTrail(r=588.0, theta=6.116, width=17.2)),
+    Candidate("moustache", 1244, 98, satTrail.SatelliteTrail(r=827.4, theta=6.273, width=16.3)),
+    Candidate("moustache", 1244, 101, satTrail.SatelliteTrail(r=614.2, theta=0.916, width=17.1)),
+    Candidate("moustache", 1246, 10, satTrail.SatelliteTrail(r=998.6, theta=5.670, width=17.9)),
+    Candidate("swallow", 1246, 37, satTrail.SatelliteTrail(r=356.8, theta=5.997, width=16.9)),
+    Candidate("unknown", 1248, 48, satTrail.SatelliteTrail(r=370.7, theta=0.227, width=17.6)),
+    Candidate("moustache", 1248, 102, satTrail.SatelliteTrail(r=2878.5, theta=0.792, width=19.1)),
+    Candidate("unknown", 1886, 96, satTrail.SatelliteTrail(r=1259.2, theta=0.770, width=32.8)),
+    Candidate("moustache", 1888, 10, satTrail.SatelliteTrail(r=149.1, theta=5.670, width=30.9)),
+    Candidate("moustache", 1888, 15, satTrail.SatelliteTrail(r=1680.6, theta=1.011, width=29.0)),
+    Candidate("diffraction", 1888, 81, satTrail.SatelliteTrail(r=2009.5, theta=6.276, width=16.9)),
+    Candidate("moustache", 1888, 83, satTrail.SatelliteTrail(r=1279.9, theta=2.356, width=30.5)),
+    Candidate("moustache", 1888, 83, satTrail.SatelliteTrail(r=1620.2, theta=2.240, width=34.9)),
+    Candidate("moustache", 1888, 98, satTrail.SatelliteTrail(r=702.6, theta=0.080, width=31.7)),
+    Candidate("moustache", 1888, 102, satTrail.SatelliteTrail(r=2948.7, theta=0.782, width=34.9)),
+    Candidate("diffraction", 1890, 85, satTrail.SatelliteTrail(r=1969.6, theta=6.269, width=17.4)),
+    Candidate("moustache", 1890, 103, satTrail.SatelliteTrail(r=1925.1, theta=5.502, width=34.3)),
+    
     
 ]
 
