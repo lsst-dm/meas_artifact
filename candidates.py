@@ -25,7 +25,23 @@ class Candidate(object):
             (np.abs(self.trail.theta - other.trail.theta) < 0.01)
 
 
-        
+shortCandidates = [
+    Candidate("satellite",  242, 95, satTrail.SatelliteTrail(r=1497.8, theta=1.245, width=21.12 )),
+    Candidate("aircraft",   262,  6, satTrail.SatelliteTrail(r=873.5,  theta=0.465, width=38.73 )),
+    Candidate("aircraft",   264, 96, satTrail.SatelliteTrail(r=1995.9, theta=0.369, width=37.42 )),
+    Candidate("satellite",  268, 51, satTrail.SatelliteTrail(r=1058.5, theta=2.741, width=12.97 )),  #DOUBLE
+    Candidate("satellite",  268, 51, satTrail.SatelliteTrail(r=1417.6, theta=6.276, width=14.49 )),  # DOUBLE
+    Candidate("satellite",  270, 78, satTrail.SatelliteTrail(r=1195.6, theta=5.871, width=14.58 )),
+    Candidate("aircraft",  1166, 65, satTrail.SatelliteTrail(r= 791.9, theta=6.058, width=22.55 )),
+    Candidate("satellite", 1168, 47, satTrail.SatelliteTrail(r=2492.4, theta=1.431, width=13.12 )),
+    Candidate("meteor",    1184, 78, satTrail.SatelliteTrail(r=2221.4, theta=0.845, width=18.69 )),
+    Candidate("aircraft",  1188, 17, satTrail.SatelliteTrail(r=741.2,  theta=6.192, width=20.34 )),
+    Candidate("satellite", 1236, 65, satTrail.SatelliteTrail(r=1580.0, theta=0.286, width= 7.94 )),
+    Candidate("satellite", 1248, 58, satTrail.SatelliteTrail(r=1546.3, theta=0.260, width=13.09 )),
+    #Candidate("empty",     1236, 50, None),
+]
+
+
 knownCandidates = [
 
 #    Candidate("satellite",  ,  , satTrail.SatelliteTrail()),
@@ -495,6 +511,7 @@ knownCandidates = [
     Candidate("aircraft", 1248,49    ,satTrail.SatelliteTrail(r=356.3,theta=6.021,width=16.14   )),
     Candidate("aircraft", 1248, 55, satTrail.SatelliteTrail(r=35.2, theta=6.020, width=17.2)),
     Candidate("satellite",1248,58    ,satTrail.SatelliteTrail(r=1546.3,theta=0.260,width=13.09  )),
+    Candidate("satellite",1248,68,    satTrail.SatelliteTrail(r=1283.5,theta=0.264,width=2.81)),
     Candidate("satellite",1248,89    ,satTrail.SatelliteTrail(r=331.5,theta=0.048,width=10.81   )),
     Candidate("satellite",1248,100   ,satTrail.SatelliteTrail(r=317.1,theta=0.039,width=7.56    )),
 
@@ -998,12 +1015,3 @@ knownCandidates = [
     
 ]
 
-shortCandidates = [
-    Candidate("satellite",  242, 95, satTrail.SatelliteTrail(r=1497.8, theta=1.245, width=21.12)),
-    Candidate("satellite",   270, 78, satTrail.SatelliteTrail(r=1195.6,theta=5.871,width=14.58)),
-    Candidate("aircraft",  1166, 65, satTrail.SatelliteTrail(r= 791.9, theta=6.058, width=22.55)),
-    Candidate("satellite",1168,47    ,satTrail.SatelliteTrail(r=2492.4,theta=1.431,width=13.12  )),
-    Candidate("meteor",    1184, 78    ,satTrail.SatelliteTrail(r=2221.4,theta=0.845,width=18.69  )),
-    Candidate("satellite", 1236, 65, satTrail.SatelliteTrail(r=1580.0, theta=0.286, width= 7.94)),    
-    #Candidate("empty",     1236, 50, None),
-]

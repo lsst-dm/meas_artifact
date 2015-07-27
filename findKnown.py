@@ -154,7 +154,22 @@ def main(root, threads, output, input=None, kind=None, visit=None, candidateSet=
             pickle.dump(results, fp)
 
 
+    if kind is not None:
+        resultsTmp = []
+        for result in results:
+            dataHash, foundTrails, runtime = result
+            candidates = candidateLookup[dataHash]
+            rightKind = False
+            for candidate in candidates:
+                if candidate.kind in kind:
+                    rightKind = True
+            if rightKind:
+                resultsTmp.append(result)
+        results = resultsTmp
+
+    
     falsePos, falseNeg = [], []
+
     
     ####################################################################
     # Tally the results and see how we did

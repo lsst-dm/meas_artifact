@@ -64,7 +64,7 @@ class SatelliteTask(pipeBase.CmdLineTask):
         
         # run for regular satellites
         trailsSat = self.runSatellite(exposure, bins=4)
-        if dbg:
+        if False: #dbg:
             self.log.info("DEBUGGING: Now plotting SATELLITE detections.")
             if coord1:
                 filename = os.path.join(path,"coord-%05d-%03d.png" % (v,c))
@@ -120,7 +120,7 @@ class SatelliteTask(pipeBase.CmdLineTask):
     def runSatellite(self, exposure, bins=None, broadTrail=False):
             
         if broadTrail:
-            luminosityLimit = 0.05 # low cut on pixel flux
+            luminosityLimit = 0.02 # low cut on pixel flux
             luminosityMax   = 50.0
             maskNPsfSigma   = 3.0*bins
             centerLimit     = 2.0           # about 1 pixel
@@ -131,21 +131,21 @@ class SatelliteTask(pipeBase.CmdLineTask):
             widths          = [40.0, 70.0, 100]  # width of an out of focus aircraft (unbinned)
             houghThresh     = 40            # counts in a r,theta bins
             skewLimit       = 400.0
-            bLimit          = 2.0
+            bLimit          = 3.0
             maxTrailWidth   = 35.0
         else:
-            luminosityLimit = 0.01   # low cut on pixel flux
+            luminosityLimit = 0.02   # low cut on pixel flux
             luminosityMax   = 4.0e2 # max luminsity for pixel flux
             maskNPsfSigma   = 7.0
-            centerLimit     = 1.0  # about 1 pixel
-            eRange          = 0.05  # about +/- 0.1
+            centerLimit     = 1.2  # about 1 pixel
+            eRange          = 0.08  # about +/- 0.1
             houghBins       = 256   # number of r,theta bins (i.e. 256x256)
             kernelSigma     = 7   # pixels
             kernelWidth     = 11   # pixels
             widths          = [1.0, 10.0]
             houghThresh     = 40    # counts in a r,theta bins
-            skewLimit       = 20.0
-            bLimit          = 1.0
+            skewLimit       = 10.0
+            bLimit          = 1.4
             maxTrailWidth   = 30.0
 
         self.finder = satell.SatelliteFinder(

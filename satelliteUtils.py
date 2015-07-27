@@ -11,6 +11,23 @@ import lsst.afw.geom          as afwGeom
 import lsst.afw.geom.ellipses as ellipses
 
 
+def angleCompare(theta1, theta2, tolerance):
+
+    tTest = np.abs(theta2 - theta1) < tolerance
+    
+    # if there's no wrap problem, just use the direct test
+    if tTest:
+        return True
+        
+    # maybe we wrapped, use the dot product to compare
+    c1, c2 = np.cos(theta1), np.cos(theta2)
+    s1, s2 = np.sin(theta1), np.sin(theta2)
+    dot    = np.clip(c1*c2 + s1*s2, -1.0, 1.0)
+    acos   = np.arccos(dot)
+    tTest = (np.abs(acos) < tolerance)
+    return tTest
+
+    
 def getExposurePsfSigma(exposure, minor=False):
     """Helper function to extract the PSF size from an afwImage.Exposure object
 

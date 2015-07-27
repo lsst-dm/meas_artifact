@@ -100,6 +100,10 @@ class SatelliteFinder(object):
             insertWidth = 4.0*(width/2.0 + psfSigma)
         calTrail.insert(calArr, profile, insertWidth)
 
+        if False:
+            wDet = calArr > 0.0002
+            calArr[wDet] = 1.0
+            calArr[~wDet] = 0.0
         # Now bin and smooth, just as we did the real image
         calArr   = afwMath.binImage(calImg, self.bins).getArray()
         calArr   = satUtil.smooth(calArr, self.sigmaSmooth)
@@ -143,6 +147,7 @@ class SatelliteFinder(object):
         rms         = img[isGood].std()
         psfSigma    = satUtil.getExposurePsfSigma(exposure, minor=True)
         #goodDet     = (msk & DET > 0) & isGood
+
         
         #################################################
         # Faint-trail detection image
@@ -163,12 +168,16 @@ class SatelliteFinder(object):
         if np.abs(widths[0]) < 1.1:
             self.sigmaSmooth = self.sigmaSmooth
             back       = satUtil.medianRing(img_faint, self.kernelWidth, 2.0*self.sigmaSmooth)
+            wDet = msk & DET > 0
+            img[wDet] *= 4.0
             img       -= back
             img_faint -= back
             kernelGrow = 1.4
+            thetaTol = 0.15
         else:
             self.sigmaSmooth = 2.0
             kernelGrow = 1.4
+            thetaTol = 0.25
             #back       = satUtil.medianRing(img_faint, self.kernelWidth, 2.0*self.sigmaSmooth)
             #img       -= back
             #img_faint -= back
@@ -185,7 +194,7 @@ class SatelliteFinder(object):
         # Different sized kernels should give the same results for a real trail
         # but would be less likely to for noise.
         # Unfortunately, this is costly, and the effect is small.
-        for kernelFactor in (1.0, 1.4):
+        for kernelFactor in (1.0, kernelGrow):
             kernelWidth = 2*int((kernelFactor*self.kernelWidth)//2) + 1
             kernelSigma = kernelFactor*self.kernelSigma 
 
@@ -210,14 +219,14 @@ class SatelliteFinder(object):
             xx, yy = np.meshgrid(np.arange(img.shape[1], dtype=int), np.arange(img.shape[0], dtype=int))
 
             mm       = momCalc.MomentManager(img, kernelWidth=kernelWidth, kernelSigma=kernelSigma)
-            mm_faint = momCalc.MomentManager(img_faint, kernelWidth=kernelWidth, kernelSigma=kernelSigma)
+            #mm_faint = momCalc.MomentManager(img_faint, kernelWidth=kernelWidth, kernelSigma=kernelSigma)
 
             mmCals = []
             nHits = []
 
             #Selector = momCalc.PixelSelector
             Selector = momCalc.PValuePixelSelector
-            maxPixels = 2000
+            maxPixels = 4000
             for i, calImg in enumerate(calImages):
                 mmCal = momCalc.MomentManager(calImg, kernelWidth=kernelWidth, kernelSigma=kernelSigma, 
                                               isCalibration=True)
@@ -295,7 +304,7 @@ class SatelliteFinder(object):
         maxSeparation = min([x/2 for x in img.shape])
         if True:
             thetaMatch, newTheta = hough.thetaAlignment(mm.theta[isCandidate],xx[isCandidate],yy[isCandidate],
-                                                        limit=4, maxSeparation=maxSeparation)
+                                                        tolerance=thetaTol,limit=3,maxSeparation=maxSeparation)
 
             mm.theta[isCandidate] = newTheta
             isCandidate[isCandidate] = thetaMatch
@@ -307,7 +316,7 @@ class SatelliteFinder(object):
         #################################################
         rMax           = sum([q**2 for q in img.shape])**0.5
         houghTransform = hough.HoughTransform(self.houghBins, self.houghThresh,
-                                              rMax=rMax, maxPoints=1000, nIter=1, maxResid=3.0)
+                                              rMax=rMax, maxPoints=1000, nIter=1, maxResid=5.5)
         solutions      = houghTransform(mm.theta[isCandidate], xx[isCandidate], yy[isCandidate])
 
         #################################################

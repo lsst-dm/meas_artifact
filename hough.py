@@ -8,7 +8,7 @@ from scipy import ndimage as ndimg
 
 import matplotlib.pyplot as plt
 
-import hesse_cluster as hesse
+import satelliteUtils as satUtil
 
 def hesseForm(theta_in, x, y):
     """Convert theta, x, y   to Hesse normal form
@@ -68,7 +68,7 @@ def twoPiOverlap(theta_in, arrays=None, overlapRange=0.2):
 
 
 
-def thetaAlignment(theta, x, y, limit=3, tolerance=0.21, maxSeparation=None):
+def thetaAlignment(theta, x, y, limit=3, tolerance=0.15, maxSeparation=None):
     """A helper function to cull the candidate points.
 
     @param theta      ndarray of thetas
@@ -107,8 +107,13 @@ def thetaAlignment(theta, x, y, limit=3, tolerance=0.21, maxSeparation=None):
     dy        = np.subtract.outer(y, y)
     dydx      = dy/(dx + 0.01)
     thetaXY = np.arctan(dydx)
+    
     aligned1 = np.abs(thetaXY - theta) < tolerance
+    aligned1 |= np.abs(thetaXY - (theta + 1.0*np.pi)) < tolerance
+    aligned1 |= np.abs(thetaXY - (theta - 1.0*np.pi)) < tolerance
     aligned2 = np.abs(thetaXY.transpose() - theta).transpose() < tolerance
+    aligned2 |= np.abs(thetaXY.transpose() - (theta + 1.0*np.pi)).transpose() < tolerance
+    aligned2 |= np.abs(thetaXY.transpose() - (theta - 1.0*np.pi)).transpose() < tolerance
     if maxSeparation:
         dist      = dx**2 + dy**2
         closish   = dist < maxSeparation**2
@@ -131,6 +136,7 @@ def thetaAlignment(theta, x, y, limit=3, tolerance=0.21, maxSeparation=None):
     cut = max(limit, 2)
     w, = np.where(nCand > cut)
     for i in w:
+        # this will fail near +-pi
         pixelTheta = thetaXY[i,aligned[i,:]]
         idx        = np.argsort(pixelTheta)
         diff       = np.diff(pixelTheta[idx])
@@ -214,7 +220,6 @@ def improveCluster(theta, x, y):
     dx[w0] = 1.0
 
     # this is the theta we get if we just draw a line between points in pixel space
-    # We could just use this, but (I'm not sure why) it doesn't do as nice a job.
     intercept   = y - (dy/dx)*x
     sign        = np.sign(intercept)
     pixel_theta = np.arctan(dy/dx) + sign*np.pi/2.0
