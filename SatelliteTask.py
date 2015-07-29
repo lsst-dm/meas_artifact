@@ -24,6 +24,7 @@ import numpy as np
 
 import satellite as satell
 import satelliteDebug as satDebug
+import satelliteTrail as satTrail
 
 if True:
     try:
@@ -31,21 +32,35 @@ if True:
     except:
         pass
 
+
+class SatelliteRunner(pipeBase.TaskRunner):
+
+    @staticmethod
+    def getTargetList(parsedCmd, **kwargs):
+        kwargs['detectionType'] = parsedCmd.detectionType
+        return [(ref, kwargs) for ref in parsedCmd.id.refList]
+    
+    
 class SatelliteTask(pipeBase.CmdLineTask):
     _DefaultName = 'satellite'
     ConfigClass = pexConfig.Config
+    RunnerClass = SatelliteRunner
 
     @classmethod
     def _makeArgumentParser(cls):
         parser = pipeBase.ArgumentParser(name=cls._DefaultName)
         parser.add_id_argument("--id", "calexp", help="Data ID, e.g. --id tract=1234 patch=2,2",
                                ContainerClass=pipeBase.DataIdContainer)
+        parser.add_argument("-d", "--detectionType",
+                            choices=('sat', 'ac', 'all'), default='all', help="Set to run")
         return parser
 
     
     @pipeBase.timeMethod
-    def run(self, dataRef):
+    def run(self, dataRef, **kwargs):
 
+        detectionType = kwargs.get('detectionType', 'all')
+        
         import lsstDebug
         dbg = lsstDebug.Info(__name__).dbg
 
@@ -68,33 +83,37 @@ class SatelliteTask(pipeBase.CmdLineTask):
         t0 = time.time()
 
         coord1, coord2 = False, False 
+
+        trails = satTrail.SatelliteTrailList(0.0, 0.0, 0.0)
         
         # run for regular satellites
-        trailsSat = self.runSatellite(exposure, bins=4)
-        if dbg:
-            self.log.info("DEBUGGING: Now plotting SATELLITE detections.")
-            if coord1:
-                filename = os.path.join(path,"coord-%05d-%03d.png" % (v,c))
-                satDebug.coordPlot(exposure, self.finder, filename)
-                sys.exit()
-            filename = os.path.join(path,"satdebug-%05d-%03d.png" % (v, c))
-            satDebug.debugPlot(self.finder, filename)
+        if detectionType in ('all', 'sat'):
+            trailsSat = self.runSatellite(exposure, bins=4)
+            if dbg:
+                self.log.info("DEBUGGING: Now plotting SATELLITE detections.")
+                if coord1:
+                    filename = os.path.join(path,"coord-%05d-%03d.png" % (v,c))
+                    satDebug.coordPlot(exposure, self.finder, filename)
+                    sys.exit()
+                filename = os.path.join(path,"satdebug-%05d-%03d.png" % (v, c))
+                satDebug.debugPlot(self.finder, filename)
+            print trailsSat
+            trails = trailsSat.merge(trails, drMax=90.0, dThetaMax=0.15)
             
         # run for broad linear (aircraft?) features by binning
-        trailsAc = self.runSatellite(exposure, bins=4, broadTrail=True)
-        if dbg:
-            self.log.info("DEBUGGING: Now plotting AIRCRAFT detections.")
-            if coord2:
-                filename = os.path.join(path,"coord-%05d-%03d.png" % (v,c))
-                satDebug.coordPlot(exposure, self.finder, filename)
-                sys.exit()
-            filename = os.path.join(path,"acdebug-%05d-%03d.png" % (v, c))
-            satDebug.debugPlot(self.finder, filename)
-
-        print trailsSat
-        print trailsAc
+        if detectionType in ('all', 'ac'):
+            trailsAc = self.runSatellite(exposure, bins=8, broadTrail=True)
+            if dbg:
+                self.log.info("DEBUGGING: Now plotting AIRCRAFT detections.")
+                if coord2:
+                    filename = os.path.join(path,"coord-%05d-%03d.png" % (v,c))
+                    satDebug.coordPlot(exposure, self.finder, filename)
+                    sys.exit()
+                filename = os.path.join(path,"acdebug-%05d-%03d.png" % (v, c))
+                satDebug.debugPlot(self.finder, filename)
+            print trailsAc
+            trails = trailsAc.merge(trails, drMax=90.0, dThetaMax=0.15)
             
-        trails = trailsSat.merge(trailsAc, drMax=90.0, dThetaMax=0.15)
         
         if True:
             picfile = os.path.join(path, "trails%05d-%03d.pickle" % (v,c))
@@ -128,32 +147,30 @@ class SatelliteTask(pipeBase.CmdLineTask):
             
         if broadTrail:
             luminosityLimit = 0.02 # low cut on pixel flux
-            luminosityMax   = 50.0
             maskNPsfSigma   = 3.0*bins
-            centerLimit     = 2.0           # about 1 pixel
+            centerLimit     = 1.0           # about 1 pixel
             eRange          = 0.08          # about +/- 0.1
             houghBins       = 200           # number of r,theta bins (i.e. 256x256)
-            kernelSigma     = 13            # pixels
-            kernelWidth     = 29           # pixels
+            kernelSigma     = 9 #13            # pixels
+            kernelWidth     = 15 #29           # pixels
             widths          = [40.0, 70.0, 100]  # width of an out of focus aircraft (unbinned)
-            houghThresh     = 80            # counts in a r,theta bins
-            skewLimit       = 400.0
-            bLimit          = 3.0
-            maxTrailWidth   = 7.0
+            houghThresh     = 40            # counts in a r,theta bins
+            skewLimit       = 50.0 #400.0
+            bLimit          = 1.5 #3.0
+            maxTrailWidth   = 1.6*bins
         else:
             luminosityLimit = 0.02   # low cut on pixel flux
-            luminosityMax   = 4.0e2 # max luminsity for pixel flux
             maskNPsfSigma   = 7.0
             centerLimit     = 1.2  # about 1 pixel
             eRange          = 0.08  # about +/- 0.1
             houghBins       = 200   # number of r,theta bins (i.e. 256x256)
             kernelSigma     = 7   # pixels
             kernelWidth     = 11   # pixels
-            widths          = [1.0, 10.0]
-            houghThresh     = 100    # counts in a r,theta bins
+            widths          = [1.0, 8.0]
+            houghThresh     = 40    # counts in a r,theta bins
             skewLimit       = 10.0
             bLimit          = 1.4
-            maxTrailWidth   = 5.5
+            maxTrailWidth   = 2.1*bins
 
         self.finder = satell.SatelliteFinder(
             kernelSigma=kernelSigma,
@@ -164,7 +181,6 @@ class SatelliteTask(pipeBase.CmdLineTask):
             houghThresh=houghThresh,
             houghBins=houghBins,
             luminosityLimit=luminosityLimit,
-            luminosityMax=luminosityMax,
             skewLimit=skewLimit,
             bLimit=bLimit,
             maxTrailWidth=maxTrailWidth,

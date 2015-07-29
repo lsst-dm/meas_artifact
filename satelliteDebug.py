@@ -211,14 +211,14 @@ def cvfluxPlot(finder, ax, mm, cmm, trails):
         ax.plot(mm.center[y,x], mm.sumI[y,x]/mm.std, colors[i%4]+'.', ms=1.0)
 
     ax.vlines([finder.centerLimit, finder.centerLimit/finder._brightFactor],
-              finder.luminosityLimit/10.0, 10.0*finder.luminosityMax, color='k', linestyle='--')
+              finder.luminosityLimit/10.0, 10000.0*finder.luminosityLimit, color='k', linestyle='--')
     ax.hlines([finder.luminosityLimit], 0.01, 10, color='k', linestyle='--')
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.set_xlabel("Center", size='small')
     ax.set_ylabel("Flux", size='small')
     ax.set_xlim([0.01, 10])
-    ax.set_ylim([finder.luminosityLimit/10.0, 10*finder.luminosityMax])
+    ax.set_ylim([finder.luminosityLimit/10.0, 10000.0*finder.luminosityLimit])
     font(ax)
 
 
