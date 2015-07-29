@@ -300,14 +300,16 @@ class SatelliteFinder(object):
         bestCal = sorted(nHits, key=lambda x: x[1], reverse=True)[0]
         bestWidth = bestCal[0]
 
+        ###############################################
+        # Theta Alignment
+        ###############################################
         nBeforeAlignment = isCandidate.sum()
         maxSeparation = min([x/2 for x in img.shape])
-        if True:
-            thetaMatch, newTheta = hough.thetaAlignment(mm.theta[isCandidate],xx[isCandidate],yy[isCandidate],
-                                                        tolerance=thetaTol,limit=3,maxSeparation=maxSeparation)
+        thetaMatch, newTheta = hough.thetaAlignment(mm.theta[isCandidate],xx[isCandidate],yy[isCandidate],
+                                                    tolerance=thetaTol,limit=3,maxSeparation=maxSeparation)
 
-            mm.theta[isCandidate] = newTheta
-            isCandidate[isCandidate] = thetaMatch
+        mm.theta[isCandidate] = newTheta
+        isCandidate[isCandidate] = thetaMatch
         nAfterAlignment = isCandidate.sum()
         self.log.logdebug("theta-alignment Bef/aft: %d / %d" % (nBeforeAlignment, nAfterAlignment))
 
