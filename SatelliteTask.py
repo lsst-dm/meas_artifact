@@ -35,7 +35,14 @@ class SatelliteTask(pipeBase.CmdLineTask):
     _DefaultName = 'satellite'
     ConfigClass = pexConfig.Config
 
+    @classmethod
+    def _makeArgumentParser(cls):
+        parser = pipeBase.ArgumentParser(name=cls._DefaultName)
+        parser.add_id_argument("--id", "calexp", help="Data ID, e.g. --id tract=1234 patch=2,2",
+                               ContainerClass=pipeBase.DataIdContainer)
+        return parser
 
+    
     @pipeBase.timeMethod
     def run(self, dataRef):
 
@@ -64,7 +71,7 @@ class SatelliteTask(pipeBase.CmdLineTask):
         
         # run for regular satellites
         trailsSat = self.runSatellite(exposure, bins=4)
-        if False: #dbg:
+        if dbg:
             self.log.info("DEBUGGING: Now plotting SATELLITE detections.")
             if coord1:
                 filename = os.path.join(path,"coord-%05d-%03d.png" % (v,c))
@@ -125,28 +132,28 @@ class SatelliteTask(pipeBase.CmdLineTask):
             maskNPsfSigma   = 3.0*bins
             centerLimit     = 2.0           # about 1 pixel
             eRange          = 0.08          # about +/- 0.1
-            houghBins       = 196           # number of r,theta bins (i.e. 256x256)
+            houghBins       = 200           # number of r,theta bins (i.e. 256x256)
             kernelSigma     = 13            # pixels
             kernelWidth     = 29           # pixels
             widths          = [40.0, 70.0, 100]  # width of an out of focus aircraft (unbinned)
-            houghThresh     = 40            # counts in a r,theta bins
+            houghThresh     = 80            # counts in a r,theta bins
             skewLimit       = 400.0
             bLimit          = 3.0
-            maxTrailWidth   = 35.0
+            maxTrailWidth   = 7.0
         else:
             luminosityLimit = 0.02   # low cut on pixel flux
             luminosityMax   = 4.0e2 # max luminsity for pixel flux
             maskNPsfSigma   = 7.0
             centerLimit     = 1.2  # about 1 pixel
             eRange          = 0.08  # about +/- 0.1
-            houghBins       = 256   # number of r,theta bins (i.e. 256x256)
+            houghBins       = 200   # number of r,theta bins (i.e. 256x256)
             kernelSigma     = 7   # pixels
             kernelWidth     = 11   # pixels
             widths          = [1.0, 10.0]
-            houghThresh     = 40    # counts in a r,theta bins
+            houghThresh     = 100    # counts in a r,theta bins
             skewLimit       = 10.0
             bLimit          = 1.4
-            maxTrailWidth   = 30.0
+            maxTrailWidth   = 5.5
 
         self.finder = satell.SatelliteFinder(
             kernelSigma=kernelSigma,

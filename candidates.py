@@ -479,8 +479,8 @@ knownCandidates = [
     Candidate("aircraft",1240,91    ,satTrail.SatelliteTrail(r=932.2,theta=2.362,width=21.81   )),
     Candidate("aircraft",1240,96    ,satTrail.SatelliteTrail(r=566.6,theta=5.498,width=21.53   )),
     Candidate("aircraft",1240,100   ,satTrail.SatelliteTrail(r=613.3,theta=1.974,width=20.22   )),
-    Candidate("aircraft",1240,103   ,satTrail.SatelliteTrail(r=1683.9,theta=5.502,width=21.69  )),
-
+    Candidate("moustache",1240,103   ,satTrail.SatelliteTrail(r=1683.9,theta=5.502,width=21.69  )),
+    Candidate("satellite",1240,103  ,satTrail.SatelliteTrail(r=126.2,theta=5.162,width=3.34     )),
     # 1244 i   1 b          3,2,1,0
     Candidate("satellite",1244,0     ,satTrail.SatelliteTrail(r=1064.2,theta=0.033,width=12.54  )),
     Candidate("satellite",1244,1     ,satTrail.SatelliteTrail(r=928.2,theta=0.015,width=9.70    )),
@@ -509,7 +509,9 @@ knownCandidates = [
     Candidate("aircraft", 1248, 36, satTrail.SatelliteTrail(r=241.0, theta=2.875, width=17.4)),
     Candidate("aircraft", 1248,43    ,satTrail.SatelliteTrail(r=605.5,theta=6.013,width=16.36   )),
     Candidate("aircraft", 1248,49    ,satTrail.SatelliteTrail(r=356.3,theta=6.021,width=16.14   )),
+    Candidate("satellite",1248, 49   ,satTrail.SatelliteTrail(r=587.0,theta=0.260,width=1.89)),
     Candidate("aircraft", 1248, 55, satTrail.SatelliteTrail(r=35.2, theta=6.020, width=17.2)),
+    Candidate("satellite",1248,57    ,satTrail.SatelliteTrail(r=2640.9,theta=0.261,width=3.05 )),
     Candidate("satellite",1248,58    ,satTrail.SatelliteTrail(r=1546.3,theta=0.260,width=13.09  )),
     Candidate("satellite",1248,68,    satTrail.SatelliteTrail(r=1283.5,theta=0.264,width=2.81)),
     Candidate("satellite",1248,89    ,satTrail.SatelliteTrail(r=331.5,theta=0.048,width=10.81   )),

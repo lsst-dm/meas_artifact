@@ -32,7 +32,7 @@ class SatelliteFinder(object):
                  luminosityMax   = 10.0,
                  skewLimit       = 40.0,
                  bLimit          = 0.5,
-                 maxTrailWidth   = 35.0,  # > 30 is rare (even for aircraft)
+                 maxTrailWidth   = 5.5,
                  log             = None,
                  verbose         = False,
              ):
@@ -169,7 +169,7 @@ class SatelliteFinder(object):
             self.sigmaSmooth = self.sigmaSmooth
             back       = satUtil.medianRing(img_faint, self.kernelWidth, 2.0*self.sigmaSmooth)
             wDet = msk & DET > 0
-            img[wDet] *= 4.0
+            img[wDet] *= 10.0
             img       -= back
             img_faint -= back
             kernelGrow = 1.4
@@ -314,7 +314,7 @@ class SatelliteFinder(object):
         #################################################
         # Hough transform
         #################################################
-        rMax           = sum([q**2 for q in img.shape])**0.5
+        rMax           = np.linalg.norm(img.shape)
         houghTransform = hough.HoughTransform(self.houghBins, self.houghThresh,
                                               rMax=rMax, maxPoints=1000, nIter=1, maxResid=5.5)
         solutions      = houghTransform(mm.theta[isCandidate], xx[isCandidate], yy[isCandidate])

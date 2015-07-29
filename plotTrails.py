@@ -30,7 +30,7 @@ def main(root, infile):
             detections[(int(v),int(c))].append( satTrail.SatelliteTrail(r=float(r),theta=float(t),width=float(w)) )
 
     print "plotting"
-    for (v,c), trails in detections.items():
+    for i, ((v,c), trails) in enumerate(sorted(detections.items())):
         print v, c
         
         dataId = {'visit': int(v), 'ccd': int(c)}
