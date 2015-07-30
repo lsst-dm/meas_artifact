@@ -314,7 +314,7 @@ def main(root, threads, output, input=None, kind=None, visit=None, candidateSet=
     print "Runtimes:   mean=%.2f  med=%.2f  std=%.2f  min=%.2f  max=%.2f\n" % \
         (rt.mean(), np.median(rt), rt.std(), rt.min(), rt.max())
 
-    with open("falsePositive.txt", 'w') as fp:
+    with open("falsePositives.txt", 'w') as fp:
         for d, f in falsePos:
             fp.write("%s %s\n" % (str(d), str(f)))
     with open("falseNegatives.txt", 'w') as fp:
