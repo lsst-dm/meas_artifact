@@ -4,14 +4,14 @@ import argparse
 import collections
 import cPickle as pickle
 import numpy as np
+
 import lsst.daf.persistence as dafPersist
 import hsc.pipe.base.butler as hscButler
-import satelliteTrail as satTrail
-import SatelliteTask as satTask
 
-import mapreduce as mapr
-
-import candidates as candi
+import satellite.satelliteTrail as satTrail
+import satellite.satelliteTask  as satTask
+import satellite.mapreduce      as mapr
+import satellite.candidates     as candi
 
 colors = {
     "red"    :"31",

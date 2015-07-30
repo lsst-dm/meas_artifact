@@ -1,5 +1,5 @@
 #!/usr/bin/env python
 
 import sys
-from SatelliteTask import PoolSatelliteTask
+from satellite.satelliteTask import PoolSatelliteTask
 PoolSatelliteTask.parseAndSubmit(sys.argv[1:])

@@ -5,6 +5,7 @@ import math
 import collections
 import time
 import cPickle as pickle
+import numpy as np
 
 import lsst.afw.cameraGeom as afwCg
 import lsst.pipe.base as pipeBase
@@ -13,24 +14,19 @@ import lsst.afw.math as afwMath
 import lsst.afw.image as afwImage
 
 import hsc.pipe.base.butler as hscButler
-
 import hsc.pipe.base.pool as basePool
 import hsc.pipe.base.parallel as basePara
 
 basePool.Debugger().enabled = True
 
-import numpy as np
-#np.seterr(all='raise')
+import satelliteFinder as satFind
+import satelliteDebug  as satDebug
+import satelliteTrail  as satTrail
 
-import satellite as satell
-import satelliteDebug as satDebug
-import satelliteTrail as satTrail
-
-if True:
-    try:
-        import debug
-    except:
-        pass
+try:
+    import debug
+except:
+    pass
 
 
 class SatelliteRunner(pipeBase.TaskRunner):
@@ -172,7 +168,7 @@ class SatelliteTask(pipeBase.CmdLineTask):
             bLimit          = 1.4
             maxTrailWidth   = 2.1*bins
 
-        self.finder = satell.SatelliteFinder(
+        self.finder = satFind.SatelliteFinder(
             kernelSigma=kernelSigma,
             kernelWidth=kernelWidth,
             bins=bins,
