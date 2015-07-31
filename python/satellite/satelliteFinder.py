@@ -96,20 +96,9 @@ class SatelliteFinder(object):
             insertWidth = 4.0*(width/2.0 + psfSigma)
         calTrail.insert(calArr, profile, insertWidth)
 
-        if False:
-            wDet = calArr > 0.0002
-            calArr[wDet] = 1.0
-            calArr[~wDet] = 0.0
         # Now bin and smooth, just as we did the real image
         calArr   = afwMath.binImage(calImg, self.bins).getArray()
         calArr   = satUtil.smooth(calArr, self.sigmaSmooth)
-
-        if False:
-            fig = figure.Figure()
-            can = FigCanvas(fig)
-            ax = fig.add_subplot(111)
-            ax.imshow(calArr, interpolation='none', cmap='gray')
-            fig.savefig("satellite-calib-image.png")
 
         return calArr
 

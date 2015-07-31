@@ -152,30 +152,6 @@ def thetaAlignment(theta, x, y, limit=3, tolerance=0.15, maxSeparation=None):
             
     isCandidate = nNearNeighbours >= limit
 
-    if False:
-        nAligned    = (aligned1 & aligned2).sum(axis=1)
-        isAligned   = nAligned >= limit
-
-        print "calc"
-        metric = np.arctan(dydx)
-        dt1 = metric - theta
-        dt2 = (metric.transpose() - theta).transpose()
-        var = dt1**2 + dt2**2
-        p = np.exp(-var/(2.0*0.15**2))
-        w = dist*p
-        w = w/w.max()
-        vals, edges = np.histogram(metric, bins=80, range=(-np.pi/2.0, np.pi/2.0), weights=w)
-        print "plot"
-        fig, ax = plt.subplots(nrows=1, ncols=1)
-        ax.semilogy(edges[:-1], vals)
-        #ax[0,1].hist(np.arctan(dydx).ravel(), bins=500)
-        #ax[1,0].hist(nAligned, bins=40)
-        #ax[1,1].hist(theta[isAligned], bins=50, edgecolor='none')
-        #ax[1,1].hist(theta[isCandidate], bins=50, edgecolor='none', facecolor='r')
-        #ax[1,2].hist(diffs, bins=200)
-        #ax[1,2].set_xlim([0.0, 0.01])
-        fig.savefig("hist.png")
-
     return isCandidate, newThetas
 
     
@@ -472,7 +448,8 @@ class HoughTransform(object):
         self.thresh = thresh
         self.rMax   = rMax
         
-        # things get slow with more than ~1000 points, shuffle and cut
+        # things get slow with more than ~1000 points
+        # We'll allow a max points setting, and shuffle our inputs and take the first N
         self.maxPoints = maxPoints
         self.nIter = nIter
 
@@ -502,7 +479,8 @@ class HoughTransform(object):
 
         if nPoints == 0:
             return HoughSolutionList(0, rIn, thetaIn)
-        
+
+        # despite shuffle, we must remain deterministic.
         np.random.seed(44)
         r, theta, x, y = r0, theta0, x0, y0
         if nPoints > self.maxPoints:
@@ -539,15 +517,17 @@ class HoughTransform(object):
             n   = idx[i].sum()
 
             # see if there's a significant 2nd-order term in a polynomial fit.
-            order2limit = 0.1 #1.5e-3
-            poly = np.polyfit(np.arange(n), residual, 2)
-            if False:
-                fig, ax = plt.subplots(nrows=1, ncols=1)
-                xTmp = np.arange(n)
-                ax.plot(xTmp, residual, 'r.')
-                ax.plot(xTmp, np.poly1d(poly)(xTmp), 'b-')
-                fig.savefig("poly.png")
+            # ... but ignore potential outliers
 
+            # Unfortunately, this isn't useful. I'll leave it in with a 'sanity' threshold
+            # but to do it right, we need to consider the length of the trail, and the binning
+            # used in the image ... maybe more.  Right now, it's rather scale dependent.
+            order2limit = 2.5e-3
+            cut = 10.0
+            resLo = np.percentile(residual, cut)
+            resHi = np.percentile(residual, 100.0-cut)
+            wIqr = (residual > resLo) & (residual < resHi)
+            poly = np.polyfit(np.arange(wIqr.sum()), residual[wIqr], 2)
             isReallyActuallyLinear = (iqr < self.maxResid) & (np.abs(poly[0]) < order2limit)
             
             if isReallyActuallyLinear:
