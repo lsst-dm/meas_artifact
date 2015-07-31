@@ -183,10 +183,6 @@ def improveCluster(theta, x, y):
     
     t = theta.copy()
     r = x*np.cos(t) + y*np.sin(t)
-    #neg       = (r < -0.2)
-    #t[neg]   += np.pi
-    #cycle     = (t > 2.0*np.pi + 0.2)
-    #t[cycle] -= 2.0*np.pi
 
     dx = np.subtract.outer(x, x)
     dy = np.subtract.outer(y, y)
@@ -268,10 +264,6 @@ def hesseBin(r0, theta0, bins=200, rMax=4096, thresh=40):
     In principal, this function is simple ... bin-up the values of r,theta and see
     if any of the bins have more than 'thresh' points.  Take the input r,thetas which landed
     in any such bin and use them to get the 'best' value of r,theta ... mean, median, whatever.
-    However, we also have the check the neighbouring bins, and we need to do
-    some basic due diligence to assess whether we believe the locus of points is a real
-    satellite trail.  A real trail should converge with almost all points in a 3x3 cell locus, so
-    the r,theta RMS of the locus in 3x3 cell and 5x5 cell regions should be about the same.
 
     """
 
@@ -315,17 +307,9 @@ def hesseBin(r0, theta0, bins=200, rMax=4096, thresh=40):
             iRMin     = max(iRPeak - 1,     0)
             iRMax     = min(iRPeak + 1,     bins - 1)
 
-            # get indices for a (wider) 5x5 box
-            iThetaMinWide = max(iThetaPeak - 3, 0)
-            iThetaMaxWide = min(iThetaPeak + 3, bins - 1)
-            iRMinWide     = max(iRPeak - 3,     0)
-            iRMaxWide     = min(iRPeak + 3,     bins - 1)
 
         tlo, thi = tEdge[iThetaMin], tEdge[iThetaMax + 1]
         rlo, rhi = rEdge[iRMin],     rEdge[iRMax + 1]
-        # wide edges
-        tloWide, thiWide = tEdge[iThetaMinWide], tEdge[iThetaMaxWide + 1]
-        rloWide, rhiWide = rEdge[iRMinWide],     rEdge[iRMaxWide + 1]
         nbox = len(loc_t)
 
         # for this locus, use the median r,theta for points within the 3x3 box around the peak
@@ -335,28 +319,9 @@ def hesseBin(r0, theta0, bins=200, rMax=4096, thresh=40):
         rTmp          = np.median(r[centeredOnPeak])
         drTmp         = r[centeredOnPeak].std()
 
-        # also get stats for points within the 5x5 box
-        # If there are many points in the 5x5 that aren't in the 3x3, the solution didn't converge
-        centeredOnPeakWide = (theta >= tloWide) & (theta < thiWide) & (r >= rloWide) & (r < rhiWide)
-        tTmpWide           = np.median(theta[centeredOnPeakWide])
-        dtTmpWide          = theta[centeredOnPeakWide].std()
-        rTmpWide           = np.median(r[centeredOnPeakWide])
-        drTmpWide          = r[centeredOnPeakWide].std()
-
         # don't accept theta < 0 or > 2pi
         if tTmp < 0.0 or tTmp > 2.0*np.pi:
             continue
-
-        # if including neighbouring cells increases our stdev, we didn't converge well and the solution
-        # is probably bad.  If only r or only theta are broad, then it might be ok ... keep it.
-        rgrow = drTmpWide/drTmp
-        tgrow = dtTmpWide/dtTmp
-        grow = np.sqrt(rgrow**2 + tgrow**2)
-
-        if rgrow > 3.0 and tgrow > 3.0:
-            print "Warning: Suspect locus at %.1f,%.3f due to poor convergence (%.2f/%.2f, %.2f/%2.f)." % \
-                (rTmp, tTmp, drTmp, rgrow, dtTmp, tgrow)
-            #continue
 
         rs.append(rTmp)
         drs.append(drTmp)
@@ -371,7 +336,7 @@ def hesseBin(r0, theta0, bins=200, rMax=4096, thresh=40):
     # - pick the one with the lowest stdev
     # - this is rare, but a bright near-vertical trail can be detected near theta=0 *and* theta=2pi
     # --> the real trail is rarely exactly vertical, so one solution will not converge nicely.
-    #     ... the stdev of thetas will be wider by a factor of ~10x
+    #     ... the stdev of thetas will be wider by a factor of "a lot", say ~10x
     n = len(rs)
     kill_list = []
     for i in range(n):
