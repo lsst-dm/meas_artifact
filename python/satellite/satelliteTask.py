@@ -61,13 +61,14 @@ class SatelliteFinderTask(pipeBase.Task):
             luminosityLimit = self.config.luminosityLimit,
             skewLimit       = self.config.skewLimit,
             bLimit          = self.config.bLimit,
-            maxTrailWidth   = self.config.maxTrailWidth,
+            maxTrailWidth   = self.config.maxTrailWidth*self.config.bins, # correct for binning
             log             = self.log
         )
         
     @pipeBase.timeMethod
     def run(self, exposure):
-        
+
+        print "Hello", self.config.widths
         trails = self.finder.getTrails(exposure, self.config.widths)
         return trails
         
@@ -123,7 +124,7 @@ class SatelliteTask(pipeBase.CmdLineTask):
         config.broad.skewLimit       = 50.0
         config.broad.bLimit          = 1.5 
         config.broad.bins            = 8
-        config.broad.maxTrailWidth   = 1.6*8 #config.broad.bins
+        config.broad.maxTrailWidth   = 1.6 # a multiple of binning
 
         # satellites
         config.narrow.luminosityLimit = 0.02  
@@ -137,7 +138,7 @@ class SatelliteTask(pipeBase.CmdLineTask):
         config.narrow.skewLimit       = 10.0
         config.narrow.bLimit          = 1.4
         config.narrow.bins            = 4
-        config.narrow.maxTrailWidth   = 2.1*4 #config.narrow.bins
+        config.narrow.maxTrailWidth   = 2.1 # multiple of binning
 
         
     def __init__(self, *args, **kwargs):

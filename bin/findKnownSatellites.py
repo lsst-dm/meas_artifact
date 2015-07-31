@@ -46,7 +46,7 @@ def hashDataId(dataId):
     
 def process(dataRef):
     task                  = satTask.SatelliteTask()
-    foundTrails, runtime  = task.run(dataRef)
+    foundTrails, runtime  = task.run(dataRef, detectionType='all')
     return (hashDataId(dataRef.dataId), foundTrails, runtime)
 
     
