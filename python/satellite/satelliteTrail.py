@@ -80,7 +80,12 @@ class SatelliteTrailList(list):
               (self.nPixels, self.binMax, self.psfSigma, len(self))
         return msg
         
-        
+
+
+##############################
+# Some handy profiles to use
+##############################
+    
 class ConstantProfile(object):
     def __init__(self, value, width):
         self.value = value
@@ -154,25 +159,29 @@ class SatelliteTrail(object):
         return trail
         
         
-    def setMask(self, exposure):
+    def setMask(self, exposure, satelliteBit):
         """Set the mask plane near this trail in an exposure.
 
-        @param exposure    The exposure with mask plane to be set.  Change is in-situ.
-
+        @param exposure      The exposure with mask plane to be set.  Change is in-situ.
+        @param satelliteBit  The bit to use for this mask.
+        
         @return nPixels    The number of pixels set.
         """
-        
-        # add a new mask plane
-        msk            = exposure.getMaskedImage().getMask()
-        satellitePlane = msk.addMaskPlane("SATELLITE")
-        satelliteBit   = 1 << satellitePlane
 
+        msk            = exposure.getMaskedImage().getMask()
+        
         # create a fresh mask and add to that.
         tmp            = type(msk)(msk.getWidth(), msk.getHeight())
         sigma          = satUtil.getExposurePsfSigma(exposure)
         # if this is being called, we probably have a width measured with our measure() method
 
-        width          = 8.0*self.width
+        # never narrower than the PSF
+        if self.width < 2.0*sigma:
+            # go to +- 8*sigma to get the extended wings
+            width = 16.0*sigma
+        else:
+            # or 12x what was measured
+            width = 12.0*self.width
         profile        = ConstantProfile(satelliteBit, width)
         self.insert(tmp, profile, width)
 
@@ -329,7 +338,7 @@ class SatelliteTrail(object):
 
         # iterate once to suppress noise
         off2 = offset[w]**2
-        weight = np.exp(-0.5*off2/sigma**2)/(2.0*np.pi*np.sqrt(sigma))
+        weight = np.exp(-0.5*off2/(2.0*sigma)**2)/(2.0*np.pi*np.sqrt(2.0*sigma))
         sigma         = bins*np.sqrt((weight*img[w]*off2).sum()/self.flux)
             
         self.width    = 2.0*sigma

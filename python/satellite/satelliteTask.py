@@ -123,7 +123,7 @@ class SatelliteConfig(pexConfig.Config):
         self.narrow.growKernel      = 1.4
         self.narrow.houghBins       = 200
         self.narrow.houghThresh     = 40
-        self.narrow.maxTrailWidth   = 2.1 # multiple of binning
+        self.narrow.maxTrailWidth   = 2.0 # multiple of binning
 
         # out-of-focus aircraft default
         self.broad.bins            = 8
@@ -142,7 +142,7 @@ class SatelliteConfig(pexConfig.Config):
         self.broad.growKernel      = 1.4 
         self.broad.houghBins       = 200      
         self.broad.houghThresh     = 40     
-        self.broad.maxTrailWidth   = 1.6 # a multiple of binning
+        self.broad.maxTrailWidth   = 2.0 # a multiple of binning
 
 
 class SatelliteRunner(pipeBase.TaskRunner):
@@ -223,8 +223,11 @@ class SatelliteTask(pipeBase.CmdLineTask):
         self.log.info(msg)
         
         # mask any trails
+        msk            = exposure.getMaskedImage().getMask()
+        satellitePlane = msk.addMaskPlane("SATELLITE")
+        satelliteBit   = 1 << satellitePlane
         for i, trail in enumerate(trails):
-            maskedPixels = trail.setMask(exposure)
+            maskedPixels = trail.setMask(exposure, satelliteBit=satelliteBit)
             msg = "(%s,%s) Trail %d/%d %s:  maskPix: %d" % (v, c, i+1, len(trails), trail, maskedPixels)
             self.log.info(msg)
 
