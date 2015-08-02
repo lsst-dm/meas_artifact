@@ -24,6 +24,11 @@ import satelliteDebug  as satDebug
 import satelliteTrail  as satTrail
 
 
+#########################################################################################
+#
+# SatelliteFinderTask is a simple Task wrapper for the SatelliteFinder class
+#
+#########################################################################################
 
 class SatelliteFinderConfig(pexConfig.Config):
     bins            = pexConfig.Field(dtype=int,   default=4,    doc="How to bin the image before detection")
@@ -93,9 +98,150 @@ class SatelliteFinderTask(pipeBase.Task):
         trails = self.finder.getTrails(exposure, self.config.widths)
         return trails
 
+
+
+
+
+#########################################################################################
+#
+# SatelliteTask is a base class for all CmdLineTask Satellite codes.
+#
+# It should be straightforward (example below) to use a different satellite detection code
+# by:
+#    - wrapping it in a task
+#    - writing a derived Task which inherits from this SatelliteTask and calls
+#      your wrapped task in overloaded runSatellite() method.
+#
+#########################################################################################
+
     
+class SatelliteRunner(pipeBase.TaskRunner):
+    """A custom runner for the SatelliteTask.
+    We only need this to pass through kwargs in the getTargetList method.
+    """
+    @staticmethod
+    def getTargetList(parsedCmd, **kwargs):
+        kwargs['debugType'] = parsedCmd.debugType.split(',') if parsedCmd.debugType else ()
+        return [(ref, kwargs) for ref in parsedCmd.id.refList]
+
+
+class SatelliteTask(pipeBase.CmdLineTask):
+    """Detect and mask Satellite trails and other linear features.
+    """
+
+    _DefaultName = "satellite"
+    RunnerClass = SatelliteRunner
+    ConfigClass = pexConfig.Config
+
+    @classmethod
+    def _makeArgumentParser(cls):
+        parser = pipeBase.ArgumentParser(name=cls._DefaultName)
+        parser.add_id_argument("--id", "calexp", help="Data ID, e.g. --id tract=1234 patch=2,2",
+                               ContainerClass=pipeBase.DataIdContainer)
+        parser.add_argument("-b", '--debugType', default=None,
+                            help="Debug outputs to produce (comma-sep-list of plot,trail,fits)")
+        return parser
+
+    def __init__(self, *args, **kwargs):
+        super(SatelliteTask, self).__init__(*args, **kwargs)
+        
     
-class SatelliteConfig(pexConfig.Config):
+    @pipeBase.timeMethod
+    def run(self, dataRef, **kwargs):
+        """Called when run as a CmdLineTask (use runSatellite() method otherwise).
+
+        This is a simple wrapper for our own runSatellite() method, but includes
+        extra debugging utilities to plot and store other relevant debug information.
+
+        @param dataRef          butler dataRef object specifying e.g. visit,ccd to run.
+
+        @return trails,timing        
+        -- trails               SatelliteTrailList object containing detections
+        -- timing               Runtime in seconds (for debugging).
+        """
+        
+        v,c = dataRef.dataId['visit'], dataRef.dataId['ccd']
+        
+        self.log.info("Detecting satellite trails in visit=%d, ccd=%d)" % (v,c))
+        
+
+        ###############################################
+        # Do the work
+        ###############################################
+            
+        exposure = dataRef.get('calexp', immediate=True)
+        trails, timing = self.runSatellite(exposure)
+
+        msg = "(%s,%s) Detected %d trail(s) in %.2f sec." % (v, c, len(trails), timing)
+        self.log.info(msg)
+
+        ###################
+        # mask any trails
+        msk            = exposure.getMaskedImage().getMask()
+        satellitePlane = msk.addMaskPlane("SATELLITE")
+        satelliteBit   = 1 << satellitePlane
+        for i, trail in enumerate(trails):
+            maskedPixels = trail.setMask(exposure, satelliteBit=satelliteBit)
+            msg = "(%s,%s) Trail %d/%d %s:  maskPix: %d" % (v, c, i+1, len(trails), trail, maskedPixels)
+            self.log.info(msg)
+
+
+        ################################################
+        # Debugging:
+        ################################################
+        basedir = os.environ.get('SATELLITE_DATA')
+        if not basedir:
+            basedir = os.path.join(os.environ.get("PWD"), "data")
+        path = os.path.join(basedir, "%04d" %(v))
+        debugType     = kwargs.get("debugType", ())
+        if debugType:
+            try:
+                os.mkdir(path)
+            except:
+                pass
+
+        # dump trails to a pickle
+        if 'trail' in debugType:
+            picfile = os.path.join(path, "trails%05d-%03d.pickle" % (v,c))
+            self.log.info("DEBUGGING: Pickling results in %s." % (picfile))
+            with open(picfile, 'w') as fp:
+                bundle = ((v,c), trails, timing)
+                pickle.dump(bundle, fp)
+
+        # Debugging: Write to FITS
+        if 'fits' in debugType:
+            fitsfile = os.path.join(path,"exp%04d-%03d.fits"%(v,c))
+            self.log.info("DEBUGGING: Writing FITS in %s." % (fitsfile))
+            exposure.writeFits(fitsfile)
+        
+        self.runDebug(dataRef, path, **kwargs)
+
+        return trails, timing
+
+        
+
+    # This Task should have no reason to touch the data repo
+    # Disable anything that might try to do so.
+    def _getConfigName(self):
+        return None
+    def _getEupsVersionsName(self):
+        return None
+    def _getMetadataName(self):
+        return None
+
+
+
+###############################################################
+#
+# Concrete implementation of the Hough SatelliteTask
+#
+# We'll inherit from SatelliteTask and overload methods
+# runSatellite()
+# runDebut()
+################################################################
+
+    
+class HoughSatelliteConfig(pexConfig.Config):
 
     narrow   = pexConfig.ConfigurableField(target = SatelliteFinderTask,
                                          doc="Search for PSF-width satellite trails")
@@ -145,124 +291,21 @@ class SatelliteConfig(pexConfig.Config):
         self.broad.maxTrailWidth   = 2.0 # a multiple of binning
 
 
-class SatelliteRunner(pipeBase.TaskRunner):
-    """A custom runner for the SatelliteTask.
-    We only need this to pass through kwargs in the getTargetList method.
-    """
-    @staticmethod
-    def getTargetList(parsedCmd, **kwargs):
-        kwargs['debugType'] = parsedCmd.debugType.split(',') if parsedCmd.debugType else ()
-        return [(ref, kwargs) for ref in parsedCmd.id.refList]
-
-
-class SatelliteTask(pipeBase.CmdLineTask):
+        
+class HoughSatelliteTask(SatelliteTask):
     """Detect and mask Satellite trails and other linear features.
     """
 
-    _DefaultName = "satellite"
+    _DefaultName = "houghSatellite"
     RunnerClass = SatelliteRunner
-    ConfigClass = SatelliteConfig
+    ConfigClass = HoughSatelliteConfig
 
-    @classmethod
-    def _makeArgumentParser(cls):
-        parser = pipeBase.ArgumentParser(name=cls._DefaultName)
-        parser.add_id_argument("--id", "calexp", help="Data ID, e.g. --id tract=1234 patch=2,2",
-                               ContainerClass=pipeBase.DataIdContainer)
-        parser.add_argument("-b", '--debugType', default=None,
-                            help="Debug outputs to produce (comma-sep-list of plot,trail,fits)")
-        return parser
 
     def __init__(self, *args, **kwargs):
         super(SatelliteTask, self).__init__(*args, **kwargs)
         self.makeSubtask('narrow')
         self.makeSubtask('broad')
         
-    
-    @pipeBase.timeMethod
-    def run(self, dataRef, **kwargs):
-        """Called when run as a CmdLineTask (use runSatellite() method otherwise).
-
-        This is a simple wrapper for our own runSatellite() method, but includes
-        extra debugging utilities to plot and store other relevant debug information.
-
-        @param dataRef          butler dataRef object specifying e.g. visit,ccd to run.
-
-        @return trails,timing        
-        -- trails               SatelliteTrailList object containing detections
-        -- timing               Runtime in seconds (for debugging).
-        """
-        
-        debugType     = kwargs.get("debugType", ())
-
-        v,c = dataRef.dataId['visit'], dataRef.dataId['ccd']
-        
-        self.log.info("Detecting satellite trails in visit=%d, ccd=%d)" % (v,c))
-        
-
-        #############################################
-        # Debugging: make a place to dump files
-        if debugType:
-            basedir = os.environ.get('SATELLITE_DATA')
-            if not basedir:
-                basedir = os.path.join(os.environ.get("PWD"), "data")
-            path = os.path.join(basedir, "%04d" %(v))
-            try:
-                os.mkdir(path)
-            except:
-                pass
-
-            
-        ###############################################
-        # Do the work
-        ###############################################
-            
-        exposure = dataRef.get('calexp', immediate=True)
-        trails, timing = self.runSatellite(exposure)
-
-        msg = "(%s,%s) Detected %d trail(s) in %.2f sec." % (v, c, len(trails), timing)
-        self.log.info(msg)
-        
-        # mask any trails
-        msk            = exposure.getMaskedImage().getMask()
-        satellitePlane = msk.addMaskPlane("SATELLITE")
-        satelliteBit   = 1 << satellitePlane
-        for i, trail in enumerate(trails):
-            maskedPixels = trail.setMask(exposure, satelliteBit=satelliteBit)
-            msg = "(%s,%s) Trail %d/%d %s:  maskPix: %d" % (v, c, i+1, len(trails), trail, maskedPixels)
-            self.log.info(msg)
-
-        
-        ################################################
-        # Debugging:
-
-        # plot trails
-        if 'plot' in debugType:
-            def debugPlot(msg, filebase, finder):
-                self.log.info("DEBUGGING: Now plotting %s detections." % (msg))
-                filename = os.path.join(path,"%s-%05d-%03d.png" % (filebase, v, c))
-                satDebug.debugPlot(finder, filename)
-            if self.config.doNarrow:
-                debugPlot("SATELLITE", "satdebug", self.narrow.finder)
-            if self.config.doBroad:
-                debugPlot("AIRCRAFT",  "acdebug",  self.broad.finder)
-
-        # dump trails to a pickle
-        if 'trail' in debugType:
-            picfile = os.path.join(path, "trails%05d-%03d.pickle" % (v,c))
-            self.log.info("DEBUGGING: Pickling results in %s." % (picfile))
-            with open(picfile, 'w') as fp:
-                bundle = ((v,c), trails, timing)
-                pickle.dump(bundle, fp)
-
-        # Debugging: Write to FITS
-        if 'fits' in debugType:
-            fitsfile = os.path.join(path,"exp%04d-%03d.fits"%(v,c))
-            self.log.info("DEBUGGING: Writing FITS in %s." % (fitsfile))
-            exposure.writeFits(fitsfile)
-
-        return trails, timing
-
-
     
     def runSatellite(self, exposure):
         """Run detection for both narrow and broad satellite trails.
@@ -293,19 +336,110 @@ class SatelliteTask(pipeBase.CmdLineTask):
         return trails, time.time() - t0
 
 
-    # This Task should have no reason to touch the data repo
-    # Disable anything that might try to do so.
-    def _getConfigName(self):
-        return None
-    def _getEupsVersionsName(self):
-        return None
-    def _getMetadataName(self):
-        return None
+    def runDebug(self, dataRef, path, **kwargs):
+        """Custom debug output for this SatelliteFinder
+        """
 
+        debugType     = kwargs.get("debugType", ())
+        v,c = dataRef.dataId['visit'], dataRef.dataId['ccd']
+        
+        # plot trails
+        if 'plot' in debugType:
+            def debugPlot(msg, filebase, finder):
+                self.log.info("DEBUGGING: Now plotting %s detections." % (msg))
+                filename = os.path.join(path,"%s-%05d-%03d.png" % (filebase, v, c))
+                satDebug.debugPlot(finder, filename)
+            if self.config.doNarrow:
+                debugPlot("SATELLITE", "satdebug", self.narrow.finder)
+            if self.config.doBroad:
+                debugPlot("AIRCRAFT",  "acdebug",  self.broad.finder)
 
             
 
+
+
+
+##########################################################################
+#
+# Example of how to add another Sat task
+#
+# As long as your Task uses the same SatelliteTrail objects,
+# and is wrapped in a Task,
+# you should be able to create your own Config, and
+# overload runSatellite() and runDebug() methods
+###########################################################################
     
+
+class AnotherSatelliteConfig(pexConfig.Config):
+    dummy = pexConfig.ConfigurableField(target = SatelliteFinderTask,
+                                         doc="Search for PSF-width satellite trails")
+    doDummy = pexConfig.Field(dtype=bool, default=True, doc="")
+
+    def setDefaults(self):
+        # satellites
+        self.dummy.widths          = [1.0,],
+        self.dummy.houghThresh     = 40
+
+
+class AnotherSatelliteTask(SatelliteTask):
+    """Detect and mask Satellite trails and other linear features ... a different way.
+    """
+
+    _DefaultName = "anotherSatellite"
+    RunnerClass = SatelliteRunner
+    ConfigClass = AnotherSatelliteConfig
+
+    def __init__(self, *args, **kwargs):
+        super(SatelliteTask, self).__init__(*args, **kwargs)
+        self.makeSubtask('dummy')
+
+        
+    def runSatellite(self, exposure):
+        """Run detection 
+
+        @param exposure   Calibrated exposure to run detection on.
+        
+        @return trails,timing
+        -- trails               SatelliteTrailList object containing detections
+        -- timing               Runtime in seconds (for debugging).
+        """
+        
+        t0 = time.time()
+        trails = satTrail.SatelliteTrailList(0.0, 0.0, 0.0)
+
+        # run for regular satellites
+        if self.config.doDummy:
+            trails = self.dummy.run(exposure)
+            
+        return trails, time.time() - t0
+
+
+    def runDebug(self, dataRef, **kwargs):
+        """Custom debug output for AnotherSatelliteFinder
+        """
+        debugType     = kwargs.get("debugType", ())
+        v,c = dataRef.dataId['visit'], dataRef.dataId['ccd']
+        
+        # plot trails
+        if 'plot' in debugType:
+            def debugPlot(msg, filebase, finder):
+                self.log.info("DEBUGGING: Now plotting %s detections." % (msg))
+                filename = os.path.join(path,"%s-%05d-%03d.png" % (filebase, v, c))
+                satDebug.debugPlot(finder, filename)
+            if self.config.doDummy:
+                debugPlot("SATELLITE", "satdebug", self.dummy.finder)
+
+
+
+
+
+##########################################################################
+#
+# Pool processing
+#
+###########################################################################
+    
+                   
 class PoolSatelliteConfig(pexConfig.Config):
     satellite    = pexConfig.ConfigurableField(target=SatelliteTask, doc="satellite")
 
