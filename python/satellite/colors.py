@@ -1,12 +1,5 @@
 #!/usr/bin/env python
 
-import os, sys
-import argparse
-
-"""
-%prog [options] text
-"""
-
 colors = {
     "red"    :"31",
     "green"  :"32",
@@ -19,6 +12,14 @@ colors = {
 
 
 def color(text, color, bold=False):
+    """Wrap ascii text to show in color in terminal.
+
+    @param text    The text you want colored
+    @param color   The color (red,green,yellow,blue,magenta,cyan,grey)
+    @param bold    Do you want bold-face font?
+
+    @return string A string you can print which will show up in color.
+    """
     
     base = "\033["
     code = colors[color]
@@ -29,22 +30,3 @@ def color(text, color, bold=False):
     suffix = base + "0m"
     return prefix + text + suffix
 
-def main(text, clr, bold=False):
-
-    if clr == 'all':
-        for c, n in sorted(colors.items(), key=lambda x: x[1]):
-            print n, ": ", color(text, c, bold=bold)
-    else:
-        print color(text, clr, bold)
-            
-
-if __name__ == '__main__':
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("text", help="Text to colorize")
-    parser.add_argument("-c", "--color", help="Specify color: "+",".join(colors.keys()), required=False, default='red')
-    parser.add_argument("-b", "--bold", help="Make bold", required=False, default=False, action='store_true')
-
-    args = parser.parse_args()
-    
-    main(args.text, clr=args.color, bold=args.bold)

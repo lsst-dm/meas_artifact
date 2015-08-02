@@ -12,26 +12,7 @@ import satellite.satelliteTrail as satTrail
 import satellite.satelliteTask  as satTask
 import satellite.mapreduce      as mapr
 import satellite.candidates     as candi
-
-colors = {
-    "red"    :"31",
-    "green"  :"32",
-    "yellow" :"33",
-    "blue"   :"34",
-    "magenta":"35",
-    "cyan"   :"36",
-    "grey"   :"37",
-    }
-
-
-def color(text, color, bold=False):
-    base = "\033["
-    code = colors[color]
-    if bold:
-        code += ";1"
-    prefix = base + code + "m"
-    suffix = base + "0m"
-    return prefix + text + suffix
+import satellite.colors         as clr
 
 
 candidateSets = {
@@ -83,14 +64,12 @@ class EventList(list):
     def recall(self):
         posIn = self.positiveInputs
         if posIn == 0:
-            #print "%s: No positive inputs.  Recall is undefined." % (color("WARNING", "yellow"))
             posIn = -1
         return self.truePositives/posIn
     @property
     def precision(self):
         posDet = self.positiveDetections
         if posDet == 0:
-            #print "%s: No positive detections.  Precision is undefined." % (color("WARNING", "yellow"))
             posDet = -1
         return self.truePositives/posDet
     @property
@@ -186,14 +165,14 @@ def main(root, threads, output, input=None, kind=None, visit=None, candidateSet=
             # if we found something it's a false positive
             if len(foundTrails) > 0:
                 for iTrail, fTrail in enumerate(foundTrails):                
-                    resultMsg  += "\n  %s: %s (%s)" % (color("FALSE-POS", "red"), fTrail, "no-candidate")
+                    resultMsg  += "\n  %s: %s (%s)" % (clr.color("FALSE-POS", "red"), fTrail, "no-candidate")
                     eventLists['empty'].append(Event(False, True))
                     eventLists['all'].append(Event(False, True))
                     falsePos.append((dataHash, fTrail))
                     
             # otherwise, it's a true negative
             else:
-                resultMsg  += "\n  %s: %s (%s)" % (color("TRUE-NEG", "green"), "No Trail", "no-candidate")
+                resultMsg  += "\n  %s: %s (%s)" % (clr.color("TRUE-NEG", "green"), "No Trail", "no-candidate")
                 eventLists['empty'].append(Event(False, False))
                 eventLists['all'].append(Event(False, False))
             allMessages += resultMsg
@@ -219,7 +198,7 @@ def main(root, threads, output, input=None, kind=None, visit=None, candidateSet=
                 if t and  (candidate.kind in candi.Candidate.positiveKinds) and \
                    (fTrail.isNear(t, rMax, thetaMax)):
                     
-                    resultMsg += "\n  %s: %s (%s)" % (color("TRUE-POS", "green"), fTrail, candidate.kind)
+                    resultMsg += "\n  %s: %s (%s)" % (clr.color("TRUE-POS", "green"), fTrail, candidate.kind)
                     claimed[iTrail] = True
                     eList.append(Event(True, True))
 
@@ -248,20 +227,21 @@ def main(root, threads, output, input=None, kind=None, visit=None, candidateSet=
                         elif isIgnored:
                             tag = "Ignored"
                             nIgnored += 1
-                            resultMsg += "\n  %s: %s (%s)" % (color("IGNORED-POS", "yellow"), fTrail, candidate.kind)
+                            resultMsg += "\n  %s: %s (%s)" % (clr.color("IGNORED-POS", "yellow"),
+                                                              fTrail, candidate.kind)
                             continue
                         elif isOtherCandidate:
                             nIgnored += 1
                             continue
                         else:
                             tag = "Unclaimed"
-                        resultTmp  += "  --> %s: %s\n" % (tag, color(str(foundTrails[iClaim]), 'yellow'))
+                        resultTmp  += "  --> %s: %s\n" % (tag, clr.color(str(foundTrails[iClaim]), 'yellow'))
                         eList.append(Event(False, True))
                         falsePos.append((dataHash, foundTrails[iClaim]))
                         
                 if nUnclaimed > nIgnored:
                     resultMsg += "\n  %s: %d Unclaimed trails (total=%d) (%s).\n" % \
-                              (color("FALSE-POS", "red"), nUnclaimed, nTrail, candidate.kind)
+                              (clr.color("FALSE-POS", "red"), nUnclaimed, nTrail, candidate.kind)
                     resultMsg += resultTmp
 
                 
@@ -272,21 +252,22 @@ def main(root, threads, output, input=None, kind=None, visit=None, candidateSet=
                 # result does not match ... and it shouldn't
                 if t is None  or (candidate.kind in \
                                   (candi.Candidate.negativeKinds | candi.Candidate.ignoredKinds)):
-                    resultMsg += "\n  %s: %s (%s)" % (color("TRUE-NEG", "green"), "No trails present, and none found.", candidate.kind)
+                    resultMsg += "\n  %s: %s (%s)" % (clr.color("TRUE-NEG", "green"),
+                                                      "No trails present, and none found.", candidate.kind)
                     eList.append(Event(False, False))
                     
                 # result does not match ... but it should have
                 else:
-                    resultMsg += "\n  %s: %s (%s)" % (color("FALSE-NEG", "red"), t, candidate.kind)
+                    resultMsg += "\n  %s: %s (%s)" % (clr.color("FALSE-NEG", "red"), t, candidate.kind)
                     eList.append(Event(True, False))
                     falseNeg.append((dataHash, t, candidate.kind))
 
                     
             did = "(%d, %d)" % (candidate.visit, candidate.ccd)
             if t:
-                msg = "%s [r=%.1f theta=%.3f wid=%.1f]." % (color(did, "cyan"), t.r, t.theta, t.width)
+                msg = "%s [r=%.1f theta=%.3f wid=%.1f]." % (clr.color(did, "cyan"), t.r, t.theta, t.width)
             else:
-                msg = "%s [empty candidate]" % (color(did, "cyan"))
+                msg = "%s [empty candidate]" % (clr.color(did, "cyan"))
             msg += resultMsg
             allMessages += msg+"\n"
             print "\n"+msg+"\n"
@@ -294,11 +275,11 @@ def main(root, threads, output, input=None, kind=None, visit=None, candidateSet=
             if candidate.kind not in candi.Candidate.ignoredKinds:
                 eventLists['all'] += eList
         
-    print color("=== Summary ===", "magenta")
+    print clr.color("=== Summary ===", "magenta")
     print allMessages
 
     for kind, eventList in eventLists.items():
-        print color("=== %s ===" % (kind), "magenta")
+        print clr.color("=== %s ===" % (kind), "magenta")
         if len(eventList) == 0:
             print "No events."
             continue
