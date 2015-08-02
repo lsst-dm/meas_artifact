@@ -391,7 +391,7 @@ class HoughTransform(object):
     provided at construction and a __call__ method is defined to do the work.
     """
     
-    def __init__(self, bins, thresh, rMax=None, maxPoints=1000, nIter=1, maxResid=3.0):
+    def __init__(self, bins, thresh, rMax=None, maxPoints=1000, nIter=1, maxResid=3.0, log=None):
         """Construct a HoughTransform object.
 
         @param bins           Number of bins to use in each of r,theta (i.e. total bins*bins will be used)
@@ -424,6 +424,7 @@ class HoughTransform(object):
         # solutions to be found very near theta = 0 and theta=2pi
         self.overlapRange = 0.2
 
+        self.log = log
         
     def __call__(self, thetaIn, xIn, yIn):
         """Compute the Hough Transform
@@ -502,9 +503,13 @@ class HoughTransform(object):
                 solutions.append(solution)
 
             else:
-                print "WARNING: Rejecting solution: r=%.1f,theta=%.3f  " \
+                msg = "WARNING: Rejecting solution: r=%.1f,theta=%.3f  " \
                     "(IQR=%.2f [limit=%.2f]  2nd-order coeff = %.2g [limit=%.2g])" % \
                     (rs[i], thetas[i], iqr, self.maxResid, poly[0], order2limit)
+                if self.log:
+                    self.log.info(msg)
+                else:
+                    print msg
 
         return solutions
         

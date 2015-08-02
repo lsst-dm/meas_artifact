@@ -255,7 +255,6 @@ class SatelliteFinder(object):
             kernelWidth = 2*int((kernelFactor*self.kernelWidth)//2) + 1
             kernelSigma = kernelFactor*self.kernelSigma 
 
-            #print "Kernels:", kernelWidth, kernelSigma
             isKernelCandidate = np.zeros(img.shape, dtype=bool)
         
             
@@ -332,8 +331,8 @@ class SatelliteFinder(object):
         #################################################
         self.log.logdebug("Hough Transform.")
         rMax           = np.linalg.norm(img.shape)
-        houghTransform = hough.HoughTransform(self.houghBins, self.houghThresh,
-                                              rMax=rMax, maxPoints=1000, nIter=1, maxResid=5.5)
+        houghTransform = hough.HoughTransform(self.houghBins, self.houghThresh, rMax=rMax,
+                                              maxPoints=1000, nIter=1, maxResid=5.5, log=self.log)
         solutions      = houghTransform(mm.theta[isCandidate], xx[isCandidate], yy[isCandidate])
 
         #################################################

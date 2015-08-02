@@ -157,7 +157,6 @@ class PixelSelector(list):
         for limit in self:
             test = self._test(limit)
             accumulator &= test
-            #print key, accumulator.sum(), test.sum()
 
         if maxPixels:
             # a no-op since we have no way to choose.  We could selected randomly?
