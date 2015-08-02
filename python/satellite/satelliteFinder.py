@@ -19,28 +19,96 @@ import satelliteDebug   as satDebug
 
 
 class SatelliteFinder(object):
+    """Class to find satellite trails and other linear features in images.
 
+    This uses a modified Hough Transform.  Briefly, the images are binned, and convolved with
+    kernels to solve for the local alignment of flux near each pixel (like getting an adaptive
+    moment at each pixel).  From this, a local position angle can be computed and used
+    in a Hough Transform (rather than testing all possible thetas).
+
+    In addition to a reasonable estimate of theta, the ratio of moments along/perpendicular to
+    the local alignment (i.e. like an ellipticity) has a known value based on the PSF width.
+    By using a 'calibration trail', a fake satellite trail can be created and measured to
+    provide expected values for trail width 'b', 'ellipticity' e = 1 - b/a, and other
+    moment-based quantities.  These expected values are used to cull the herd of pixels down
+    to a more manageable number.
+
+    If the number of candidate pixels is small enough, they can be compared pairwise to further
+    weed out non-satellite-trail points.  With two points, we have two local estimates of theta
+    from the convolution of moments, but also a direct delta-x,delta-y estimate.  If both points
+    in the pair are part of the same trail theta1,theta2 should be similar and should match the
+    thetaXY based on the pixel coordinates.  Coincident theta1==theta2==thetaXY points are kept.
+    This is done by the thetaAlignment() routine.
+    
+    Finally, in computing the Hough transform, the input thetas are still quite noisy, but
+    the functional form in Hough space (r,theta space) is known: r = x*cos(theta) + y*sin(theta).
+    The derivative is easily computable and each r,theta point can be extrapolated along its
+    derivative as a tangent line.  The intersection point of these tangent extrapolations gives a
+    very robust estimate of theta.
+
+    """
+    
     def __init__(self,
-                 kernelSigma     = 15,
-                 kernelWidth     = 31,
                  bins            = 4,
-                 centerLimit     = 0.8,
-                 eRange          = 0.06,
-                 houghThresh     = 20,
-                 houghBins       = 256,
-                 luminosityLimit = 4.0,
-                 skewLimit       = 40.0,
-                 bLimit          = 0.5,
-                 maxTrailWidth   = 5.5,
+                 doBackground    = True,
+                 scaleDetected   = 1.0,
+                 sigmaSmooth     = 1.0,
+                 thetaTolerance  = 0.15,
+                 
+                 luminosityLimit = 0.02,       
+                 centerLimit     = 1.2,       
+                 eRange          = 0.08,       
+                 bLimit          = 1.4,
+                 skewLimit       = 10.0,       
+                 
+                 kernelSigma     = 7,     
+                 kernelWidth     = 11,    
+                 growKernel      = 1.4,
+                 
+                 houghBins       = 200,        
+                 houghThresh     = 40,
+                 
+                 maxTrailWidth   = 2.1,
+                 
                  log             = None,
                  verbose         = False,
              ):
-        """ """
+        """Construct SatelliteFinder
+
+        @param bins              Binning to use (improves speed, but becomes unreliable above 4)
+        @param doBackground      Subtract median-ring filter background
+        @param scaleDetected     Scale pixels with detected flag by this amount.
+        @param growKernel        Repeat with a kernel larger by this fraction (no repeat if 1.0)
+        @param sigmaSmooth       Do a Gaussian smooth with this sigma (binned pixels)
+        @param thetaTolerance    Max theta difference for thetaAlignment() routine.
+        
+        @param luminosityLimit   Min flux to accept  [units of Std.Dev].
+        @param centerLimit       Max error in 1st moment (centroid) to accept [pixels].
+        @param eRange            Max error in e=1-b/a above and below the calib trail value.
+        @param bLimit            Max error in trail width [pixels].
+        @param skewLimit         Max error in 3rd moment (skewness) to accept [pixels^3]
+        
+        @param kernelSigma       Gaussian sigma to taper the kernel [pixels]
+        @param kernelWidth       Width of kernel in pixels.
+        
+        @param houghBins         Number of bins in r,theta space (total = bins x bins)
+        @param houghThresh       Count level in Hough bin to consider a detection.
+        
+        @param maxTrailWidth     Discard trail detections wider than this.
+        
+        @param log               A log object.
+        @param verbose           Be chatty.
+        """
+        
+        self.bins              = bins
+        self.doBackground      = doBackground
+        self.scaleDetected     = scaleDetected
+        self.sigmaSmooth       = sigmaSmooth
+        self.thetaTolerance    = thetaTolerance
         
         self.kernelSigma       = kernelSigma        
         self.kernelWidth       = kernelWidth
-        self.bins              = bins
-        self.sigmaSmooth       = 1.0
+        self.growKernel        = 1.4
 
         self.centerLimit       = centerLimit
         self.eRange            = eRange
@@ -104,6 +172,13 @@ class SatelliteFinder(object):
 
         
     def getTrails(self, exposure, widths):
+        """Detect satellite trails in exposure using provided widths
+
+        @param exposure      The exposure to detect in
+        @param widths        A list of widths [pixels] to use for calibration trails.
+
+        @return trails       A SatelliteTrailList object containing detected trails.
+        """
 
         emsk = exposure.getMaskedImage().getMask()
         DET  = emsk.getPlaneBitMask("DETECTED")
@@ -143,23 +218,22 @@ class SatelliteFinder(object):
         imgClip = expClip.getMaskedImage().getImage().getArray()
         imgClip[(mskClip & (MASK | DET) > 0)] = 0.0
 
-        # subtract a small scale background when we search for PSFs
-        if np.abs(widths[0]) < 1.1:
-            self.sigmaSmooth = self.sigmaSmooth
-            back       = satUtil.medianRing(imgClip, self.kernelWidth, 2.0*self.sigmaSmooth)
+        # scale the detected pixels
+        if np.abs(self.scaleDetected - 1.0) > 1.0e-6:
+            self.log.logdebug("Scaling detected")
             wDet       = msk & DET > 0
             sig = imgClip.std()
             wSig = img > 2.0*sig
             # amplify detected pixels (make this configurable?)
-            img[wDet|wSig] *= 10.0
+            img[wDet|wSig] *= self.scaleDetected
+
+        # subtract a small scale background when we search for PSFs
+        if self.doBackground:
+            self.log.logdebug("Median ring background")
+            back       = satUtil.medianRing(imgClip, self.kernelWidth, 2.0*self.sigmaSmooth)
             img       -= back
             imgClip   -= back
-            kernelGrow = 1.4
-            thetaTol   = 0.15
-        else:
-            self.sigmaSmooth = 2.0
-            kernelGrow = 1.4
-            thetaTol   = 0.25
+
         
         #   - smooth 
         img       = satUtil.smooth(img,       self.sigmaSmooth)
@@ -176,7 +250,8 @@ class SatelliteFinder(object):
         # Different sized kernels should give the same results for a real trail
         # but would be less likely to for noise.
         # Unfortunately, this is costly, and the effect is small.
-        for kernelFactor in (1.0, kernelGrow):
+        for kernelFactor in (1.0, self.growKernel):
+            self.log.logdebug("Getting moments growKernel=%.1f" % (self.growKernel))
             kernelWidth = 2*int((kernelFactor*self.kernelWidth)//2) + 1
             kernelSigma = kernelFactor*self.kernelSigma 
 
@@ -239,11 +314,13 @@ class SatelliteFinder(object):
         ###############################################
         # Theta Alignment
         ###############################################
+        self.log.logdebug("Theta alignment.")
         xx, yy = np.meshgrid(np.arange(img.shape[1], dtype=int), np.arange(img.shape[0], dtype=int))
         nBeforeAlignment = isCandidate.sum()
         maxSeparation = min([x/2 for x in img.shape])
-        thetaMatch, newTheta = hough.thetaAlignment(mm.theta[isCandidate],xx[isCandidate],yy[isCandidate],
-                                                    tolerance=thetaTol,limit=3,maxSeparation=maxSeparation)
+        thetaMatch, newTheta = hough.thetaAlignment(mm.theta[isCandidate], xx[isCandidate], yy[isCandidate],
+                                                    tolerance=self.thetaTolerance,
+                                                    limit=3, maxSeparation=maxSeparation)
 
         mm.theta[isCandidate] = newTheta
         isCandidate[isCandidate] = thetaMatch
@@ -253,14 +330,16 @@ class SatelliteFinder(object):
         #################################################
         # Hough transform
         #################################################
+        self.log.logdebug("Hough Transform.")
         rMax           = np.linalg.norm(img.shape)
         houghTransform = hough.HoughTransform(self.houghBins, self.houghThresh,
                                               rMax=rMax, maxPoints=1000, nIter=1, maxResid=5.5)
         solutions      = houghTransform(mm.theta[isCandidate], xx[isCandidate], yy[isCandidate])
 
         #################################################
-        # Trail objects
+        # Construct Trail objects from Hough solutions
         #################################################
+        self.log.logdebug("Constructing SatelliteTrail objects.")
         trails = satTrail.SatelliteTrailList(nAfterAlignment, solutions.binMax, psfSigma)
         for s in solutions:
             trail = satTrail.SatelliteTrail.fromHoughSolution(s, self.bins)
@@ -271,7 +350,9 @@ class SatelliteFinder(object):
                 trails.append(trail)
             else:
                 self.log.info("Dropping (maxWidth>%.1f): %s" %(self.maxTrailWidth, trail))
-                
+
+
+        # A bit hackish, but stash some useful info for diagnostic plots
         self._mm           = mm
         self._mmCals       = mmCals
         self._isCandidate  = isCandidate
