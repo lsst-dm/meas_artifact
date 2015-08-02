@@ -19,10 +19,9 @@ candidateSets = {
     'all'   : candi.knownCandidates,
     'short' : candi.shortCandidates,
 }
-    
+
 
 def hashDataId(dataId):
-    #return "%04d-%03d" % (int(dataId['visit']), int(dataId['ccd']))
     return  (int(dataId['visit']), int(dataId['ccd']))
     
 def process(dataRef):
