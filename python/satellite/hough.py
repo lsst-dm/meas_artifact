@@ -10,28 +10,28 @@ import matplotlib.pyplot as plt
 
 import satelliteUtils as satUtil
 
-def hesseForm(theta_in, x, y):
+def hesseForm(thetaIn, x, y):
     """Convert theta, x, y   to Hesse normal form
 
-    @param theta_in    Local position angle in radians (-pi/2 < theta_in < pi/2)
+    @param thetaIn     Local position angle in radians (-pi/2 < thetaIn < pi/2)
     @param x           Local x coordinate in pixels
     @param y           Local y coordinate in pixels
 
     @return r, theta   Hesse normal form:  r = x*cos(theta) + y*sin(theta)
 
-    The theta_in we are given is a local position angle wrt to the x-axis.  For an elongated
-    shape at position x,y; theta_in is aligned along the *long* axis.  However, the theta
+    The thetaIn we are given is a local position angle wrt to the x-axis.  For an elongated
+    shape at position x,y; thetaIn is aligned along the *long* axis.  However, the theta
     used in the Hesse normal form is the angle of the vector normal to the local long axis.
-    Theta is therefore different from theta_in by +/- pi/2.  The sign is determined by the sign
+    Theta is therefore different from thetaIn by +/- pi/2.  The sign is determined by the sign
     of the y-intercept.
     
     The basic geometry is shown at e.g. https://en.wikipedia.org/wiki/Hesse_normal_form
     """
     
     # if the intercept is y > 0, then add pi/2; otherwise subtract pi/2
-    intercept = y - x*np.tan(theta_in)
+    intercept = y - x*np.tan(thetaIn)
     pihalves  = np.sign(intercept)*0.5*np.pi
-    theta     = theta_in + pihalves
+    theta     = thetaIn + pihalves
     
     # now ... -pi < theta < pi ...  convert to 0..2pi range
     theta[(theta < 0.0)] += 2.0*np.pi
@@ -40,7 +40,7 @@ def hesseForm(theta_in, x, y):
     return r, theta
         
 
-def twoPiOverlap(theta_in, arrays=None, overlapRange=0.2):
+def twoPiOverlap(thetaIn, arrays=None, overlapRange=0.2):
     """
     Take any thetas near zero and *copy* them to above 2*pi.
     Take any thetas near 2*pi and *copy* them to near 0
@@ -50,11 +50,11 @@ def twoPiOverlap(theta_in, arrays=None, overlapRange=0.2):
     same theta yielding two solutions.
     """
     
-    w_0,   = np.where( theta_in < overlapRange )
-    w_2pi, = np.where( 2.0*np.pi - theta_in < overlapRange )
+    w_0,   = np.where( thetaIn < overlapRange )
+    w_2pi, = np.where( 2.0*np.pi - thetaIn < overlapRange )
 
-    theta = np.append(theta_in, theta_in[w_0] + 2.0*np.pi)
-    theta = np.append(theta,    theta_in[w_2pi] - 2.0*np.pi)
+    theta = np.append(thetaIn, thetaIn[w_0] + 2.0*np.pi)
+    theta = np.append(theta,    thetaIn[w_2pi] - 2.0*np.pi)
 
     # if we're given other arrays, append in the same way
     outArray = []

@@ -45,14 +45,14 @@ def getExposurePsfSigma(exposure, minor=False):
         return np.sqrt(axes.getA()*axes.getB())
 
 
-def separableConvolve(data, vx, vy):
-    """Convolve 2D data with 1D kernels in X and then Y
+def separableCrossCorrelate(data, vx, vy):
+    """Cross-correlate 2D data with 1D kernels in X and then Y
 
     @param data    The input 2D ndarray
-    @param vx      The x-vector for convolution
-    @param vy      The y-vector for convolution
+    @param vx      The x-vector for cross-correlation
+    @param vy      The y-vector for cross-correlation
 
-    @return out    The convolved 2D array.
+    @return out    The cross-correlated 2D array.
     """
     
     mode = 'reflect'
@@ -72,7 +72,7 @@ def smooth(img, sigma):
     k     = 2*int(6.0*sigma) + 1
     kk    = np.arange(k) - k//2
     gauss = (1.0/np.sqrt(2.0*np.pi))*np.exp(-kk*kk/(2.0*sigma))
-    smth  = separableConvolve(img, gauss, gauss)
+    smth  = separableCrossCorrelate(img, gauss, gauss)
     return smth
 
 
@@ -186,18 +186,3 @@ def momentConvolve2d(data, k, sigma, middleOnly=False):
     return ImageMoment(*values)
 
     
-    
-if __name__ == '__main__':
-    n = 256
-    data = np.zeros((n,n))
-    data[n//2,n//2] += 1
-
-    smth = medianRing(data, 10.0, 2.0)
-
-    fig = figure.Figure()
-    can = FigCanvas(fig)
-    ax = fig.add_subplot(121)
-    ax.imshow(data)
-    ax = fig.add_subplot(122)
-    ax.imshow(smth)
-    fig.savefig("ring.png")

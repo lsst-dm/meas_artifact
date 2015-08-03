@@ -26,7 +26,8 @@ def hashDataId(dataId):
     
 def process(dataRef):
     task                  = satTask.HoughSatelliteTask()
-    foundTrails, runtime  = task.run(dataRef, detectionType='all')
+    exposure = dataRef.get("calexp", immediate=True)
+    foundTrails, runtime = task.process(exposure)
     return (hashDataId(dataRef.dataId), foundTrails, runtime)
 
     

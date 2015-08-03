@@ -87,27 +87,52 @@ class SatelliteTrailList(list):
 ##############################
     
 class ConstantProfile(object):
+    """A constant trail profile"""
+
     def __init__(self, value, width):
+        """Construct
+
+        @param value  The constant value to set
+        @param width  The width of the trail
+        """
         self.value = value
         self.width = width
-    def __call__(self, offset):
-        w  = (offset < self.width/2.0).astype(type(self.value))
-        return self.value*w
         
+    def __call__(self, offset):
+        """Return profile value at 'offset'
+
+        @param offset  A distance from the center.
+        """
+        w  = (offset <= self.width/2.0).astype(type(self.value))
+        return self.value*w
+
+    
 class DoubleGaussianProfile(object):
+    """A Double Gaussian trail profile"""
+    
     def __init__(self, flux, sigma, fWing=0.1):
+        """Construct
+
+        @param flux       The flux of the trail
+        @param sigma      Sigma of the inner Gaussian
+        @param fWing      Fraction of flux in the wing (outer) Gaussian.
+        """
         self.flux  = flux
         self.sigma = sigma
         self.fWing = fWing
         self.fCore = 1.0 - fWing
-        self.A1  = 1.0/(2.0*np.pi*self.sigma**2)
-        self.A2  = 1.0/(2.0*np.pi*(2.0*self.sigma)**2)
+        self.A1  = 1.0/(np.sqrt(2.0*np.pi)*self.sigma)
+        self.A2  = 1.0/(np.sqrt(2.0*np.pi)*(2.0*self.sigma))
         self.coef1 = self.flux*self.fCore*self.A1
         self.coef2 = self.flux*self.fWing*self.A2
         self.twoSigma2Core = 2.0*self.sigma**2
         self.twoSigma2Wing = 2.0*(2.0*self.sigma)**2
         
     def __call__(self, offset):
+        """Return profile value at offset.
+
+        @param offset   Distance from the profile center.
+        """
         g1  = np.exp(-offset**2/self.twoSigma2Core)
         g2  = np.exp(-offset**2/self.twoSigma2Wing)
         out = self.coef1*g1 + self.coef2*g2
@@ -191,7 +216,40 @@ class SatelliteTrail(object):
         self.nMaskedPixels += nPixels
         return nPixels
 
+    def endPoints(self, nx, ny): 
+        """Compute the length of the trail in an nx*ny image.
+
+        @param nx      Image x dimension
+        @param ny      Image y dimension
+        """
+
+        points = []
+        epsilon = 1.0e-8
+        if np.abs(self.vy) > epsilon:
+            for ix in 0, nx:
+                y = (self.r - ix*self.vx)/self.vy
+                if (y > 0) and (y < ny):
+                    points.append( (ix, y) )
+        if np.abs(self.vx) > epsilon:
+            for iy in 0, ny:
+                x = (self.r - iy*self.vy)/self.vx
+                if (x > 0) and (x < nx):
+                    points.append( (x, iy) )
+        points = sorted(points, key=lambda x: x[0])
+        return points
+    
+    def length(self, nx, ny):
+        """Compute the length of the trail in an nx*ny image.
+
+        @param nx      Image x dimension
+        @param ny      Image y dimension
+        """
+
+        p1, p2 = self.endPoints(nx, ny)
+        length = ((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2)**0.5
+        return length
         
+    
     def trace(self, nx, ny, offset=0, bins=1):
         """Get x,y values near this satellite trail.
 
@@ -200,29 +258,19 @@ class SatelliteTrail(object):
         @param offset  Distance from trail centerline to return values
         @param bins    Correct for images binned by this amount.
         """
-        
-        x = np.arange(nx)
-        y = (self.r/bins + offset - x*self.vx)/self.vy
-        w =  (x > 0) & (x < nx) & (y > 0) & (y < ny)
-        return x[w], y[w]
 
-    def length(self, nx, ny):
-        """Compute the length of the trail in an nx*ny image.
+        p1, p2 = self.endPoints(nx, ny)
+        dx = np.abs(p2[0] - p1[0])
+        dy = np.abs(p2[1] - p1[1])
+        if dx > dy:
+            x = np.arange(p1[0], p2[0])
+            y = (self.r/bins + offset - x*self.vx)/self.vy
+        else:
+            y = np.arange(p1[1], p2[1])
+            x = (self.r/bins + offset - y*self.vy)/self.vx
 
-        @param nx      Image x dimension
-        @param ny      Image y dimension
-        """
+        return x.astype(int), y.astype(int)
 
-        # we could do this faster, but this won't likely ever be a bottleneck for speed.
-        # just get the trace and compute with the first and last point.
-        x, y = self.trace(nx, ny)
-        length = 0
-        if len(x):
-            dx = x[-1] - x[0]
-            dy = y[-1] - y[0]
-            length = np.sqrt(dx**2 + dy**2)
-        return length
-        
 
     def residual(self, x, y, bins=1):
         """Get residuals of this fit compared to given x,y coords.
@@ -239,15 +287,15 @@ class SatelliteTrail(object):
         """Plant this satellite trail in a given exposure.
 
         @param exposure       The exposure to plant in (accepts ExposureF, ImageF, MaskU or ndarray)
-        @param sigma          The PSF size (as Gaussian sigma) to use.
-        @param maskBit        Set pixels to this value.  (Don't plant a Double-Gaussian trail profile).
+        @param profile        A profile function object.
+        @param width          Set pixels to this value.  (Don't plant a Double-Gaussian trail profile).
 
         This method serves a few purposes.
 
         (1) To search for a trail with profile similar to a PSF, we plant a PSF-shaped trail
-            and measure its parameters for use in calibrating detection limits.
-        (2) When we find a trail, our setMask() method calls this method with a maskBit to set.
-        (3) For testing, we can insert fake trails and try to find them.
+            and measure its parameters for use in CALIBRATING detection limits.
+        (2) When we find a trail, our setMask() method calls this method with a maskBit to SET THE MASK.
+        (3) For TESTING, we can insert fake trails and try to find them.
         """
 
         # Handle Exposure, Image, ndarray
@@ -272,7 +320,7 @@ class SatelliteTrail(object):
         # as the parameter in a 1D DoubleGaussian
         offset = np.abs(dot - self.r)
 
-        # only bother updating the pixels within 5-sigma of the line
+        # only bother updating the pixels within width
         w = (offset < width/2.0)
         #img += profile(offset)
         img[w] += profile(offset[w])
