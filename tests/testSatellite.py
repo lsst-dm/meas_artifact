@@ -4,8 +4,8 @@ import sys, os
 import unittest
 import numpy as np
 import lsst.utils.tests as utilsTests
-import satellite.satelliteTrail as satTrail
-import satellite.satelliteUtils as satUtil
+import lsst.meas.satellite.satelliteTrail as satTrail
+import lsst.meas.satellite.satelliteUtils as satUtil
 
 class SatelliteTestCase(unittest.TestCase):
 

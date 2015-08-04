@@ -8,11 +8,11 @@ import numpy as np
 import lsst.daf.persistence as dafPersist
 import hsc.pipe.base.butler as hscButler
 
-import satellite.satelliteTrail as satTrail
-import satellite.satelliteTask  as satTask
-import satellite.mapreduce      as mapr
-import satellite.candidates     as candi
-import satellite.colors         as clr
+import lsst.meas.satellite.satelliteTrail as satTrail
+import lsst.meas.satellite.satelliteTask  as satTask
+import lsst.meas.satellite.mapreduce      as mapr
+import lsst.meas.satellite.candidates     as candi
+import lsst.meas.satellite.colors         as clr
 
 
 candidateSets = {
