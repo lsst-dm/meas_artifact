@@ -8,8 +8,8 @@ import numpy as np
 import lsst.daf.persistence as dafPersist
 import hsc.pipe.base.butler as hscButler
 
-import lsst.meas.satellite.satelliteTrail as satTrail
-import lsst.meas.satellite.satelliteTask  as satTask
+import lsst.meas.satellite as measSat
+
 import lsst.meas.satellite.mapreduce      as mapr
 import lsst.meas.satellite.candidates     as candi
 import lsst.meas.satellite.colors         as clr
@@ -25,7 +25,7 @@ def hashDataId(dataId):
     return  (int(dataId['visit']), int(dataId['ccd']))
     
 def process(dataRef):
-    task                  = satTask.HoughSatelliteTask()
+    task                  = measSat.HoughSatelliteTask()
     exposure = dataRef.get("calexp", immediate=True)
     foundTrails, runtime = task.process(exposure)
     return (hashDataId(dataRef.dataId), foundTrails, runtime)

@@ -260,16 +260,21 @@ class SatelliteTrail(object):
         """
 
         p1, p2 = self.endPoints(nx, ny)
-        dx = np.abs(p2[0] - p1[0])
-        dy = np.abs(p2[1] - p1[1])
+        xs = p1[0], p2[0]
+        ys = p1[1], p2[1]
+
+        dx = max(xs) - min(xs)
+        dy = max(ys) - min(ys)
         if dx > dy:
-            x = np.arange(p1[0], p2[0])
+            lo, hi = min(xs), max(xs)
+            x = np.arange(lo, hi)
             y = (self.r/bins + offset - x*self.vx)/self.vy
         else:
-            y = np.arange(p1[1], p2[1])
+            lo, hi = min(ys), max(ys)
+            y = np.arange(lo, hi)
             x = (self.r/bins + offset - y*self.vy)/self.vx
 
-        return x.astype(int), y.astype(int)
+        return np.rint(x).astype(int), np.rint(y).astype(int)
 
 
     def residual(self, x, y, bins=1):

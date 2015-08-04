@@ -50,8 +50,8 @@ def twoPiOverlap(thetaIn, arrays=None, overlapRange=0.2):
     same theta yielding two solutions.
     """
     
-    w_0,   = np.where( thetaIn < overlapRange )
-    w_2pi, = np.where( 2.0*np.pi - thetaIn < overlapRange )
+    w_0,   = np.where( thetaIn <= overlapRange )
+    w_2pi, = np.where( 2.0*np.pi - thetaIn <= overlapRange )
 
     theta = np.append(thetaIn, thetaIn[w_0] + 2.0*np.pi)
     theta = np.append(theta,    thetaIn[w_2pi] - 2.0*np.pi)
@@ -274,16 +274,20 @@ def hesseBin(r0, theta0, bins=200, rMax=4096, thresh=40):
     overlapRange = 0.2
 
     # eliminate any underdesirable r,theta values
+    # namely theta~0.0 and r > rMax
     notTrivial = (np.abs(theta) > 1.0e-2) & (np.abs(r) > 1.0*rMax/bins)
 
     # there actually *are* near vertical trails.  Disable this for now.
     #notBleed   = np.abs(theta - np.pi/2.0) > 1.0e-2
+    
     isOk       = notTrivial # & notBleed
 
+    # This builds a 2d histogram and labels any bins with count level above a threshold
     bin2d, rEdge, tEdge = np.histogram2d(r[isOk], theta[isOk], bins=(bins,bins),
                                            range=((0.0, rMax), (-overlapRange, overlapRange+2.0*np.pi)) )
     locus, numLocus = ndimg.label(bin2d > thresh, structure=np.ones((3,3)))
 
+    # Now check each locus and get the points which contributed to it, or its immediate neighbours
     rs, ts, idx, drs, dts = [], [], [], [], []
     for i in range(numLocus):
         label = i + 1
@@ -328,6 +332,7 @@ def hesseBin(r0, theta0, bins=200, rMax=4096, thresh=40):
         ts.append(tTmp)
         dts.append(dtTmp)
 
+        # keep a boolean array ID'ing the points which contributed
         w = (theta0 >= tlo) & (theta0 < thi) & (r0 >= rlo) & (r0 < rhi)
         idx.append(w)
 
@@ -343,7 +348,10 @@ def hesseBin(r0, theta0, bins=200, rMax=4096, thresh=40):
         for j in range(i,n):
             dr = abs(rs[i] - rs[j])
             dt = abs(ts[i] - ts[j])
-            if dr < 10 and dt > 1.9*np.pi:
+            # if this pair is close in r, but differs by ~2pi in theta, it's the same thing
+            # detected twice.
+            if dr < 20 and dt > 1.9*np.pi:
+                # the one with great theta-scatter is 'bad'
                 bad = i if dts[i] > dts[j] else j
                 kill_list.append(bad)
 
@@ -442,7 +450,6 @@ class HoughTransform(object):
         theta0, (r0, x0, y0) = twoPiOverlap(thetaIn, (rIn, xIn, yIn), overlapRange=self.overlapRange)
         
         nPoints = len(r0)
-
         if nPoints == 0:
             return HoughSolutionList(0, rIn, thetaIn)
 
@@ -468,7 +475,7 @@ class HoughTransform(object):
         # bin the data in r,theta space; get r,theta that pass our threshold as a satellite trail
         bin2d, rEdge, thetaEdge, rs, thetas, idx = hesseBin(rNew, thetaNew, thresh=self.thresh,
                                                             bins=self.bins, rMax=rMax)
-        
+
         numLocus = len(thetas)
         solutions = HoughSolutionList(bin2d.max(), rIn, thetaIn)
         for i in range(numLocus):
