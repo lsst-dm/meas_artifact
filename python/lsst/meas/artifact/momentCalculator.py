@@ -339,37 +339,3 @@ class PValuePixelSelector(PixelSelector):
         return ret
 
 
-
-
-        
-if __name__ == '__main__':
-
-    n = 256
-    kwid = 15
-    ksig = 9
-    
-    img = np.random.normal(size=(n,n))
-    img[n/2,n/2] += 1
-    mm = MomentManager(img, kernelWidth=kwid, kernelSigma=ksig)
-
-    cal = np.zeros((kwid,kwid))
-    cal[kwid/2,kwid/2] += 1
-    cmm = MomentManager(cal, kernelWidth=kwid, kernelSigma=ksig, isCalibration=True)
-
-    sumI = MomentLimit('sumI', 1.0, 'center')
-    
-    norm = PixelSelector(mm, cmm)
-    norm.append(sumI)
-    
-    print mm.ellip[n/2,n/2]
-    good = norm.getPixels()
-    print good.sum()
-
-    pval = PValuePixelSelector(mm, cmm)
-    pval.append(sumI)
-    
-    print mm.ellip[n/2,n/2]
-    good = pval.getPixels(maxPixels=1000)
-    print good.sum()
-    
-    

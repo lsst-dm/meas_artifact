@@ -491,7 +491,7 @@ class AnotherSatelliteTask(SatelliteTask):
     
                    
 class PoolSatelliteConfig(pexConfig.Config):
-    satellite    = pexConfig.ConfigurableField(target=SatelliteTask, doc="satellite")
+    satellite    = pexConfig.ConfigurableField(target=HoughSatelliteTask, doc="satellite")
 
     
 class PoolSatelliteTask(basePara.BatchPoolTask):

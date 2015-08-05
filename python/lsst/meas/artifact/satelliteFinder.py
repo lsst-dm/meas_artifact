@@ -51,7 +51,7 @@ class SatelliteFinder(object):
     def __init__(self,
                  bins            = 4,
                  doBackground    = True,
-                 scaleDetected   = 1.0,
+                 scaleDetected   = 10.0,
                  sigmaSmooth     = 1.0,
                  thetaTolerance  = 0.15,
                  

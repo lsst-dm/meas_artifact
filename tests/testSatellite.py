@@ -412,7 +412,7 @@ class SatelliteTestCase(utilsTests.TestCase):
 
         # Add two fake trails
         img  = mimg.getImage().getArray()
-        flux = 1000.0
+        flux = 400.0 
         sigma = seeing
         prof = measArt.DoubleGaussianProfile(flux, sigma)
         width = 8*sigma
@@ -423,28 +423,81 @@ class SatelliteTestCase(utilsTests.TestCase):
         rms = 20.0
         noise = rms*np.random.normal(size=(nx, ny))
         img += noise
-
-        if True:
-            plt.imshow(img, origin='lower', cmap='gray')
-            plt.savefig("fake.png")
         
         # create a finder and see what we get
-        task            = measArt.HoughSatelliteTask()
-        trails, runtime = task.process(exposure)
+        finder          = measArt.SatelliteFinder()
+        trailsFind      = finder.getTrails(exposure, widths=[1.0])
 
-        # make sure 
-        self.assertEqual(len(trails), 2)
+        # try a task
+        config               = measArt.HoughSatelliteConfig()
+        config.narrow.eRange = 0.02
+        task                 = measArt.HoughSatelliteTask(config=config)
+        trailsTask, runtime  = task.process(exposure)
 
+        # make sure both trails detected by finder and task
+        self.assertEqual(len(trailsFind), 2)
+        self.assertEqual(len(trailsTask), 2)
+
+        # make sure we found the right ones!
         drMax = 5
         dThetaMax = 0.1
-        found1 = trail1.isNear(trails[0], drMax, dThetaMax) or trail1.isNear(trails[1], drMax, dThetaMax)
-        found2 = trail2.isNear(trails[0], drMax, dThetaMax) or trail2.isNear(trails[1], drMax, dThetaMax)
+        for trails in trailsFind, trailsTask:
+            found1 = trail1.isNear(trails[0], drMax, dThetaMax) or trail1.isNear(trails[1], drMax, dThetaMax)
+            found2 = trail2.isNear(trails[0], drMax, dThetaMax) or trail2.isNear(trails[1], drMax, dThetaMax)
+            self.assertTrue(found1)
+            self.assertTrue(found2)
+
             
-        self.assertTrue(found1)
-        self.assertTrue(found2)
+        plt.imshow(img, origin='lower', cmap='gray')
+        for trail in trailsTask:
+            x1, y1 = trail.trace(nx, ny, offset=10)
+            x2, y2 = trail.trace(nx, ny, offset=-10)
+            plt.plot(x1, y1, 'r-')
+            plt.plot(x2, y2, 'r-')
+        plt.savefig("fake.png")
+            
 
+    def testPixelSelector(self):
+        
+        nx, ny = 512, 512
+        kwid = 15
+        ksig = 90000
 
+        # create a fake image and MomentManager with a vertical line in the middle
+        #img = np.random.normal(size=(nx,ny))
+        img = np.zeros((nx, ny))
+        img[:,nx//2] += 1
+        mm = measArt.MomentManager(img, kernelWidth=kwid, kernelSigma=ksig)
 
+        # create a calibration image MomentManager
+        cal = np.zeros((kwid,kwid))
+        cal[:,kwid//2] += 1
+        cmm = measArt.MomentManager(cal, kernelWidth=kwid, kernelSigma=ksig, isCalibration=True)
+
+        # create limits to test
+        sumI  = measArt.MomentLimit('sumI',   0.01,  'lower')
+        cent  = measArt.MomentLimit('center', 0.01,  'upper')
+        ellip = measArt.MomentLimit('ellip',  0.01, 'center')
+
+        # Test the two pixel selectors: basic and p-value
+        # --> a basic PixelSelector object (straight cut on values ... pass/fail)
+        #     -- inherits from list, so we append our tests to it
+        # --> a p-value PixelSelector object (sum log(p) and cut at a specified probability threshold)
+        #     -- inherits from PixelSelector base class
+        for selectorClass in measArt.PixelSelector, measArt.PValuePixelSelector:
+        
+            selector = selectorClass(mm, cmm)
+            # append the limits ... use (overloaded) append to verify checking valid limit info
+            for lim in sumI, cent, ellip:
+                selector.append(lim)
+
+            # did we get the right number ... and are they the same pixels?
+            goodPixels = selector.getPixels(maxPixels=1000)
+            self.assertEqual(ny, goodPixels.sum())
+            diff = goodPixels - img
+            self.assertFalse(diff.any())
+        
+        
         
 #################################################################
 # Test suite boiler plate
