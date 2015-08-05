@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import lsst.utils.tests as utilsTests
 import lsst.afw.image as afwImage
 import lsst.meas.algorithms as measAlg
-import lsst.meas.satellite as measSat
+import lsst.meas.artifact as measArt
 
 np.random.seed(42)
 
@@ -28,10 +28,10 @@ class SatelliteTestCase(utilsTests.TestCase):
         drMax     = 50.0
         dThetaMax = 0.15
         
-        s1 = measSat.SatelliteTrail(r=1769.0,theta=0.017,width=29.88)
-        s2 = measSat.SatelliteTrail(r=1769.0,theta=2.0*np.pi-0.001,width=29.88)
-        s3 = measSat.SatelliteTrail(r=1769.0,theta=np.pi, width=29.88)
-        s4 = measSat.SatelliteTrail(r=1700.0,theta=0.017, width=29.88)
+        s1 = measArt.SatelliteTrail(r=1769.0,theta=0.017,width=29.88)
+        s2 = measArt.SatelliteTrail(r=1769.0,theta=2.0*np.pi-0.001,width=29.88)
+        s3 = measArt.SatelliteTrail(r=1769.0,theta=np.pi, width=29.88)
+        s4 = measArt.SatelliteTrail(r=1700.0,theta=0.017, width=29.88)
 
         def compare(trail1, trail2, expect):
             comp = trail1.isNear(trail2, drMax=drMax, dThetaMax=dThetaMax)
@@ -61,12 +61,12 @@ class SatelliteTestCase(utilsTests.TestCase):
             # try values within and outside tolerance
             for delta,expected in (0.01, True), (0.2, False):
                 t2 = t + delta
-                isNear = measSat.angleCompare(t, t2, tolerance)
+                isNear = measArt.angleCompare(t, t2, tolerance)
                 self.assertEqual(isNear, expected)
 
                 # try adding 2pi and see if it's still correct
                 t2 = t + delta + 2.0*np.pi
-                isNear = measSat.angleCompare(t, t2, tolerance)
+                isNear = measArt.angleCompare(t, t2, tolerance)
                 self.assertEqual(isNear, expected)
 
                 
@@ -85,8 +85,8 @@ class SatelliteTestCase(utilsTests.TestCase):
         img = np.zeros((nx, ny))
         img[ny//2,nx//2] = 1.0
 
-        imgX = measSat.separableCrossCorrelate(img, vx, oy)
-        imgY = measSat.separableCrossCorrelate(img, ox, vy)
+        imgX = measArt.separableCrossCorrelate(img, vx, oy)
+        imgY = measArt.separableCrossCorrelate(img, ox, vy)
 
         # cross-correlating will flip the symmetry wrt meshgrid, but should otherwise be the same
         testX = np.abs(imgX - xx[::,::-1]) > 0.0
@@ -120,7 +120,7 @@ class SatelliteTestCase(utilsTests.TestCase):
         img[ny//2,nx//2] = 1.0
 
         sigma = 1.0e99
-        moments = measSat.momentConvolve2d(img, vx, sigma)
+        moments = measArt.momentConvolve2d(img, vx, sigma)
 
         testX  = np.abs(moments.ix  - xx[::,::-1])    > 0.0
         testY  = np.abs(moments.iy  - yy[::-1,::])    > 0.0
@@ -150,13 +150,13 @@ class SatelliteTestCase(utilsTests.TestCase):
         
         value = 1.0 # the value to insert
         width = 2.1 # the width of the trail
-        constProf = measSat.ConstantProfile(value, width)
+        constProf = measArt.ConstantProfile(value, width)
         
         flux = 10.0
         sigma = 2.0
         # test both extremes of the DoubleGaussian
-        gaussProf  = measSat.DoubleGaussianProfile(flux, sigma, fWing=0.0)
-        gaussProf2 = measSat.DoubleGaussianProfile(flux, 0.5*sigma, fWing=1.0)
+        gaussProf  = measArt.DoubleGaussianProfile(flux, sigma, fWing=0.0)
+        gaussProf2 = measArt.DoubleGaussianProfile(flux, 0.5*sigma, fWing=1.0)
         
         # vertical trail
         vFake = np.zeros((nx, ny))
@@ -170,7 +170,7 @@ class SatelliteTestCase(utilsTests.TestCase):
             
             # r,theta  defining the trail
             r = nx//2
-            trail = measSat.SatelliteTrail(r, theta)
+            trail = measArt.SatelliteTrail(r, theta)
 
             # check the length
             leng = trail.length(nx, ny)
@@ -222,7 +222,7 @@ class SatelliteTestCase(utilsTests.TestCase):
         y0 = ny*np.arange(n)
         theta0 = 0.5*np.pi*np.ones(n)
 
-        r, theta = measSat.hesseForm(theta0, x0, y0)
+        r, theta = measArt.hesseForm(theta0, x0, y0)
 
         rResid     = r - nx//2
         thetaResid = theta - 0.0  # expect value is 0.0 ... just showing that.
@@ -235,7 +235,7 @@ class SatelliteTestCase(utilsTests.TestCase):
         x0 = nx*np.arange(n)
         theta0 = np.zeros(n)
 
-        r, theta = measSat.hesseForm(theta0, x0, y0)
+        r, theta = measArt.hesseForm(theta0, x0, y0)
 
         rResid     = r - ny//2
         thetaResid = theta - np.pi/2.0
@@ -257,7 +257,7 @@ class SatelliteTestCase(utilsTests.TestCase):
         t = rang*np.arange(100)/99  
         t = np.append(t, 2.0*np.pi - t)
         
-        t2, _ = measSat.twoPiOverlap(t, overlapRange=rang)
+        t2, _ = measArt.twoPiOverlap(t, overlapRange=rang)
 
         tmax = 2.0*np.pi + rang
         tmin = -rang
@@ -292,7 +292,7 @@ class SatelliteTestCase(utilsTests.TestCase):
         # append a line
         nLine = 100
         r, theta = 300, 0.4
-        trail = measSat.SatelliteTrail(r, theta)
+        trail = measArt.SatelliteTrail(r, theta)
         _x, _y = trail.trace(nx, ny)
         if len(_x) > nLine:
             stride = len(_x)/nLine
@@ -311,7 +311,7 @@ class SatelliteTestCase(utilsTests.TestCase):
 
         # set ruthless limit=nLine/2  (normally 3 to 5)
         # It means a candidate is accepted only if it has this many statistically unexpected neighbours.
-        isCand, newTheta = measSat.thetaAlignment(t, x, y, limit=int(0.5*nLine), tolerance=tolerance)
+        isCand, newTheta = measArt.thetaAlignment(t, x, y, limit=int(0.5*nLine), tolerance=tolerance)
 
         # make sure we have the right number of hits
         self.assertEqual(isCand.sum(), nLine)
@@ -327,22 +327,22 @@ class SatelliteTestCase(utilsTests.TestCase):
         nx, ny = 512, 512
 
         r, theta = 300, 0.4
-        trail = measSat.SatelliteTrail(r, theta)
+        trail = measArt.SatelliteTrail(r, theta)
         x, y = trail.trace(nx, ny)
         n = len(x)
         t = theta + 0.05*np.random.normal(size=n)
 
         niter = 2
-        rNew, tNew, _r, _x, _y = measSat.improveCluster(t, x, y)
+        rNew, tNew, _r, _x, _y = measArt.improveCluster(t, x, y)
         for i in range(niter-1):
-            rNew, tNew, _r, _x, _y = measSat.improveCluster(tNew, x, y)
+            rNew, tNew, _r, _x, _y = measArt.improveCluster(tNew, x, y)
 
         rEst = rNew.mean()
         tEst = tNew.mean()
 
         # if you need to look at it
         if False:
-            r0, theta0 = measSat.hesseForm(t-np.pi/2.0, x, y)
+            r0, theta0 = measArt.hesseForm(t-np.pi/2.0, x, y)
             plt.plot(theta0, r0, 'k.')
             plt.plot(tNew, rNew, '.r')
             plt.plot([tEst], [rEst], 'go')
@@ -359,14 +359,14 @@ class SatelliteTestCase(utilsTests.TestCase):
         
         nx, ny = 512, 512
         r0, t0 = 300, 0.4
-        trail = measSat.SatelliteTrail(r0, t0)
+        trail = measArt.SatelliteTrail(r0, t0)
         x, y = trail.trace(nx, ny)
         n = len(x)
         r = r0 + np.random.normal(size=n)
         t = t0 + 0.01*np.random.normal(size=n)
 
         rMax = (nx**2 + ny**2)**0.5
-        result = measSat.hesseBin(r, t, rMax=rMax)
+        result = measArt.hesseBin(r, t, rMax=rMax)
         bin2d, rEdge, tEdge, rs, ts, idx = result
 
         # make sure we only got one hit
@@ -380,7 +380,7 @@ class SatelliteTestCase(utilsTests.TestCase):
         self.assertClose(ts[0], t0, rtol=1.0e-2)
 
         # try the HoughTransform
-        hough = measSat.HoughTransform(bins=200, thresh=40, rMax=rMax, maxResid=4.0, nIter=3)
+        hough = measArt.HoughTransform(bins=200, thresh=40, rMax=rMax, maxResid=4.0, nIter=3)
 
         solutions = hough(t, x, y)
 
@@ -399,8 +399,8 @@ class SatelliteTestCase(utilsTests.TestCase):
         nx, ny = 512, 512
         r1, t1 = 300, 0.4
         r2, t2 = 200, 2.0*np.pi-0.2
-        trail1 = measSat.SatelliteTrail(r1, t1)
-        trail2 = measSat.SatelliteTrail(r2, t2)
+        trail1 = measArt.SatelliteTrail(r1, t1)
+        trail2 = measArt.SatelliteTrail(r2, t2)
         
         # create an exposure with a PSF object
         mimg = afwImage.MaskedImageF(nx, ny)
@@ -414,7 +414,7 @@ class SatelliteTestCase(utilsTests.TestCase):
         img  = mimg.getImage().getArray()
         flux = 1000.0
         sigma = seeing
-        prof = measSat.DoubleGaussianProfile(flux, sigma)
+        prof = measArt.DoubleGaussianProfile(flux, sigma)
         width = 8*sigma
         trail1.insert(img, prof, width)
         trail2.insert(img, prof, width)
@@ -429,7 +429,7 @@ class SatelliteTestCase(utilsTests.TestCase):
             plt.savefig("fake.png")
         
         # create a finder and see what we get
-        task            = measSat.HoughSatelliteTask()
+        task            = measArt.HoughSatelliteTask()
         trails, runtime = task.process(exposure)
 
         # make sure 

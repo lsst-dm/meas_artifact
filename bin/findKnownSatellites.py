@@ -8,11 +8,11 @@ import numpy as np
 import lsst.daf.persistence as dafPersist
 import hsc.pipe.base.butler as hscButler
 
-import lsst.meas.satellite as measSat
+import lsst.meas.artifact as measArt
 
-import lsst.meas.satellite.mapreduce      as mapr
-import lsst.meas.satellite.candidates     as candi
-import lsst.meas.satellite.colors         as clr
+import lsst.meas.artifact.mapreduce      as mapr
+import lsst.meas.artifact.candidates     as candi
+import lsst.meas.artifact.colors         as clr
 
 
 candidateSets = {
@@ -25,7 +25,7 @@ def hashDataId(dataId):
     return  (int(dataId['visit']), int(dataId['ccd']))
     
 def process(dataRef):
-    task                  = measSat.HoughSatelliteTask()
+    task                  = measArt.HoughSatelliteTask()
     exposure = dataRef.get("calexp", immediate=True)
     foundTrails, runtime = task.process(exposure)
     return (hashDataId(dataRef.dataId), foundTrails, runtime)
