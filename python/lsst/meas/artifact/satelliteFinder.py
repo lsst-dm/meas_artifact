@@ -342,6 +342,7 @@ class SatelliteFinder(object):
         trails = satTrail.SatelliteTrailList(nAfterAlignment, solutions.binMax, psfSigma)
         for s in solutions:
             trail = satTrail.SatelliteTrail.fromHoughSolution(s, self.bins)
+            trail.detectionWidth = bestWidth
             trail.measure(exp, bins=self.bins)
             # last chance to drop it
             if trail.width < self.maxTrailWidth:

@@ -170,6 +170,8 @@ class SatelliteTrail(object):
         self.binMax   = binMax
         self.resid    = resid
 
+        self.detectionWidth = None
+        
         self.nMaskedPixels  = 0
         
     @classmethod
@@ -184,7 +186,7 @@ class SatelliteTrail(object):
         return trail
         
         
-    def setMask(self, exposure, satelliteBit):
+    def setMask(self, exposure, satelliteBit, andMask=None):
         """Set the mask plane near this trail in an exposure.
 
         @param exposure      The exposure with mask plane to be set.  Change is in-situ.
@@ -210,6 +212,14 @@ class SatelliteTrail(object):
         profile        = ConstantProfile(satelliteBit, width)
         self.insert(tmp, profile, width)
 
+        # only set bits which already have 'andMask' set.
+        # This is intended to allow only 'DETECTED' pixels to be set.  I don't know what other bit
+        # might be useful, but a mask was chosen as it's no harder to implement.
+        if andMask is not None:
+            whereAndMask    = (msk.getArray() & andMask) > 0
+            whereSatAndMask = (tmp.getArray() > 0) & whereAndMask
+            tmp.getArray()[~whereSatAndMask] = 0
+        
         # OR it in to the existing plane, return the number of pixels we set
         msk     |= tmp
         nPixels  = (tmp.getArray() > 0).sum()

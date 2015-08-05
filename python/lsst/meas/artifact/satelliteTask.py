@@ -56,7 +56,6 @@ class SatelliteFinderConfig(pexConfig.Config):
     widths          = pexConfig.ListField(dtype=float, default= (1.0, 8.0),
                                           doc="*unbinned* width of trail to search for.")
 
-
 class SatelliteFinderTask(pipeBase.Task):
     """A thin Task wrapper to construct and run a SatelliteFinder."""
     
@@ -112,10 +111,16 @@ class SatelliteFinderTask(pipeBase.Task):
 #
 #########################################################################################
 class SatelliteConfig(pexConfig.Config):
-    debugType = pexConfig.Field(dtype=str, default=None, doc="Types debug output to write (fits,trail)")
+    maskOnlyDetected = pexConfig.Field(dtype=bool,  default=True,
+                                       doc="Mask only pixels which already have DETECTED set.")
+
+    
+    debugType        = pexConfig.Field(dtype=str,   default=None,
+                                       doc="Types debug output to write (fits,trail)")
 
     defaultDir = os.path.join(os.environ.get("PWD"), "data")
-    debugDir  = pexConfig.Field(dtype=str, default=defaultDir, doc="Directory to write debug outputs")
+    debugDir         = pexConfig.Field(dtype=str, default=defaultDir,
+                                       doc="Directory to write debug outputs")
     
 
 class SatelliteTask(pipeBase.CmdLineTask):
@@ -242,7 +247,12 @@ class SatelliteTask(pipeBase.CmdLineTask):
         satelliteBit   = msk.getPlaneBitMask("SATELLITE")
         nMaskedPixels = 0
         for i, trail in enumerate(trails):
-            maskedPixels = trail.setMask(exposure, satelliteBit=satelliteBit)
+            andMask = None
+            # do this only for narrow trails.  Aircraft trails won't generally be DETECTED.
+            # It's sleezy doing this in the base class as it assumes things about the derived class
+            if self.config.maskOnlyDetected and trail.detectionWidth < 10.0:
+                andMask = msk.getPlaneBitMask("DETECTED")
+            maskedPixels = trail.setMask(exposure, satelliteBit=satelliteBit, andMask=andMask)
             msg = "  Trail %d/%d %s:  maskPix: %d" % (i+1, len(trails), trail, maskedPixels)
             self.log.info(msg)
             nMaskedPixels += maskedPixels
