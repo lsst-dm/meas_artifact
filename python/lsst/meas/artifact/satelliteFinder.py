@@ -69,6 +69,7 @@ class SatelliteFinder(object):
                  houghThresh     = 40,
                  
                  maxTrailWidth   = 2.1,
+                 maskAndBits     = (),
                  
                  log             = None,
                  verbose         = False,
@@ -95,6 +96,7 @@ class SatelliteFinder(object):
         @param houghThresh       Count level in Hough bin to consider a detection.
         
         @param maxTrailWidth     Discard trail detections wider than this.
+        @param maskAndBits       Only allow pixels with these bits to be masked (typ. DETECTED, if any)
         
         @param log               A log object.
         @param verbose           Be chatty.
@@ -119,6 +121,7 @@ class SatelliteFinder(object):
         self.bLimit            = bLimit
 
         self.maxTrailWidth     = maxTrailWidth
+        self.maskAndBits       = maskAndBits
         
         if log is None:
             logLevel = pexLog.Log.INFO
@@ -342,7 +345,8 @@ class SatelliteFinder(object):
         trails = satTrail.SatelliteTrailList(nAfterAlignment, solutions.binMax, psfSigma)
         for s in solutions:
             trail = satTrail.SatelliteTrail.fromHoughSolution(s, self.bins)
-            trail.detectionWidth = bestWidth
+            trail.detectWidth = bestWidth
+            trail.maskAndBits = self.maskAndBits
             trail.measure(exp, bins=self.bins)
             # last chance to drop it
             if trail.width < self.maxTrailWidth:

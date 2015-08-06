@@ -147,7 +147,7 @@ class SatelliteTrail(object):
     or to set mask bits in an exposure.
     """
     
-    def __init__(self, r, theta, width=0.0, flux=1.0, center=0.0, binMax=None, resid=None):
+    def __init__(self, r, theta, width=0.0, flux=1.0, center=0.0, binMax=None, resid=None, maskAndBits=None):
         """Construct a SatelliteTrail with specified parameters.
 
         @param r        r from Hesse normal form of the trail
@@ -156,6 +156,7 @@ class SatelliteTrail(object):
         @param flux     Flux of the trail
         @param binMax   The max bin count for the Hough solution
         @param resid    The coordinate resid tuple (median,inter_quart_range) for residuals from the solution
+        @param maskAndBits  Only mask pixels with these bits set.
         """
 
         self.r        = r
@@ -170,7 +171,8 @@ class SatelliteTrail(object):
         self.binMax   = binMax
         self.resid    = resid
 
-        self.detectionWidth = None
+        self.detectWidth = None
+        self.maskAndBits  = maskAndBits
         
         self.nMaskedPixels  = 0
         
@@ -204,21 +206,24 @@ class SatelliteTrail(object):
 
         # never narrower than the PSF
         if self.width < 2.0*sigma:
-            # go to +- 8*sigma to get the extended wings
-            width = 16.0*sigma
+            # go to +- 10*sigma to get the extended wings
+            width = 20.0*sigma
         else:
-            # or 12x what was measured
-            width = 12.0*self.width
+            # or 15x what was measured
+            width = 15.0*self.width
         profile        = ConstantProfile(satelliteBit, width)
         self.insert(tmp, profile, width)
 
         # only set bits which already have 'andMask' set.
         # This is intended to allow only 'DETECTED' pixels to be set.  I don't know what other bit
         # might be useful, but a mask was chosen as it's no harder to implement.
-        if andMask is not None:
-            whereAndMask    = (msk.getArray() & andMask) > 0
-            whereSatAndMask = (tmp.getArray() > 0) & whereAndMask
-            tmp.getArray()[~whereSatAndMask] = 0
+        if self.maskAndBits:
+            andBits = 0
+            for label in self.maskAndBits:
+                andBits |= msk.getPlaneBitMask(label)
+            whereDetectMask   = (msk.getArray() & andBits) > 0
+            whereSatAndDetect = (tmp.getArray() > 0) & whereDetectMask
+            tmp.getArray()[~whereSatAndDetect] = 0
         
         # OR it in to the existing plane, return the number of pixels we set
         msk     |= tmp

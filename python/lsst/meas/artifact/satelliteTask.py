@@ -53,6 +53,9 @@ class SatelliteFinderConfig(pexConfig.Config):
                                       doc="Min number of 'hits' in a Hough bin for a detection.")
     maxTrailWidth   = pexConfig.Field(dtype=float, default=2.1,
                                       doc="Discard trails with measured widths greater than this (pixels).")
+    
+    maskAndBits     = pexConfig.ListField(dtype=str,   default=(),
+                                      doc="Only mask pixels with one of these bits set.")
     widths          = pexConfig.ListField(dtype=float, default= (1.0, 8.0),
                                           doc="*unbinned* width of trail to search for.")
 
@@ -87,6 +90,7 @@ class SatelliteFinderTask(pipeBase.Task):
             houghThresh     = self.config.houghThresh,
             houghBins       = self.config.houghBins,
             maxTrailWidth   = self.config.maxTrailWidth*self.config.bins, # correct for binning
+            maskAndBits     = self.config.maskAndBits,
             log             = self.log
         )
         
@@ -110,11 +114,7 @@ class SatelliteFinderTask(pipeBase.Task):
 #      your wrapped task in overloaded runSatellite() method.
 #
 #########################################################################################
-class SatelliteConfig(pexConfig.Config):
-    maskOnlyDetected = pexConfig.Field(dtype=bool,  default=True,
-                                       doc="Mask only pixels which already have DETECTED set.")
-
-    
+class SatelliteConfig(pexConfig.Config):    
     debugType        = pexConfig.Field(dtype=str,   default=None,
                                        doc="Types debug output to write (fits,trail)")
 
@@ -247,12 +247,7 @@ class SatelliteTask(pipeBase.CmdLineTask):
         satelliteBit   = msk.getPlaneBitMask("SATELLITE")
         nMaskedPixels = 0
         for i, trail in enumerate(trails):
-            andMask = None
-            # do this only for narrow trails.  Aircraft trails won't generally be DETECTED.
-            # It's sleezy doing this in the base class as it assumes things about the derived class
-            if self.config.maskOnlyDetected and trail.detectionWidth < 10.0:
-                andMask = msk.getPlaneBitMask("DETECTED")
-            maskedPixels = trail.setMask(exposure, satelliteBit=satelliteBit, andMask=andMask)
+            maskedPixels = trail.setMask(exposure, satelliteBit=satelliteBit)
             msg = "  Trail %d/%d %s:  maskPix: %d" % (i+1, len(trails), trail, maskedPixels)
             self.log.info(msg)
             nMaskedPixels += maskedPixels
@@ -332,6 +327,7 @@ class HoughSatelliteConfig(SatelliteConfig):
         self.narrow.houghBins       = 200
         self.narrow.houghThresh     = 40
         self.narrow.maxTrailWidth   = 2.0 # multiple of binning
+        self.narrow.maskAndBits     = ("DETECTED",)
 
         # out-of-focus aircraft default
         self.broad.bins            = 8
@@ -351,6 +347,7 @@ class HoughSatelliteConfig(SatelliteConfig):
         self.broad.houghBins       = 200      
         self.broad.houghThresh     = 40     
         self.broad.maxTrailWidth   = 2.0 # a multiple of binning
+        self.broad.maskAndBits     = ()
 
 
         
