@@ -1,0 +1,175 @@
+
+
+README for meas_artifact
+
+
+Satellite Detection/Masking Code
+--------------------------------
+
+The layout of the package should look something like this (examples of usage follow):
+
+$ tree
+.
+|-- bin
+|   |-- combineSatellitePickles.py           
+|   |-- findKnownSatellites.py               # main development/testing script
+|   |-- plotTrails.py                        
+|   |-- poolSatellite.py                     # run satellite detection on calexps as a batch job
+|   `-- runSatellite.py                      # run satellite detection on calexps as CmdLineTask
+|-- doc
+|   `-- README                               # this document
+|-- python
+|   `-- lsst
+|       |-- __init__.py
+|       `-- meas
+|           |-- __init__.py
+|           `-- artifact
+|               |-- __init__.py
+|               |-- candidates.py            # List of known artifacts in (mainly COSMOS) data
+|               |-- colors.py                # print to stdout in color
+|               |-- hough.py                 # code relating to Hough Transform
+|               |-- mapreduce.py             # A simple map-reduce used in findKnownSatellites.py
+|               |-- momentCalculator.py      # Class to manage computed moments.
+|               |-- satelliteDebug.py        # Debug plot functions
+|               |-- satelliteFinder.py       # The main SatelliteFinder class.
+|               |-- satelliteTask.py         # Code for CmdLineTask and PoolTask
+|               |-- satelliteTrail.py        # SatelliteTrail class to contain detections
+|               `-- satelliteUtils.py        # Utility functions for satellite detection.
+|-- tests
+|   `-- testSatellite.py                     # unit tests
+`-- ups
+    `-- meas_artifact.table
+
+
+By and large, the bin/ scripts should almost never be needed for
+anything.  They were written for development purposes.  The code is
+contained in a CmdLineTask, and can be run on Exposure objects from
+the pipeline.  The CmdLineTask was needed during development to run on
+calexp images directly.  It may be useful if a particular trail is not
+being detected, or some other feature is being detected as a trail,
+but otherwise it shouldn't be needed.
+
+
+
+========================================================
+=
+= Bin scripts
+=
+========================================================
+
+
+#### runSatellite.py and poolSatellite.py
+
+This runs like any other pipeline script, but it works on calexps.  So
+you have to have the single-frame data already on disk to use this.
+Here's an example for a bright trail in visit 1236, ccd 65.
+
+$ runSatellite.py /data1/Subaru/HSC/rerun/bick/cosmos333/ --id visit=1236 ccd=65 -c debugType=fits,trail -L DEBUG
+
+The 'debugType' argument controls which debugging outputs are written.
+A debugDir argument determines where they're written, with
+'$PWD/data/' as the default.  Valid values are:
+
+- 'fits':  write the FITS file after masking the trail
+- 'trail': write the SatelliteTrail object in a pickle
+- 'plot':  write a diagnostic plot showing the moment parameters and detected pixels (WARNING - *slow*)
+
+If you want to run a big batch job, poolSatellite.py works just like
+e.g. reduceFrames.py.  This example runs all the COSMOS data I used
+for testing:
+
+$ poolSatellite.py /lustre/Subaru/SSP/rerun/bick/cosmos333/ --id visit=242^244^246^248^250^254^256^258^260^262^264^266^268^270^272^1166^1168^1170^1172^1174^1176^1178^1180^1182^1184^1186^1188^1190^1192^1194^1202^1204^1206^1208^1210^1212^1214^1216^1218^1220^1222^1228^1230^1232^1236^1238^1240^1242^1244^1246^1248^1886^1888^1890 --nodes 8 --procs 12 --job satellite
+
+
+#### findKnownSatellites.py
+
+This script is used to load a collection of info about known satellite
+trails and run the calexps to see if the algorithm can detect them
+correctly.  The known trails are stored as SatelliteTrail objects in
+candidates.py.  There are two candidate sets defined, 'all' (about 800
+in total) and 'short' (12).  The full set includes a number of control
+frames which contain now satellite or aircraft trail.
+
+Here's how to run the 'short' set:
+
+$ findKnownSatellites.py /data1/Subaru/HSC/rerun/bick/cosmos333/ -c short -j 12
+
+The trails are classified as:
+
+'satellite'   - probably a satellite trail ... steady brightness ... about the width of the PSF
+'aircraft'    - probably an out-of-focus aircraft ... 40-100 pixels width, very faint.
+'moustache'   - arc-shaped ghost artifact, typically 50-80 pixels wide ... only in edge CCDs
+'swallow'     - swallow tail ghost.
+'diffraction' - A diffraction spike associated with a bright star.
+'empty'       - control CCD containing no artifact.
+'unknown'     - A real false-positive.  Detection found in a test run, but it's not clear what it is.
+'scattered'   - scattered light.  Most of these are unmasked bleeds from bright stars.
+'meteor'      - probably a meteor ... varying brightness ... a bit wider than the PSF.
+
+
+The stats are pretty dodgy here.  I've tried to compute 'precision'
+and 'recall', but pinning down true-positive, false-positive,
+true-negative, false-negative is tricky when you aren't sure what's
+there.  I tried identifying trails by eye ahead of time, but I found
+the algorithm often picked-up things that I had missed.  So, I suspect
+there are a few trails in the data set that recorded as
+true-negatives, when they're actually false-negatives.
+
+
+#### combineSatellitePickles.py and plotTrails.py
+
+
+These two are used to collect and plot the results from
+runSatellites.py (or poolSatellites.py).  Each visit,ccd can dump a
+pickle containing the SatelliteTrailList and a bit of other
+information.  The 'combine' script just loads those pickles and writes
+them as a single pickle.  It also has the option to print
+SatelliteTrails, so you can also use it to print results from a run to
+stdout.
+
+E.g. Write to file 'dump.pickle', and (-v) print to stdout.
+
+$ combineSatellitePickles.py data/1236/trails01236-065.pickle -o dump.pickle -v
+
+
+Plot can then be used to overplot a trail on an image.
+
+$ ./bin/plotTrails.py /lustre/Subaru/SSP/rerun/bick/cosmos333 dump.pickle
+
+The input file can be either a pickle, or a text file with space-separated columns:
+
+<visit>  <ccd>  <r>  <theta>  <width>
+
+
+
+========================================================
+=
+= Modules
+=
+========================================================
+
+NOTE: Most of the functions and classes described here have examples in the test script:
+
+tests/testSatellite.py
+
+The main class which does detection is the SatelliteFinder.  There's a
+SatelliteFinderTask which wraps it to handle Config and allow it to be
+used as a Task.
+
+The main algorithm is the HoughSatelliteTask, which inherits from a
+SatelliteTask.  It contain two target versions of the
+SatelliteFinderTasks, one to search for narrow trails (PSF-width), and
+one to search for broad trails (aircraft width).
+
+HoughSatelliteTask(SatelliteTask)
+    'narrow' = SatelliteFinderTask (calls SatelliteFinder.getTrails() with 'narrow' configuration)
+    'broad'  = SatelliteFinderTask (calls SatelliteFinder.getTrails() with 'broad' configuration)
+
+
+There's also a toy Task called AnotherSatelliteTask which just uses
+the 'narrow' configuration as a place holder.  This is included as a
+demo for how someone could write their own *SatelliteTask.  The main
+requirement is a method runSatellite() which calls something that
+returns a SatelliteTrailList.  So, another algorithm should be fairly
+easy to add later.
+
