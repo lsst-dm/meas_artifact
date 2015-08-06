@@ -26,7 +26,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("inputs", nargs="+", help="Input pickel files.")
     parser.add_argument("-o", "--output", help="output filename")
-    parser.add_argument("-v", "--verbose", type=bool, default=False, action='set_true',
+    parser.add_argument("-v", "--verbose", default=False, action='store_true',
                         help="Print the contents to stdout")
     args = parser.parse_args()
     main(args.inputs, args.output, verbose=args.verbose)
