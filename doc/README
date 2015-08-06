@@ -115,6 +115,12 @@ the algorithm often picked-up things that I had missed.  So, I suspect
 there are a few trails in the data set that recorded as
 true-negatives, when they're actually false-negatives.
 
+By default, the script will load the calexps and run the algorithm,
+but it also stores all the results (-o outfile).  You can run the
+script using results from a previous run as input (-i infile) to look
+more carefully at statistics from a specific kind of trail (-k kind
+[from the above list]).
+
 
 #### combineSatellitePickles.py and plotTrails.py
 
@@ -173,3 +179,109 @@ requirement is a method runSatellite() which calls something that
 returns a SatelliteTrailList.  So, another algorithm should be fairly
 easy to add later.
 
+
+========================================================
+=
+= Classes and Functions
+=
+========================================================
+
+Here's a brief list of classes and functions defined in the modules:
+
+lsst/meas/artifact/candidates.py:
+    class Candidate(object)
+    -- A container for candidates detections used in testing.
+    
+lsst/meas/artifact/momentCalculator.py:
+    class MomentManager(object)
+    -- Manage 1st,2nd,3rd moments measured by cross-correlation
+    class MomentLimit(object)
+    -- Specify the valid range (or upper/lower limit) for a given moment
+    class PixelSelector(list)
+    -- A container for the limits to be applied to the moments.
+       Limits are applied as hard cuts
+    class PValuePixelSelector(PixelSelector)
+    -- Another container for the limits to be applied to the moments.
+       Limits are a sum of log(p), and a cut is made to keep most probable ones.
+
+lsst/meas/artifact/satelliteFinder.py:
+    class SatelliteFinder(object)
+    -- The main work horse, and where most of the algorithm is written.
+
+lsst/meas/artifact/satelliteTrail.py:
+    class SatelliteTrail(object)
+    -- The main container for results, but also knows how to add itself to an
+       image and is therefore used to create calibration trails, and to
+       set Mask pixels when a trail is found.
+    class SatelliteTrailList(list)
+    -- A list of SatelliteTrails, with some summery info in attributes.
+    class ConstantProfile(object)
+    -- A callable object to get the profile shape of a trail
+       (constant in this case)
+    class DoubleGaussianProfile(object)
+    -- A callable object to get the profile shape of a trail
+       (A double-Gaussian in this case)
+
+    
+lsst/meas/artifact/satelliteTask.py:
+    class SatelliteFinderConfig(pexConfig.Config)
+    class SatelliteFinderTask(pipeBase.Task)
+    -- Task to wrap a SatelliteFinder
+    
+    class SatelliteConfig(pexConfig.Config)
+    class SatelliteTask(pipeBase.CmdLineTask)
+    -- Base Task for Satellite detection
+
+    class HoughSatelliteConfig(SatelliteConfig)
+    class HoughSatelliteTask(SatelliteTask)
+    -- Derived class with current implementation
+    
+    class AnotherSatelliteConfig(pexConfig.Config)
+    class AnotherSatelliteTask(SatelliteTask)
+    -- Derived example class, should someone add a new algorithm
+    
+    class PoolSatelliteConfig(pexConfig.Config)
+    class PoolSatelliteTask(basePara.BatchPoolTask)
+    -- Batch wrappers for HoughSatelliteTask
+
+
+lsst/meas/artifact/satelliteUtils.py:
+    def angleCompare(theta1, theta2, tolerance)
+    -- compare two angles, but handle wrap
+    def getExposurePsfSigma(exposure, minor=False)
+    -- helper to get the PSF sigma from an exposure
+    def separableCrossCorrelate(data, vx, vy)
+    -- 2d cross-correlate with vectors vx, vy (separably)
+    def smooth(img, sigma):
+    -- Gaussian smooth.
+    def medianRing(img, radius, width):
+    -- Smooth (filter) with a median ring.
+    def momentConvolve2d(data, k, sigma, middleOnly=False):
+    -- Do the cross-correlation for all the moments.
+
+    
+lsst/meas/artifact/mapreduce.py:
+    class MapFunc(object)
+    -- Wrap up python's multiprocessing.
+    
+lsst/meas/artifact/hough.py
+    class HoughSolutionList(list)
+    -- A namedtuple to return results from the HoughTransform
+    class HoughTransform(object)
+    -- Compute the Hough transform
+
+    def hesseForm(thetaIn, x, y)
+    -- convert to r,theta format (Hesse Normal Form)
+    def twoPiOverlap(thetaIn, arrays=None, overlapRange=0.2)
+    -- wrap angles by duplicating some points near 0 and 2pi
+    def thetaAlignment(theta, x, y, limit=3, tolerance=0.15, maxSeparation=None)
+    -- ID strong candidates based on pair-wise theta values being the same.
+    def improveCluster(theta, x, y)
+    -- Extrapolate r,theta coordinates along their derivative to get a better cluster.
+    def hesseBin(r0, theta0, bins=200, rMax=4096, thresh=40)
+    -- Do the 2D binning in r,theta and get peaks.
+    
+    
+bin/findKnownSatellites.py
+    class EventList(list)
+    -- A container for managing stats for candidates and detections
