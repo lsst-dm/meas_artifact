@@ -241,16 +241,18 @@ class SatelliteTrail(object):
         points = []
         epsilon = 1.0e-8
         if np.abs(self.vy) > epsilon:
-            for ix in 0, nx:
+            for ix in 0, nx-1:
                 y = (self.r - ix*self.vx)/self.vy
-                if (y > 0) and (y < ny):
+                if (y >= 0) and (y < ny):
                     points.append( (ix, y) )
         if np.abs(self.vx) > epsilon:
-            for iy in 0, ny:
+            for iy in 0, ny-1:
                 x = (self.r - iy*self.vy)/self.vx
-                if (x > 0) and (x < nx):
+                if (x >= 0) and (x < nx):
                     points.append( (x, iy) )
         points = sorted(points, key=lambda x: x[0])
+        if len(points) != 2:
+            points = ( (0,0), (0,0) )
         return points
     
     def length(self, nx, ny):
@@ -418,8 +420,8 @@ class SatelliteTrail(object):
         med, iqr = -1.0, -1.0
         if self.resid is not None:
             med,iqr = self.resid
-        rep = "SatelliteTrail(r=%.1f,theta=%.3f,width=%.2f,flux=%.2f,binMax=%r,resid=(%.2f,%.2f)[%dpix])" % \
-              (self.r, self.theta, self.width, self.flux, self.binMax, med, iqr, self.length(2048,4096))
+        rep = "SatelliteTrail(r=%.1f,theta=%.3f,width=%.2f,flux=%.2f,binMax=%r,resid=(%.2f,%.2f))" % \
+              (self.r, self.theta, self.width, self.flux, self.binMax, med, iqr)
         return rep
         
     def __repr__(self):

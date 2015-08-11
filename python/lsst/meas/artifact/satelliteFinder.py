@@ -350,7 +350,8 @@ class SatelliteFinder(object):
             trail.measure(exp, bins=self.bins)
             # last chance to drop it
             if trail.width < self.maxTrailWidth:
-                self.log.info(str(trail))
+                nx, ny = exposure.getWidth(), exposure.getHeight()
+                self.log.info(str(trail) + "[%dpix]" % (trail.length(nx,ny)))
                 trails.append(trail)
             else:
                 self.log.info("Dropping (maxWidth>%.1f): %s" %(self.maxTrailWidth, trail))

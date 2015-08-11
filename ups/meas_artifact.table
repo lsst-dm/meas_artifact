@@ -1,8 +1,9 @@
+setupRequired(scipy)
 setupRequired(daf_persist)
 setupRequired(meas_algorithms)
 setupRequired(afw)
 setupRequired(pex_logging)
 setupRequired(pipe_base)
 
-envAppend(PATH, ${PRODUCT_DIR}/bin}
+envAppend(PATH, ${PRODUCT_DIR}/bin)
 envPrepend(PYTHONPATH, ${PRODUCT_DIR}/python)

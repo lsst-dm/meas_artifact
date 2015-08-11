@@ -25,10 +25,12 @@ def hashDataId(dataId):
     return  (int(dataId['visit']), int(dataId['ccd']))
     
 def process(dataRef):
-    task                  = measArt.HoughSatelliteTask()
-    exposure = dataRef.get("calexp", immediate=True)
-    foundTrails, runtime = task.process(exposure)
-    return (hashDataId(dataRef.dataId), foundTrails, runtime)
+    config          = measArt.HoughSatelliteConfig()
+    #config.doBroad  = False
+    task            = measArt.HoughSatelliteTask(config=config)
+    exposure        = dataRef.get("calexp", immediate=True)
+    trails, runtime = task.process(exposure)
+    return (hashDataId(dataRef.dataId), trails, runtime)
 
     
 Event = collections.namedtuple("Event", "input detected")
@@ -83,7 +85,7 @@ class EventList(list):
 
 
         
-def main(root, threads, output, input=None, kind=None, visit=None, candidateSet=None):
+def main(root, threads, output, input=None, kind=None, visit=None, sensor=None, candidateSet=None):
 
     if not candidateSet:
         candidateSet = candi.knownCandidates
@@ -117,7 +119,9 @@ def main(root, threads, output, input=None, kind=None, visit=None, candidateSet=
         for candidate in candidateSet:
             rightKind  = kind  is None or (candidate.kind in kind)
             rightVisit = visit is None or (candidate.visit in visit)
-            if rightKind and rightVisit and (candidate.visit,candidate.ccd) not in alreadyProcessing:
+            rightSensor = sensor is None or (candidate.ccd in sensor)
+            if rightKind and rightVisit and rightSensor and \
+                    (candidate.visit,candidate.ccd) not in alreadyProcessing:
                 dataId       = {'visit': candidate.visit, 'ccd': candidate.ccd}
                 dataRef      = hscButler.getDataRef(butler, dataId)
                 mp.add(dataRef)
@@ -153,6 +157,8 @@ def main(root, threads, output, input=None, kind=None, visit=None, candidateSet=
     ####################################################################
     # Tally the results and see how we did
     runtimes = []
+    widths = collections.defaultdict(list)
+    
     for result in results:
         dataHash, foundTrails, runtime = result
         runtimes.append(runtime)
@@ -183,7 +189,7 @@ def main(root, threads, output, input=None, kind=None, visit=None, candidateSet=
             nTrail = len(foundTrails)
             
             eList = EventList()
-        
+
             t = candidate.trail
             resultMsg = ""
             #########################################
@@ -192,6 +198,8 @@ def main(root, threads, output, input=None, kind=None, visit=None, candidateSet=
             claimed = [False]*nTrail
             for iTrail,fTrail in enumerate(foundTrails):
 
+                widths[candidate.kind].append(fTrail.width)
+                
                 nMasked[candidate.kind] += fTrail.nMaskedPixels
                 nMasked['all'] += fTrail.nMaskedPixels
 
@@ -295,6 +303,10 @@ def main(root, threads, output, input=None, kind=None, visit=None, candidateSet=
     print "Runtimes:   mean=%.2f  med=%.2f  std=%.2f  min=%.2f  max=%.2f\n" % \
         (rt.mean(), np.median(rt), rt.std(), rt.min(), rt.max())
 
+    for k,v in widths.items():
+        print "Widths: %16s mean=%6.2f med=%6.2f std=%6.2f min=%6.2f max=%6.2f" % \
+            (k, np.mean(v), np.median(v), np.std(v), np.min(v), np.max(v))
+    
     with open("falsePositives.txt", 'w') as fp:
         for d, f in falsePos:
             fp.write("%s %s\n" % (str(d), str(f)))
@@ -311,6 +323,7 @@ if __name__ == '__main__':
     parser.add_argument("-j", "--threads", type=int, default=1, help="Number of threads to use")
     parser.add_argument("-k", "--kind", default=None, help="Specify kind to run.")
     parser.add_argument("-v", "--visit", default=None, help="Specify visit to run")
+    parser.add_argument("-s", "--sensor", default=None, help="Specify sensor (ccd) to run")
     parser.add_argument("-o", "--output", default="known.pickle")
     parser.add_argument("-i", "--input", default=None)
     args = parser.parse_args()
@@ -319,8 +332,10 @@ if __name__ == '__main__':
         args.kind = args.kind.split("^")
     if args.visit:
         args.visit = [int(x) for x in args.visit.split("^")]
+    if args.sensor:
+        args.sensor = [int(x) for x in args.sensor.split("^")]
     if args.output == 'None':
         args.output = None
         
     main(args.root, args.threads, args.output, args.input, kind=args.kind, visit=args.visit,
-         candidateSet=candidateSets[args.candidates])
+         sensor=args.sensor, candidateSet=candidateSets[args.candidates])

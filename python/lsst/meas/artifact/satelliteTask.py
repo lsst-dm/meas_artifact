@@ -115,14 +115,15 @@ class SatelliteFinderTask(pipeBase.Task):
 #
 #########################################################################################
 class SatelliteConfig(pexConfig.Config):    
-    debugType        = pexConfig.Field(dtype=str,   default=None,
+    debugType        = pexConfig.Field(dtype=str,   default="",
                                        doc="Types debug output to write (fits,trail)")
 
     defaultDir = os.path.join(os.environ.get("PWD"), "data")
     debugDir         = pexConfig.Field(dtype=str, default=defaultDir,
                                        doc="Directory to write debug outputs")
     
-
+    doMask     = pexConfig.Field(dtype=bool, default=True, doc="Mask detected satellite trails?")
+    
 class SatelliteTask(pipeBase.CmdLineTask):
     """Detect and mask Satellite trails and other linear features.
     """
@@ -138,6 +139,12 @@ class SatelliteTask(pipeBase.CmdLineTask):
         return parser
 
     def __init__(self, *args, **kwargs):
+        """Construct
+        """
+        # We don't use schema, but we may some day, and keeping it is
+        # consistent with other pipeline tasks.
+        
+        schema = kwargs.pop("schema", None)
         super(SatelliteTask, self).__init__(*args, **kwargs)
         
     
@@ -205,7 +212,7 @@ class SatelliteTask(pipeBase.CmdLineTask):
             self.log.info("DEBUGGING: Writing FITS in %s." % (fitsfile))
             exposure.writeFits(fitsfile)
         
-        self.runDebug(dataRef, path, **kwargs)
+        self.runDebug(dataRef, path, debugType)
 
         return trails, timing
 
@@ -239,6 +246,9 @@ class SatelliteTask(pipeBase.CmdLineTask):
 
         Derived classes shouldn't need to overload this method. 
         """
+
+        if not self.config.doMask:
+            return 0
         
         ###################
         # mask any trails
@@ -266,7 +276,7 @@ class SatelliteTask(pipeBase.CmdLineTask):
         """
         raise NotImplementedError("You must implement runSatellite() in your derived class.")
 
-    def runDebug(self, dataRef, path, **kwargs):
+    def runDebug(self, dataRef, path, debugType):
         """Method to run custom debugging routine.
 
         @param dataRef        Butler DataRef for e.g. visit,ccd
@@ -325,7 +335,7 @@ class HoughSatelliteConfig(SatelliteConfig):
         self.narrow.kernelWidth     = 11     # pixels
         self.narrow.growKernel      = 1.4
         self.narrow.houghBins       = 200
-        self.narrow.houghThresh     = 40
+        self.narrow.houghThresh     = 25
         self.narrow.maxTrailWidth   = 2.0 # multiple of binning
         self.narrow.maskAndBits     = ("DETECTED",)
 
@@ -345,7 +355,7 @@ class HoughSatelliteConfig(SatelliteConfig):
         self.broad.kernelWidth     = 15            # pixels
         self.broad.growKernel      = 1.4 
         self.broad.houghBins       = 200      
-        self.broad.houghThresh     = 40     
+        self.broad.houghThresh     = 50     
         self.broad.maxTrailWidth   = 2.0 # a multiple of binning
         self.broad.maskAndBits     = ()
 
@@ -394,11 +404,10 @@ class HoughSatelliteTask(SatelliteTask):
         return trails, time.time() - t0
 
 
-    def runDebug(self, dataRef, path, **kwargs):
+    def runDebug(self, dataRef, path, debugType):
         """Custom debug output for this SatelliteFinder
         """
 
-        debugType     = kwargs.get("debugType", ())
         v,c = dataRef.dataId['visit'], dataRef.dataId['ccd']
         
         # plot trails
