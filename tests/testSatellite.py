@@ -4,6 +4,8 @@ import sys, os
 import unittest
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.figure as figure
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigCanvas
 import lsst.utils.tests as utilsTests
 import lsst.afw.image as afwImage
 import lsst.meas.algorithms as measAlg
@@ -343,10 +345,13 @@ class SatelliteTestCase(utilsTests.TestCase):
         # if you need to look at it
         if False:
             r0, theta0 = measArt.hesseForm(t-np.pi/2.0, x, y)
-            plt.plot(theta0, r0, 'k.')
-            plt.plot(tNew, rNew, '.r')
-            plt.plot([tEst], [rEst], 'go')
-            plt.savefig("improveCluster.png")
+            fig = figure.Figure()
+            can = FigCanvas(fig)
+            ax = fig.add_subplot(111)
+            ax.plot(theta0, r0, 'k.')
+            ax.plot(tNew, rNew, '.r')
+            ax.plot([tEst], [rEst], 'go')
+            fig.savefig("improveCluster.png")
 
         self.assertLess(np.abs(rEst - r), 1.0)
         self.assertLess(np.abs(tEst - theta), 0.001)
@@ -448,13 +453,16 @@ class SatelliteTestCase(utilsTests.TestCase):
             self.assertTrue(found2)
 
             
-        plt.imshow(img, origin='lower', cmap='gray')
+        fig = figure.Figure()
+        can = FigCanvas(fig)
+        ax = fig.add_subplot(111)
+        ax.imshow(img, origin='lower', cmap='gray')
         for trail in trailsTask:
             x1, y1 = trail.trace(nx, ny, offset=10)
             x2, y2 = trail.trace(nx, ny, offset=-10)
-            plt.plot(x1, y1, 'r-')
-            plt.plot(x2, y2, 'r-')
-        plt.savefig("fake.png")
+            ax.plot(x1, y1, 'r-')
+            ax.plot(x2, y2, 'r-')
+        fig.savefig("fake.png")
             
 
     def testPixelSelector(self):

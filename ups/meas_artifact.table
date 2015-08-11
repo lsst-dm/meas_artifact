@@ -1,5 +1,5 @@
 setupRequired(scipy)
-setupRequired(daf_persist)
+setupRequired(daf_persistence)
 setupRequired(meas_algorithms)
 setupRequired(afw)
 setupRequired(pex_logging)

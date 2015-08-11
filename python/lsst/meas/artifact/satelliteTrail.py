@@ -241,12 +241,12 @@ class SatelliteTrail(object):
         points = []
         epsilon = 1.0e-8
         if np.abs(self.vy) > epsilon:
-            for ix in 0, nx-1:
+            for ix in 0, nx:
                 y = (self.r - ix*self.vx)/self.vy
                 if (y >= 0) and (y < ny):
                     points.append( (ix, y) )
         if np.abs(self.vx) > epsilon:
-            for iy in 0, ny-1:
+            for iy in 0, ny:
                 x = (self.r - iy*self.vy)/self.vx
                 if (x >= 0) and (x < nx):
                     points.append( (x, iy) )
