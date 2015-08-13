@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import numpy          as np
+import copy
 import matplotlib.pyplot as plt
 import lsst.afw.image as afwImage
 
@@ -159,8 +160,8 @@ class SatelliteTrail(object):
         @param maskAndBits  Only mask pixels with these bits set.
         """
 
-        self.r        = r
-        self.theta    = theta
+        self._r       = r
+        self._theta   = theta
         self.vx       = np.cos(theta)
         self.vy       = np.sin(theta)
         
@@ -175,6 +176,22 @@ class SatelliteTrail(object):
         self.maskAndBits  = maskAndBits
         
         self.nMaskedPixels  = 0
+
+    @property
+    def r(self):
+        return self._r
+    @r.setter
+    def r(self, value):
+        self._r = value
+    @property
+    def theta(self):
+        return self._theta
+    @theta.setter
+    def theta(self, value):
+        self._theta = value
+        self.vx = np.cos(value)
+        self.vy = np.sin(value)
+
         
     @classmethod
     def fromHoughSolution(cls, solution, bins):
@@ -293,7 +310,19 @@ class SatelliteTrail(object):
 
         return np.rint(x).astype(int), np.rint(y).astype(int)
 
-
+    
+    def shiftOrigin(self, dx, dy):
+        dr       = dx*self.vx + dy*self.vy
+        rNew     = self.r - dr
+        thetaNew = self.theta
+        if rNew < 0.0:
+            rNew *= -1.0
+            thetaNew += np.pi if thetaNew < np.pi else -np.pi
+        trail = copy.copy(self)
+        trail.r = rNew
+        trail.theta = thetaNew
+        return trail
+        
     def residual(self, x, y, bins=1):
         """Get residuals of this fit compared to given x,y coords.
 

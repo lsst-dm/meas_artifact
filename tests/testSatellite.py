@@ -207,6 +207,43 @@ class SatelliteTestCase(utilsTests.TestCase):
             test = np.abs(img - fake) > 0.0
             self.assertFalse(test.any())
 
+            
+    def testShiftOrigin(self):
+        """Verify trail origin shift works."""
+
+        # make a trail and shift the origin
+        # be sure to shift enough so that we test the
+        # reversal in theta when the sign of r changes.
+        angle = np.pi/6.0
+        trail = measArt.SatelliteTrail(r=1000.0,theta=angle)
+
+        delta = 500.0, 1000.0, 1500.0
+        for d in delta:
+
+            # try x
+            t = trail.shiftOrigin(d, 0.0)
+            rExpected = trail.r - d*np.cos(angle)
+            self.assertAlmostEquals(t.r,      np.abs(rExpected))
+            tExpected = angle if rExpected >= 0 else angle + np.pi
+            self.assertAlmostEquals(t.theta,  tExpected)
+
+            # and round-trip
+            t2 = t.shiftOrigin(-d, 0.0)
+            self.assertAlmostEquals(t2.r, trail.r)
+            self.assertAlmostEquals(t2.theta, trail.theta)
+            
+            # try y
+            t = trail.shiftOrigin(0.0, d)
+            rExpected = trail.r - d*np.sin(angle)
+            self.assertAlmostEquals(t.r,      np.abs(rExpected))
+            tExpected = angle if rExpected >= 0 else angle + np.pi
+            self.assertAlmostEquals(t.theta,  tExpected)
+
+            # and round-trip
+            t2 = t.shiftOrigin(0.0, -d)
+            self.assertAlmostEquals(t2.r, trail.r)
+            self.assertAlmostEquals(t2.theta, trail.theta)
+
 
     def testHesseForm(self):
         """Verify hesse form conversion"""
