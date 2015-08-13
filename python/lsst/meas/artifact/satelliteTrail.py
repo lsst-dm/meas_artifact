@@ -301,7 +301,7 @@ class SatelliteTrail(object):
         @param y   array of y pixel coord
         """
 
-        dr = x*cos(t) + y*sin(t) - self.r/bins
+        dr = x*self.vx + y*self.vy - self.r/bins
         return dr
 
         
