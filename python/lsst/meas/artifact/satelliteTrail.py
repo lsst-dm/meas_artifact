@@ -104,7 +104,7 @@ class ConstantProfile(object):
 
         @param offset  A distance from the center.
         """
-        w  = (offset <= self.width/2.0).astype(type(self.value))
+        w  = (offset <= self.width/2.0)
         return self.value*w
 
     
@@ -374,7 +374,7 @@ class SatelliteTrail(object):
         # only bother updating the pixels within width
         w = (offset < width/2.0)
         #img += profile(offset)
-        img[w] += profile(offset[w])
+        img[w] += profile(offset[w]).astype(img.dtype)
         return img
 
 

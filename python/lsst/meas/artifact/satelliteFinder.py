@@ -223,7 +223,6 @@ class SatelliteFinder(object):
 
         # scale the detected pixels
         if np.abs(self.scaleDetected - 1.0) > 1.0e-6:
-            self.log.logdebug("Scaling detected")
             wDet       = msk & DET > 0
             sig = imgClip.std()
             wSig = img > 2.0*sig
@@ -232,7 +231,6 @@ class SatelliteFinder(object):
 
         # subtract a small scale background when we search for PSFs
         if self.doBackground:
-            self.log.logdebug("Median ring background")
             back       = satUtil.medianRing(imgClip, self.kernelWidth, 2.0*self.sigmaSmooth)
             img       -= back
             imgClip   -= back
@@ -254,7 +252,7 @@ class SatelliteFinder(object):
         # but would be less likely to for noise.
         # Unfortunately, this is costly, and the effect is small.
         for kernelFactor in (1.0, self.growKernel):
-            self.log.logdebug("Getting moments growKernel=%.1f" % (self.growKernel))
+            self.log.info("Getting moments growKernel=%.1f" % (self.growKernel))
             kernelWidth = 2*int((kernelFactor*self.kernelWidth)//2) + 1
             kernelSigma = kernelFactor*self.kernelSigma 
 
@@ -303,10 +301,10 @@ class SatelliteFinder(object):
                 isKernelCandidate |= pixels
 
                 msg = "cand: nPix: %d  tot: %d" % (pixels.sum(), isKernelCandidate.sum())
-                self.log.logdebug(msg)
+                self.log.info(msg)
 
             isCandidate &= isKernelCandidate
-            self.log.logdebug("total: %d" % (isCandidate.sum()))
+            self.log.info("total: %d" % (isCandidate.sum()))
 
             nHits.append((widths[i], isKernelCandidate.sum()))
         
@@ -316,7 +314,6 @@ class SatelliteFinder(object):
         ###############################################
         # Theta Alignment
         ###############################################
-        self.log.logdebug("Theta alignment.")
         xx, yy = np.meshgrid(np.arange(img.shape[1], dtype=int), np.arange(img.shape[0], dtype=int))
         nBeforeAlignment = isCandidate.sum()
         maxSeparation = min([x/2 for x in img.shape])
@@ -327,12 +324,11 @@ class SatelliteFinder(object):
         mm.theta[isCandidate] = newTheta
         isCandidate[isCandidate] = thetaMatch
         nAfterAlignment = isCandidate.sum()
-        self.log.logdebug("theta-alignment Bef/aft: %d / %d" % (nBeforeAlignment, nAfterAlignment))
+        self.log.info("theta-alignment Bef/aft: %d / %d" % (nBeforeAlignment, nAfterAlignment))
 
         #################################################
         # Hough transform
         #################################################
-        self.log.logdebug("Hough Transform.")
         rMax           = np.linalg.norm(img.shape)
         houghTransform = hough.HoughTransform(self.houghBins, self.houghThresh, rMax=rMax,
                                               maxPoints=1000, nIter=1, maxResid=5.5, log=self.log)
@@ -341,7 +337,6 @@ class SatelliteFinder(object):
         #################################################
         # Construct Trail objects from Hough solutions
         #################################################
-        self.log.logdebug("Constructing SatelliteTrail objects.")
         trails = satTrail.SatelliteTrailList(nAfterAlignment, solutions.binMax, psfSigma)
         for s in solutions:
             trail = satTrail.SatelliteTrail.fromHoughSolution(s, self.bins)

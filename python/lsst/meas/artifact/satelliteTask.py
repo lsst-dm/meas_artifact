@@ -13,11 +13,9 @@ import lsst.pex.config as pexConfig
 import lsst.afw.math as afwMath
 import lsst.afw.image as afwImage
 
-import hsc.pipe.base.butler as hscButler
-import hsc.pipe.base.pool as basePool
-import hsc.pipe.base.parallel as basePara
-
-basePool.Debugger().enabled = True
+from lsst.pipe.drivers.utils import getDataRef
+from lsst.ctrl.pool.pool import abortOnError, Pool, NODE
+from lsst.ctrl.pool.parallel import BatchPoolTask
 
 import satelliteFinder as satFind
 import satelliteDebug  as satDebug
@@ -510,7 +508,7 @@ class PoolSatelliteConfig(pexConfig.Config):
     satellite    = pexConfig.ConfigurableField(target=HoughSatelliteTask, doc="satellite")
 
     
-class PoolSatelliteTask(basePara.BatchPoolTask):
+class PoolSatelliteTask(BatchPoolTask):
     """A batch job processor for SatelliteTask
 
     You should almost never need to run this unless you're doing some development
@@ -518,7 +516,7 @@ class PoolSatelliteTask(basePara.BatchPoolTask):
     just like e.g. reduceFrames.py or multiBand.py (i.e. the pipeline batch processors)
     """
     
-    RunnerClass = hscButler.ButlerTaskRunner
+    RunnerClass = pipeBase.ButlerInitializedTaskRunner
     ConfigClass = PoolSatelliteConfig
     _DefaultName = "poolSatellite"
 
@@ -549,7 +547,7 @@ class PoolSatelliteTask(basePara.BatchPoolTask):
                                help="data ID, e.g. --id visit=12345")
         return parser
 
-    @basePool.abortOnError
+    @abortOnError
     def run(self, expRef, butler):
         """Handle the scatter/gather (or map/reduce if you prefer) for satellite detection jobs.
 
@@ -559,7 +557,7 @@ class PoolSatelliteTask(basePara.BatchPoolTask):
         @param butler   The butler to get the data.
         """
         
-        pool = basePool.Pool("poolSatellite")
+        pool = Pool("poolSatellite")
         pool.cacheClear()
         pool.storeSet(butler=butler)
 
@@ -577,11 +575,11 @@ class PoolSatelliteTask(basePara.BatchPoolTask):
         
     def process(self, cache, dataId):
         """Process this dataId."""
-        
-        dataRef = hscButler.getDataRef(cache.butler, dataId, datasetType="src")
+
+        dataRef = getDataRef(cache.butler, dataId, datasetType="src")
         ccdId = dataRef.get("ccdExposureId")
 
-        with self.logOperation("Started satellite %s (ccdId=%d) on %s" % (dataId, ccdId, basePool.NODE)):
+        with self.logOperation("Started satellite %s (ccdId=%d) on %s" % (dataId, ccdId, NODE)):
             try:
                 # *** HERE's the important call ***
                 result = self.satellite.run(dataRef)
@@ -595,6 +593,6 @@ class PoolSatelliteTask(basePara.BatchPoolTask):
                 # Cache the results (in particular, the image)
                 cache.result = result
 
-            self.log.info("Finished satellite %s (ccdId=%d) on %s" % (dataId, ccdId, basePool.NODE))
+            self.log.info("Finished satellite %s (ccdId=%d) on %s" % (dataId, ccdId, NODE))
             return pipeBase.Struct(ccdId=ccdId)
 

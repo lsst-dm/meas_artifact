@@ -6,7 +6,6 @@ import cPickle as pickle
 import numpy as np
 
 import lsst.daf.persistence as dafPersist
-import hsc.pipe.base.butler as hscButler
 
 import lsst.meas.artifact as measArt
 
@@ -123,7 +122,11 @@ def main(root, threads, output, input=None, kind=None, visit=None, sensor=None, 
             if rightKind and rightVisit and rightSensor and \
                     (candidate.visit,candidate.ccd) not in alreadyProcessing:
                 dataId       = {'visit': candidate.visit, 'ccd': candidate.ccd}
-                dataRef      = hscButler.getDataRef(butler, dataId)
+                dataRefList = [ref for ref in butler.subset("calexp", **dataId)]
+                assert len(dataRefList) == 1
+                dataRef = dataRefList.pop()
+                if not dataRef.datasetExists():
+                    continue
                 mp.add(dataRef)
                 alreadyProcessing.add( (candidate.visit, candidate.ccd) )
         results = mp.run()
