@@ -137,16 +137,12 @@ def thetaAlignment(theta, x, y, limit=3, tolerance=0.15, maxSeparation=None):
     w, = np.where(nCand > cut)
     for i in w:
         # this will fail near +-pi
-        pixelTheta = thetaXY[i,aligned[i,:]]
-        idx        = np.argsort(pixelTheta)
-        diff       = np.diff(pixelTheta[idx])
-        didx       = (diff < closeNeighbourTolerance[i]) & (diff > 1.0e-8)
-
-        # how many collisions do we actually have?
-        nNearNeighbours[i]      = didx.sum()
-
+        pixelTheta = np.sort(thetaXY[i,aligned[i,:]])
+        diff = np.diff(pixelTheta)
+        select = (diff < closeNeighbourTolerance[i]) & (diff > 1.0e-8)
+        nNearNeighbours[i] = select.sum()
         if nNearNeighbours[i] >= limit:
-            pixTheta = pixelTheta[idx[didx]]  #they're sorted
+            pixTheta = 0.5*(pixelTheta[:-1] + pixelTheta[1:])[select]
             idxMedian = len(pixTheta)//2
             newThetas[i] = pixTheta[idxMedian]
             
