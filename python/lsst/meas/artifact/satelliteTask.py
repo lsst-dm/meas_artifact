@@ -209,7 +209,21 @@ class SatelliteTask(pipeBase.CmdLineTask):
             fitsfile = os.path.join(path,"exp%04d-%03d.fits"%(visit, ccd))
             self.log.info("DEBUGGING: Writing FITS in %s." % (fitsfile))
             exposure.writeFits(fitsfile)
-        
+
+        if 'ds9' in debugType:
+            import lsst.afw.display.ds9 as ds9
+            mask = exposure.getMaskedImage().getMask()
+            old = mask.getArray().copy()
+            try:
+                mask &= ~mask.getPlaneBitMask(["DETECTED", "NOT_DEBLENDED"])
+                ds9.setMaskPlaneColor('SATELLITE', color="orange", frame=1)
+                ds9.setMaskTransparency(80, frame=1)
+                ds9.scale("zscale", "zscale", frame=1)
+                ds9.mtv(exposure, frame=1)
+            finally:
+                mask.getArray()[:] = old
+            import pdb;pdb.set_trace()
+
         self.runDebug(dataRef, path, debugType)
 
         return trails, timing
