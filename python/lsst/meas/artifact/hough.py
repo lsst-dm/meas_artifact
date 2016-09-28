@@ -101,7 +101,7 @@ def thetaAlignment(theta, x, y, limit=3, tolerance=0.15, maxSeparation=None):
     The factor of 2 arises because a point may preceed or follow.
     """
     
-    n = len(theta)
+    num = len(theta)
 
     dx        = np.subtract.outer(x, x)
     dy        = np.subtract.outer(y, y)
@@ -121,7 +121,7 @@ def thetaAlignment(theta, x, y, limit=3, tolerance=0.15, maxSeparation=None):
     else:
         aligned   = aligned1 & aligned2
         
-    nNearNeighbours = np.zeros(n)
+    nNearNeighbours = np.zeros(num)
     newThetas = copy.copy(theta)
     
     # Using variable names  pCloseNeighbour = e^(2*nCand*closeNeighbourTolerance/tolerance)

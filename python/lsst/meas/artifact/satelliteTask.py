@@ -168,12 +168,12 @@ class SatelliteTask(pipeBase.CmdLineTask):
         # these should be replaced by 'visit-like-thing' and 'ccd-like-thing'
         # The values are used only in logs and in filenames used when
         # debugging is enabled.
-        v,c = dataRef.dataId['visit'], dataRef.dataId['ccd']
+        visit, ccd = dataRef.dataId['visit'], dataRef.dataId['ccd']
                 
         ###############################################
         # Do the work
         ###############################################
-        self.log.info("Detecting satellite trails in visit=%d, ccd=%d)" % (v,c))
+        self.log.info("Detecting satellite trails in visit=%d, ccd=%d)" % (visit, ccd))
         
         exposure = dataRef.get('calexp', immediate=True)
         trails, timing = self.process(exposure)
@@ -187,7 +187,7 @@ class SatelliteTask(pipeBase.CmdLineTask):
         # very slow. 
         ################################################
         debugDir = self.config.debugDir
-        path = os.path.join(debugDir, "%04d" %(v))
+        path = os.path.join(debugDir, "%04d" % (visit,))
         debugType     = self.config.debugType
         debugType = debugType.split(",") if debugType else ()
         if debugType:
@@ -198,15 +198,15 @@ class SatelliteTask(pipeBase.CmdLineTask):
 
         # dump trails to a pickle
         if 'trail' in debugType:
-            picfile = os.path.join(path, "trails%05d-%03d.pickle" % (v,c))
+            picfile = os.path.join(path, "trails%05d-%03d.pickle" % (visit, ccd))
             self.log.info("DEBUGGING: Pickling results in %s." % (picfile))
             with open(picfile, 'w') as fp:
-                bundle = ((v,c), trails, timing)
+                bundle = ((visit, ccd), trails, timing)
                 pickle.dump(bundle, fp)
 
         # Debugging: Write to FITS
         if 'fits' in debugType:
-            fitsfile = os.path.join(path,"exp%04d-%03d.fits"%(v,c))
+            fitsfile = os.path.join(path,"exp%04d-%03d.fits"%(visit, ccd))
             self.log.info("DEBUGGING: Writing FITS in %s." % (fitsfile))
             exposure.writeFits(fitsfile)
         
