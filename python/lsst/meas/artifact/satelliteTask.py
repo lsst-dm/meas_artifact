@@ -192,7 +192,7 @@ class SatelliteTask(pipeBase.CmdLineTask):
         debugType = debugType.split(",") if debugType else ()
         if debugType:
             try:
-                os.mkdir(path)
+                os.makedirs(path)
             except:
                 pass
 
