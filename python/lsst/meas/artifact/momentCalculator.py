@@ -212,6 +212,7 @@ class PixelSelector(list):
         val         = getattr(self.momentManager,    limit.name)
         expectation = getattr(self.calMomentManager, limit.name)
         norm        = (val - expectation)/np.abs(limit.value)
+        print "%s: expectation=%f" % (limit.name, expectation)
         if limit.limitType == 'lower':
             test = norm > 1.0
         elif limit.limitType == 'center':
@@ -231,6 +232,7 @@ class PixelSelector(list):
         for limit in self:
             test = self._test(limit)
             accumulator &= test
+            print "%s: %d --> %d" % (limit.name, test.sum(), accumulator.sum())
 
         if maxPixels:
             # a no-op since we have no way to choose.  We could selected randomly?
@@ -329,6 +331,9 @@ class PValuePixelSelector(PixelSelector):
         # 0.7-sigma:  0.25  # 52% accepted
         # 0.5-sigma:  0.125 # 38% accepted
         thresh1 = self.thresh or -0.125*n #-0.5*n
+
+        thresh1 = -0.5*n
+
         ret = logp > thresh1        
 
         if maxPixels:

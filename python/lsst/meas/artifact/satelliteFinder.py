@@ -18,6 +18,18 @@ import momentCalculator as momCalc
 import satelliteDebug   as satDebug
 
 
+def displayArray(array, frame, title=None):
+    import lsst.afw.display.ds9 as ds9
+    typemap = {np.dtype(t1): t2 for t1, t2 in
+               (("int32", afwImage.ImageI),
+                ("bool", afwImage.ImageU),
+                ("float32", afwImage.ImageF))}
+
+    dummy = typemap[array.dtype](*reversed(array.shape))
+    dummy.getArray()[:] = array
+    ds9.mtv(dummy, frame=frame, title=title)
+
+
 class SatelliteFinder(object):
     """Class to find satellite trails and other linear features in images.
 
@@ -164,12 +176,20 @@ class SatelliteFinder(object):
         # otherwise, use a double gaussian
         else:
             profile  = satTrail.DoubleGaussianProfile(1.0, width/2.0 + psfSigma)
-            insertWidth = 4.0*(width/2.0 + psfSigma)
+            insertWidth = self.bins*kernelWidth # 4.0*(width/2.0 + psfSigma)
         calTrail.insert(calArr, profile, insertWidth)
+
+        if False:
+            displayArray(calArr, frame=2, title="Calibration image, unsmoothed")
+            import pdb;pdb.set_trace()
 
         # Now bin and smooth, just as we did the real image
         calArr   = afwMath.binImage(calImg, self.bins).getArray()
         calArr   = satUtil.smooth(calArr, self.sigmaSmooth)
+
+        if False:
+            displayArray(calArr, frame=2, title="Calibration image, smoothed")
+            import pdb;pdb.set_trace()
 
         return calArr
 
@@ -190,6 +210,8 @@ class SatelliteFinder(object):
             MASK |= emsk.getPlaneBitMask(plane)
         
         t1 = time.time()
+
+        import pdb;pdb.set_trace()
 
         #################################################
         # Main detection image
@@ -241,6 +263,9 @@ class SatelliteFinder(object):
         imgClip   = satUtil.smooth(imgClip, self.sigmaSmooth)
         rms       = imgClip[(mskClip & (MASK | DET) == 0)].std()
 
+        if True:
+            import lsst.afw.display.ds9 as ds9
+            ds9.mtv(exp, frame=1, title="Image")
         
         isCandidate = np.ones(img.shape, dtype=bool)
 
@@ -248,11 +273,14 @@ class SatelliteFinder(object):
         # Try different kernel sizes
         ###########################################
         
+        mmCals = []
+        nHits = []
+
         # Different sized kernels should give the same results for a real trail
         # but would be less likely to for noise.
         # Unfortunately, this is costly, and the effect is small.
         for kernelFactor in (1.0, self.growKernel):
-            self.log.info("Getting moments growKernel=%.1f" % (self.growKernel))
+            self.log.info("Getting moments with kernel grown by factor of %.1f" % (kernelFactor,))
             kernelWidth = 2*int((kernelFactor*self.kernelWidth)//2) + 1
             kernelSigma = kernelFactor*self.kernelSigma 
 
@@ -273,8 +301,16 @@ class SatelliteFinder(object):
             #################################################
             mm       = momCalc.MomentManager(img, kernelWidth=kernelWidth, kernelSigma=kernelSigma)
 
-            mmCals = []
-            nHits = []
+            if True:
+                displayArray(mm.imageMoment.ix, frame=2, title="Ix")
+                displayArray(mm.imageMoment.iy, frame=3, title="Iy")
+                ellip, theta, b = momCalc.momentToEllipse(mm.imageMoment.ixx, mm.imageMoment.iyy, mm.imageMoment.ixy)
+                displayArray(ellip, frame=4, title="Ellip")
+                displayArray(b, frame=5, title="b")
+                displayArray(np.sqrt(mm.imageMoment.ixxx**2 + mm.imageMoment.iyyy**2), frame=6, title="Skew")
+                print "KernelFactor=%f bins=%d" % (kernelFactor, self.bins)
+                import pdb;pdb.set_trace()
+
 
             #Selector = momCalc.PixelSelector
             Selector = momCalc.PValuePixelSelector
@@ -282,6 +318,10 @@ class SatelliteFinder(object):
             for i, calImg in enumerate(calImages):
                 mmCal = momCalc.MomentManager(calImg, kernelWidth=kernelWidth, kernelSigma=kernelSigma, 
                                               isCalibration=True)
+
+                self.log.info("Width=%f kernelFactor=%f bins=%d: sumI=%f center=%f centerPerp=%f skew=%f skewPerp=%f ellip=%f b=%f" %
+                              (widths[i], kernelFactor, self.bins, mmCal.sumI, mmCal.center, mmCal.center_perp, mmCal.skew, mmCal.skew_perp, mmCal.ellip, mmCal.b))
+
                 mmCals.append(mmCal)
 
                 sumI  = momCalc.MomentLimit('sumI',        self.luminosityLimit*rms, 'lower')
@@ -293,21 +333,41 @@ class SatelliteFinder(object):
                 b     = momCalc.MomentLimit('b',           self.bLimit,              'center')
 
                 selector = Selector(mm, mmCal)
-                for limit in sumI, ellip, cent, centP, skew, skewP, b:
+                for limit in (
+                    sumI,
+                    ellip,
+                    cent,
+                    centP,
+                    skew,
+                    skewP,
+                    b
+                    ):
                     selector.append(limit)
 
                 pixels      = selector.getPixels(maxPixels=maxPixels)
-                    
+
+                if True:
+                    displayArray(pixels, frame=7, title="Selected pixels for width")
+                    print "Width=%f kernelFactor=%f bins=%d" % (widths[i], kernelFactor, self.bins)
+                    import pdb;pdb.set_trace()
+
+
                 isKernelCandidate |= pixels
+
+                nHits.append((widths[i], isKernelCandidate.sum()))
 
                 msg = "cand: nPix: %d  tot: %d" % (pixels.sum(), isKernelCandidate.sum())
                 self.log.info(msg)
 
+
             isCandidate &= isKernelCandidate
             self.log.info("total: %d" % (isCandidate.sum()))
 
-            nHits.append((widths[i], isKernelCandidate.sum()))
-        
+            if True:
+                displayArray(isCandidate, frame=8, title="Selected pixels so far")
+                import pdb;pdb.set_trace()
+
+       
         bestCal = sorted(nHits, key=lambda x: x[1], reverse=True)[0]
         bestWidth = bestCal[0]
 
@@ -326,12 +386,15 @@ class SatelliteFinder(object):
         nAfterAlignment = isCandidate.sum()
         self.log.info("theta-alignment Bef/aft: %d / %d" % (nBeforeAlignment, nAfterAlignment))
 
+        if True:
+            displayArray(isCandidate, frame=9, title="Selected pixels for Hough")
+
         #################################################
         # Hough transform
         #################################################
         rMax           = np.linalg.norm(img.shape)
         houghTransform = hough.HoughTransform(self.houghBins, self.houghThresh, rMax=rMax,
-                                              maxPoints=1000, nIter=1, maxResid=5.5, log=self.log)
+                                              maxPoints=10000, nIter=1, maxResid=5.5, log=self.log)
         solutions      = houghTransform(mm.theta[isCandidate], xx[isCandidate], yy[isCandidate])
 
         #################################################

@@ -349,7 +349,7 @@ class HoughSatelliteConfig(SatelliteConfig):
         self.narrow.houghBins       = 200
         self.narrow.houghThresh     = 25
         self.narrow.maxTrailWidth   = 2.0 # multiple of binning
-        self.narrow.maskAndBits     = ("DETECTED",)
+#        self.narrow.maskAndBits     = ("DETECTED",)
 
         # out-of-focus aircraft default
         self.broad.bins            = 8

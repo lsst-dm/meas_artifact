@@ -145,7 +145,7 @@ def thetaAlignment(theta, x, y, limit=3, tolerance=0.15, maxSeparation=None):
             pixTheta = 0.5*(pixelTheta[:-1] + pixelTheta[1:])[select]
             idxMedian = len(pixTheta)//2
             newThetas[i] = pixTheta[idxMedian]
-            
+      
     isCandidate = nNearNeighbours >= limit
 
     return isCandidate, newThetas
